@@ -9,6 +9,7 @@ open PSO
 open Backtester
 open XPlot.Plotly
 
+
 [<EntryPoint>]
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
@@ -32,7 +33,7 @@ let main argv =
     let samples = Array.zeroCreate 10 |> Array.map (fun x -> ghostModel|> Models.sample 1500 |> Array.scan (+) 0.0)
     let Runs = samples |> Array.Parallel.map (fun x -> Backtester.run settings x)
     let PnLs = Runs |> Array.map (fun x -> x |> Backtester.computePnL |> Array.fold (+) 0.0)
-    printfn "%A" PnLs *)
+    printfn "%A" PnLs*)
 
 
     stopWatch.Stop()

@@ -3,7 +3,9 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net472</TargetFramework> 
 
-    <WarnOn>3390;$(WarnOn)</WarnOn>
+    <WarnOn>3390;$(WarnOn)</WarnOn> 
+
+    <AssemblyName>ProbaDingue</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +24,7 @@
 
   <ItemGroup>
     <PackageReference Include="MathNet.Numerics" Version="4.15.0" />
+    <PackageReference Include="MathNet.Numerics.FSharp" Version="4.15.0" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
     <PackageReference Include="System.Runtime.Numerics" Version="4.3.0" />
     <PackageReference Include="XPlot.GoogleCharts" Version="3.0.1" />
