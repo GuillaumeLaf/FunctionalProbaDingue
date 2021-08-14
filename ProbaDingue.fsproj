@@ -13,6 +13,7 @@
     <Compile Include="PSO_algorithm.fs" />
     <Compile Include="Utilities.fs" />
     <Compile Include="Distributions.fs" />
+    <Compile Include="Models\DrawModel.fs" />
     <Compile Include="Models\ModelsTypes.fs" />
     <Compile Include="Models\Models.fs" />
     <Compile Include="Backtester\BacktesterTypes.fs" />
@@ -31,5 +32,9 @@
     <PackageReference Include="XPlot.GoogleCharts.WPF" Version="1.3.0" />
     <PackageReference Include="XPlot.Plotly" Version="4.0.3" />
     <PackageReference Include="XPlot.Plotly.WPF" Version="1.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
   </ItemGroup>
 </Project>
