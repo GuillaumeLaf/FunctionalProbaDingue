@@ -13,12 +13,17 @@ module Model =
     let inline ( -. ) (N1:Skeleton) (N2:Skeleton) = Node(Substraction, N1, N2)
     let inline ( <. ) (N1:Skeleton) (N2:Skeleton) = Node(LessThan, N1, N2)
 
-    let foldSkeleton nodeF leafV g = 
+    let foldSkeleton nodeF leafV sk = 
         let rec loop n k = 
             match n with
                 | Node(op,left,right) -> nodeF op (loop left) (loop right) n k
                 | Leaf(input,x,idx) -> leafV input x idx n k
-        loop g id
+        loop sk id
+
+    let heightSkeleton skeleton = 
+        foldSkeleton (fun _ kl kr _ k -> kl (fun lacc -> kr (fun racc -> (1 + max lacc racc) |> k)))
+                     (fun _ _ _ _ k -> 1 |> k)
+                     skeleton
 
     let forwardPass (Graph(GraphState(p,v,innov,prevResult),skeleton)) = 
         foldSkeleton (fun op kl kr _ k -> match op with

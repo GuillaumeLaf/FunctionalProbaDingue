@@ -13,9 +13,9 @@
     <Compile Include="PSO_algorithm.fs" />
     <Compile Include="Utilities.fs" />
     <Compile Include="Distributions.fs" />
-    <Compile Include="Models\DrawModel.fs" />
     <Compile Include="Models\ModelsTypes.fs" />
     <Compile Include="Models\Models.fs" />
+    <Compile Include="Models\DrawModel.fs" />
     <Compile Include="Backtester\BacktesterTypes.fs" />
     <Compile Include="Backtester\DataHandling.fs" />
     <Compile Include="Backtester\Strategies.fs" />
