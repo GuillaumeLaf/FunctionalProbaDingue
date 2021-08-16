@@ -14,6 +14,8 @@
     <Compile Include="Utilities.fs" />
     <Compile Include="Distributions.fs" />
     <Compile Include="Models\ModelsTypes.fs" />
+    <Compile Include="Models\Graph.fs" />
+    <Compile Include="Models\Nodes.fs" />
     <Compile Include="Models\Models.fs" />
     <Compile Include="Models\DrawModel.fs" />
     <Compile Include="Backtester\BacktesterTypes.fs" />
