@@ -7,3 +7,5 @@ This Project constitutes my first real attempt at making a viable algorithmic tr
 ## Major Techniques
 + Computational Graphs
 + Optimization (global - local)
+..+ Particle Swarm Optimization
+..+ BFGS (with MathNet.Numerics)
