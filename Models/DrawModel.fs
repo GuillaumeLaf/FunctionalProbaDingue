@@ -68,12 +68,12 @@ module DrawModel =
                                      | Multiplication -> drawNodeAt point ("*"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
                                      | Substraction -> drawNodeAt point ("-"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
                                      | LessThan -> drawNodeAt point ("<"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
-            | Leaf(input,x,idx) -> match input with
-                                   | Innovation -> (drawLeafAt innovationPen point (string(idx))) |> k   // input arrays must at least be the same length as the number of innovation nodes.
-                                   | Parameter -> (drawLeafAt parameterPen point (string(idx))) |> k
-                                   | Variable -> (drawLeafAt variablePen point (string(idx))) |> k
-                                   | PreviousResult -> (drawLeafAt nodePen point (string(idx))) |> k
-                                   | Constant -> (drawLeafAt constantPen point (string(idx))) |> k
+            | Leaf(input,x,idx,_) -> match input with
+                                     | Innovation -> (drawLeafAt innovationPen point (string(idx))) |> k   // input arrays must at least be the same length as the number of innovation nodes.
+                                     | Parameter -> (drawLeafAt parameterPen point (string(idx))) |> k
+                                     | Variable -> (drawLeafAt variablePen point (string(idx))) |> k
+                                     | PreviousResult -> (drawLeafAt nodePen point (string(idx))) |> k
+                                     | Constant -> (drawLeafAt constantPen point (string(idx))) |> k
         loop skeleton initialCenter 1 id
   
         

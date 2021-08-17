@@ -17,10 +17,10 @@ module ModelsTypes =
         | Constant
 
     type Skeleton =     // Contains the skeleton of the model. The data of the Parameters and Variables are stored in arrays.
-        | Leaf of Input * x:float option * idx:int
+        | Leaf of Input * x:float option * idx:int * pullFrom: (Input * int) option
         | Node of Op * Skeleton * Skeleton
 
-    type GraphState = GraphState of p:float array * v:float array * innov:float array * prevResult:float array
+    type GraphState = GraphState of p:float array * v:float array * innov:float array * prevResult:float array * constant:float array
 
     type Graph = Graph of GraphState * Skeleton
 
