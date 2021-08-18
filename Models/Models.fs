@@ -23,15 +23,6 @@ module Model =
         | i when i < order -> Some (Variable,i-1)
         | _ -> None
 
-    let updateStrategySETAR order1 order2 delay = function
-        | 0 -> Some (PreviousResult,0)
-        | i when i = order1 -> Some (PreviousResult,0)
-        | i when i < order1+order2 -> Some (Variable,i-1)
-        | i when i = order1+order2 && int(delay) = 1 -> Some (PreviousResult,0)
-        | i when i = order1+order2 && int(delay) <= order2 && int(delay) >= 1 -> Some (Variable,order1+int(delay)-1)
-        | i when i = order1+order2 && (int(delay) >= order2 || int(delay) <= 1) -> invalidArg "delay" "Delay must be between 1 and order2." // find a way to better restrict parameters.
-        | _ -> None        
-
     let rec buildSkeleton (ModelType(_,parameters)) = 
         match parameters with
         | MAparams(coeffs) -> Array.zeroCreate coeffs.Length |> Array.mapi (fun i _ -> Leaf(Parameter,None,i,None))
@@ -44,28 +35,20 @@ module Model =
                                                                                 |> Array.reduce ( +. )
                                                                                 |> ( +. ) (Leaf(Innovation,None,0,None))
 
-        | SETARparams(coeffs1,coeffs2,threshold,delay) -> let ar = buildSkeleton (ModelType(AR,ARparams(coeffs1)))
+        | SETARparams(coeffs1,coeffs2,threshold,delay) -> let ar1 = buildSkeleton (ModelType(AR,ARparams(coeffs1)))
+                                                          let ar2 = buildSkeleton (ModelType(AR,ARparams(coeffs2)))
+                                                          let maxOrderIsModel1 = if coeffs1.Length >= coeffs2.Length then true else false
+                                                          let maxDelay = max coeffs1.Length coeffs2.Length
                                                           let mixingVariable = match delay with
                                                                                 | 0 -> invalidArg "delay" "Delay cannot be less than 1."
-                                                                                | 1 -> Leaf(Variable,None,coeffs1.Length+coeffs2.Length,Some (PreviousResult, 0))
-                                                                                | x when x <= coeffs1.Length -> Leaf(Variable,None,coeffs1.Length+coeffs2.Length,Some (Variable, -coeffs1.Length-coeffs2.Length+int(delay)-1))
-                                                                                | x when x > coeffs1.Length -> invalidArg "delay" "Delay cannot exceed the order of the first AR model."
-                                                                                | _ -> invalidArg "delay" "Something when wrong with the delay parameter..."
-                                                          let mixingCondition = (Leaf(Parameter,None,coeffs1.Length+coeffs2.Length,None) <. mixingVariable)
-                                                          Node.mixture mixingCondition ar ar
-
-(*        | SETARparams(coeffs1,coeffs2,threshold,delay) -> let ar1 = Array.zeroCreate coeffs1.Length |> Array.mapi (fun i _ -> Leaf(Parameter,None,i,None))
-                                                                                                    |> Array.mapi (fun i p -> Leaf(Variable,None,i,updateStrategyAR coeffs.Length i) |> ( *. ) p)
-                                                                                                    |> Array.reduce ( +. )
-                                                                                                    |> ( +. ) (Leaf(Innovation,None,0,None))
-
-                                                          let ar2 = Array.zeroCreate coeffs2.Length |> Array.mapi (fun i _ -> Leaf(Parameter,None,i+coeffs1.Length))
-                                                                                                    |> Array.mapi (fun i p -> Leaf(Variable,None,i+coeffs1.Length) |> ( *. ) p)
-                                                                                                    |> Array.reduce ( +. )
-                                                                                                    |> ( +. ) (Leaf(Innovation,None,0))
-                                                          
-                                                          let cond = (Leaf(Parameter,None,coeffs1.Length+coeffs2.Length) <. Leaf(Variable,None,coeffs1.Length+coeffs2.Length))
-                                                          (cond *. ar1) +. ((Leaf(Constant,Some 1.0,0) -. cond) *. ar2) *)
+                                                                                | 1 -> Leaf(Variable,None,0,Some (PreviousResult, 0))
+                                                                                | x when maxOrderIsModel1 && x <= coeffs1.Length -> Leaf(Variable,None,0,Some (Variable, -coeffs1.Length-coeffs2.Length+int(delay)-1))
+                                                                                | x when (not maxOrderIsModel1) && x > coeffs1.Length -> Leaf(Variable,None,0,Some (Variable, -coeffs2.Length+int(delay)-1))
+                                                                                | x when x > maxDelay -> invalidArg "delay" "Delay cannot exceed the maximum Order of the two AR models."
+                                                                                | _ -> invalidArg "delay" "Something went wrong with the delay parameter..."
+                                                          let mixingCondition = (Leaf(Parameter,None,0,None) <. mixingVariable)
+                                                          Node.mixture mixingCondition ar1 ar2
+                                                          |> Graph.groupInnovations [|0;0|]
 
     let buildDefaultGraphStateFrom skeleton = 
         let constantsValues = Graph.getValueOfConstants skeleton
@@ -79,7 +62,7 @@ module Model =
               |> Array.sortBy (fun x -> fst x)
               |> Array.map (fun x -> snd x)
               |> (fun array -> GraphState(array.[0],array.[1],array.[2],array.[3],constantsValues))
-        skeleton |> Graph.countNodeByInputFromSK 
+        skeleton |> Graph.countNodeByInputFromSK
                  |> InputCounter.fromArray
                  |> InputCounter.AddOneIfZero
                  |> InputCounter.toArray

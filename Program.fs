@@ -15,9 +15,15 @@ open XPlot.Plotly
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
-    let ghostModel = Model.build SETAR (SETARparams([|0.6;0.0|], [|-1.5;0.0|], 0.5, 1))
-    // let ghostModel = Model.build AR (ARparams([|0.6;0.0;0.0;0.0;0.0|]))
-    DrawModel.DrawModel ghostModel
+    let ghostModel = Model.build SETAR (SETARparams([|-1.5|],[|0.6;-0.2|], 0.5, 1))
+    // let ghostModel = Model.build AR (ARparams([|-0.6;0.0;0.0;0.0;0.0|]))
+    let sple = Model.sample 1000 ghostModel
+    Chart.Line sple |> Chart.Show
+    
+    let fitModel = Model.build SETAR (SETARparams([|0.0|],[|0.0;0.0|], 0.5, 1))
+    let fittedModel = fitModel |> Model.fit sple 
+    printfn "%A" fittedModel
+    
 
 
     stopWatch.Stop()

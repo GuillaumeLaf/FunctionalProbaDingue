@@ -6,7 +6,7 @@ open System
 open System.Drawing
 open System.Windows.Forms
 
-module DrawModel = 
+module DrawStructure = 
     
     let drawOperator (e:PaintEventArgs) (p:Pen) op (center:float*float) (radius:float) = 
         let pen = new Pen(Color.Black)
@@ -77,7 +77,7 @@ module DrawModel =
         loop skeleton initialCenter 1 id
   
         
-    let DrawModel (T(name,Graph(_,skeleton),_)) = 
+    let Model (T(name,Graph(_,skeleton),_)) = 
         let form = new Form()
         form.Size <- new Size(1600,800)
 

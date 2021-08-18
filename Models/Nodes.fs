@@ -38,8 +38,6 @@ module Node =
     let inline ( -. ) (N1:Skeleton) (N2:Skeleton) = Node(Substraction, N1, N2)
     let inline ( <. ) (N1:Skeleton) (N2:Skeleton) = Node(LessThan, N1, N2)
 
-
-
     let shiftSkeletonBy shift sk = 
         Graph.foldSkeleton (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> Node(op,lacc,racc) |> k)))
                            (fun input x idx pullFrom n k -> let nb = InputCounter.AmountOf input shift
@@ -57,8 +55,8 @@ module Node =
 
         let shiftedSk2 = shiftSkeletonBy inputNodeSk1 sk2
 
-        let totalShift = InputCounter.Add inputNodeSk1 inputNodeSk2
-        let shiftedMixingNode = shiftSkeletonBy totalShift mixingNode
+        let totalCount = InputCounter.Add inputNodeSk1 inputNodeSk2
+        let shiftedMixingNode = shiftSkeletonBy totalCount mixingNode
         
 
         (shiftedMixingNode *. sk1) +. ((Leaf(Constant, Some 1.0,0,None) -. shiftedMixingNode) *. shiftedSk2)

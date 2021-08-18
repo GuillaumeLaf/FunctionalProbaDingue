@@ -30,7 +30,7 @@ module Graph =
                                                | Parameter -> p.[idx] |> k
                                                | Variable -> v.[idx] |> k
                                                | PreviousResult -> prevResult.[idx] |> k // never reached
-                                               | Constant -> x |> Option.defaultValue 0.0 |> k)
+                                               | Constant -> constant.[idx] |> k)
                      skeleton
 
     let countNodeByInput (Graph(_,skeleton)) = 
@@ -64,3 +64,8 @@ module Graph =
         |> Array.sortBy (fun x -> fst x)
         |> Array.map (fun x -> (snd x) |> Option.defaultValue 0.0)
 
+    let groupInnovations (groups:int []) skeleton = 
+        foldSkeleton (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> Node(op,lacc,racc) |> k)))
+                     (fun input x idx pullFrom n k -> (if input = Innovation then (Leaf(Innovation,x,groups.[idx],pullFrom)) else (Leaf(input,x,idx,pullFrom))) |> k)
+                     skeleton
+                     
