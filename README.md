@@ -14,6 +14,7 @@ This Project constitutes my first real attempt at making a viable algorithmic tr
   + SETAR
 
 # TO DO
+- [ ] Parallel Tree traversal
 + Optimization techniques
   - [ ] Maximum Likelihood
   - [ ] Integer/Mixed Optimization   
