@@ -23,3 +23,9 @@ This Project constitutes my first real attempt at making a viable algorithmic tr
   - [ ] Marko-Switching Models
   - [ ] Smooth-Transition Models
   - [ ] ARCH - GARCH
++ Statistical Testing
+  - [ ] (Non)Linearity
+  - [ ] (In)dependence
+  - [ ] Heteroscedasticity
+  - [ ] Normally Distributed
+  - [ ] (Non)Stationarity
