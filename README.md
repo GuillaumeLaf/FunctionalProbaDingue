@@ -7,5 +7,19 @@ This Project constitutes my first real attempt at making a viable algorithmic tr
 ## Major Techniques
 + Computational Graphs
 + Optimization (global - local) 
-..+ Particle Swarm Optimization 
-..+ BFGS (with MathNet.Numerics) 
+  + Particle Swarm Optimization 
+  + BFGS (with MathNet.Numerics) 
++ Models
+  + AR / MA
+  + SETAR
+
+# TO DO
++ Optimization techniques
+  - [ ] Maximum Likelihood
+  - [ ] Integer/Mixed Optimization   
+  - [ ] Further PSO Algorithm
+- [ ] Forecast Confidence Interval (Exact - Bootstrap)
++ Models
+  - [ ] Marko-Switching Models
+  - [ ] Smooth-Transition Models
+  - [ ] ARCH - GARCH
