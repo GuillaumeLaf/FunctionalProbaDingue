@@ -71,22 +71,22 @@ module Graph =
 
     let getUpdatingStrategy (Graph(state,skeleton)) = Skeleton.updatingStrategy skeleton
 
+    let updateVariables (UpdateVariableStrategy(pullfrom)) (GraphState(p,v,innov,prevResult,constant)) = 
+        Array.zeroCreate v.Length |> Array.mapi (fun i _ -> match pullfrom.[i] with  
+                                                            | Some (Innovation, idx) -> innov.[idx]
+                                                            | Some (Parameter, idx) -> p.[idx]
+                                                            | Some (Variable, idx) -> v.[idx]
+                                                            | Some (PreviousResult, idx) -> prevResult.[idx]  // Make sure the idx is a possible index of array.
+                                                            | Some (Constant,idx) -> constant.[idx] 
+                                                            | None -> v.[i])   
+
     module TimeSerie = 
-        let fold nextParamF nextVarF nextGraphF nextInnovF (array:float array) (Graph(initialState,sk)) = 
+        let fold currentResultF nextParamF nextVarF nextGraphF nextInnovF (array:float array) (Graph(initialState,sk)) = 
             let (GraphState(_,_,_,_,c)) = initialState
             let updateGraphState state x = 
-                let currentResult = forwardPass (Graph(state,sk))
+                let currentResult = currentResultF (Graph(state,sk))
                 GraphState(nextParamF x state, state |> nextGraphF x currentResult |>  nextVarF x, nextInnovF x state, [|currentResult|],c)
             Array.scan updateGraphState initialState array |> Array.skip 1
-
-        let updateVariables (UpdateVariableStrategy(pullfrom)) (GraphState(p,v,innov,prevResult,constant)) = 
-            Array.zeroCreate v.Length |> Array.mapi (fun i _ -> match pullfrom.[i] with  
-                                                                | Some (Innovation, idx) -> innov.[idx]
-                                                                | Some (Parameter, idx) -> p.[idx]
-                                                                | Some (Variable, idx) -> v.[idx]
-                                                                | Some (PreviousResult, idx) -> prevResult.[idx]  // Make sure the idx is a possible index of array.
-                                                                | Some (Constant,idx) -> constant.[idx] 
-                                                                | None -> v.[i])
 
         let updateGraphWithTruth name (newDataPoint:float) (expectation:float) (GraphState(p,v,i,prev,c)) = 
             match name with
@@ -94,14 +94,18 @@ module Graph =
             | AR -> GraphState(p,v,i,[|newDataPoint|],c)
             | SETAR -> GraphState(p,v,i,[|newDataPoint|],c)
 
-        let getGraphStates (array:float array) (T(name,graph,updateStrat)) = 
+        let rollingGraphStates (array:float array) (T(name,graph,updateStrat)) = 
             let updateGraph = updateGraphWithTruth name
-            fold (fun _ (GraphState(p,_,_,_,_)) -> p)
-                 (fun _ g -> updateVariables updateStrat g)
-                 (fun dataPoint expect g -> updateGraph dataPoint expect g)
+            fold forwardPass
+                 (fun _ (GraphState(p,_,_,_,_)) -> p)
+                 (fun _ state -> updateVariables updateStrat state)
+                 (fun dataPoint expect state -> updateGraph dataPoint expect state)
                  (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
                  array
                  graph
+
+        let realizations stateTS = stateTS |> Array.map (fun (GraphState(_,_,_,prev,_)) -> prev.[0])
+            
 
 
                     

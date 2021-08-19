@@ -87,13 +87,35 @@ module Model =
     let sample (n:int) (T(_,graph,updateStrat)) = 
         let result = Array.zeroCreate n
         let distr = Distributions.Norm(0.0, 1.0) |> create
-        Graph.TimeSerie.fold (fun _ (GraphState(p,_,_,_,_)) -> p)
-                                  (fun _ state -> Graph.TimeSerie.updateVariables updateStrat state)
-                                  (fun _ currentResult (GraphState(p,v,i,_,c)) -> GraphState(p,v,i,[|currentResult|],c))
-                                  (fun _ (GraphState(_,_,innov,_,_)) -> [| for i in 0..innov.Length-1 do distr |> Distributions.sample |])
-                                  result
-                                  graph
+        Graph.TimeSerie.fold Graph.forwardPass
+                             (fun _ (GraphState(p,_,_,_,_)) -> p)
+                             (fun _ state -> Graph.updateVariables updateStrat state)
+                             (fun _ currentResult (GraphState(p,v,i,_,c)) -> GraphState(p,v,i,[|currentResult|],c))
+                             (fun _ (GraphState(_,_,innov,_,_)) -> [| for i in 0..innov.Length-1 do distr |> Distributions.sample |])
+                             result
+                             graph
                 |> Array.map (fun (GraphState(_,_,_,prev,_)) -> prev.[0])
+
+    let conditionalExpectation steps (T(name,graph,updateStrat)) = 
+        Graph.TimeSerie.fold Graph.forwardPass
+                             (fun _ (GraphState(p,_,_,_,_)) -> p)
+                             (fun _ g -> Graph.updateVariables updateStrat g)
+                             (fun _ currentResult (GraphState(p,v,i,_,c)) -> GraphState(p,v,i,[|currentResult|],c))
+                             (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
+                             (Array.zeroCreate steps)
+                             graph
+                |> Array.map (fun (GraphState(_,_,_,prev,_)) -> prev.[0])
+
+    let rollingConditionalExpectation steps (array:float array) (T(name,graph,updateStrat)) = 
+        let updateGraph = Graph.TimeSerie.updateGraphWithTruth name
+        let conditionalExpectationFromGraph = ( fun g -> (conditionalExpectation steps (T(name,g,updateStrat))).[steps-1] )
+        Graph.TimeSerie.fold conditionalExpectationFromGraph
+                             (fun _ (GraphState(p,_,_,_,_)) -> p)
+                             (fun _ state -> Graph.updateVariables updateStrat state)
+                             (fun dataPoint expect state -> updateGraph dataPoint expect state)
+                             (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
+                             array
+                             graph         
 
     let fit (array:float array) (T(name,graph,updateStrat)) = 
         let len = array.Length
@@ -108,8 +130,9 @@ module Model =
         let mutable finalVariables = initVariables
 
         let leastSquareFunction pa = 
-            let tmp = Graph.TimeSerie.fold (fun _ (GraphState(p,_,_,_,_)) -> p)
-                                           (fun _ g -> Graph.TimeSerie.updateVariables updateStrat g)
+            let tmp = Graph.TimeSerie.fold Graph.forwardPass
+                                           (fun _ (GraphState(p,_,_,_,_)) -> p)
+                                           (fun _ g -> Graph.updateVariables updateStrat g)
                                            (fun dataPoint expect g -> updateGraphWithTruth dataPoint expect g)
                                            (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
                                            array
@@ -133,15 +156,6 @@ module Model =
         let result = solver.FindMinimum(obj, Vector<float>.Build.Dense initParam)
         let fittedParameters = result.MinimizingPoint.AsArray()
         T(name, Graph(GraphState(fittedParameters,finalVariables,initInnov,initPrev,initConstants),initSkeleton),updateStrat)
-
-    let conditionalExpectation steps (T(name,graph,updateStrat)) = 
-        Graph.TimeSerie.fold (fun _ (GraphState(p,_,_,_,_)) -> p)
-                             (fun _ g -> Graph.TimeSerie.updateVariables updateStrat g)
-                             (fun _ currentResult (GraphState(p,v,i,_,c)) -> GraphState(p,v,i,[|currentResult|],c))
-                             (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
-                             (Array.zeroCreate steps)
-                             graph
-                |> Array.map (fun (GraphState(_,_,_,prev,_)) -> prev.[0])
 
 
                        

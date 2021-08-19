@@ -19,7 +19,8 @@ module Optimization =
 
     type OptimizationProblem = OptimizationProblem of OptimizationMethod * ObjectiveFunction
 
-
+    let run (array:float array) (T(name,graph,updateStrat)) = 
+        
 
 
     
