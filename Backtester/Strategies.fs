@@ -9,15 +9,12 @@ module TradingSignalStrategies =
         | x when x <= 0.0 -> Exit, {state with tradingSignal=Exit}
         | _ -> NoSignal, {state with tradingSignal=NoSignal}
 
-(*    let ModelStrategy m (state:State) = 
-        let transformedDataArray = Array.map (fun x -> x.transformedData) state.data
-        match Model.conditionalExpectation transformedDataArray m with
+    let ModelStrategy m (state:State) = 
+        // let transformedDataArray = Array.map (fun x -> x.transformedData) state.data
+        match (Model.conditionalExpectation 1 m).[0] with
         | x when x > 0.0 -> Entry, {state with tradingSignal=Entry}
         | x when x <= 0.0 -> Exit, {state with tradingSignal=Exit}
-        | _ -> NoSignal, {state with tradingSignal=NoSignal}*)
-
-    let ModelStrategy m (state:State) = 
-        NoSignal, state
+        | _ -> NoSignal, {state with tradingSignal=NoSignal}
             
 module PositionSizingStrategies = 
     let naiveStrategy (state:State) = 

@@ -48,10 +48,10 @@ module Model =
                                                                                 | _ -> invalidArg "delay" "Something went wrong with the delay parameter..."
                                                           let mixingCondition = (Leaf(Parameter,None,0,None) <. mixingVariable)
                                                           Node.mixture mixingCondition ar1 ar2
-                                                          |> Graph.groupInnovations [|0;0|]
+                                                          |> Graph.Skeleton.groupInnovations [|0;0|]
 
     let buildDefaultGraphStateFrom skeleton = 
-        let constantsValues = Graph.getValueOfConstants skeleton
+        let constantsValues = Graph.Skeleton.valueOfConstants skeleton
         let graphStateFromArrays a = 
             a |> Array.map (fun x -> match fst x with
                                       | Innovation -> 2,snd x
@@ -62,7 +62,7 @@ module Model =
               |> Array.sortBy (fun x -> fst x)
               |> Array.map (fun x -> snd x)
               |> (fun array -> GraphState(array.[0],array.[1],array.[2],array.[3],constantsValues))
-        skeleton |> Graph.countNodeByInputFromSK
+        skeleton |> Graph.Skeleton.countNodeByInput
                  |> InputCounter.fromArray
                  |> InputCounter.AddOneIfZero
                  |> InputCounter.toArray
@@ -84,32 +84,15 @@ module Model =
         let updateStrategy = Graph.getUpdatingStrategy graph |> UpdateVariableStrategy
         T(name, graph, updateStrategy)
 
-    let updateVariables (UpdateVariableStrategy(pullfrom)) (GraphState(p,v,innov,prevResult,constant)) = 
-        Array.zeroCreate v.Length |> Array.mapi (fun i _ -> match pullfrom.[i] with  
-                                                            | Some (Innovation, idx) -> innov.[idx]
-                                                            | Some (Parameter, idx) -> p.[idx]
-                                                            | Some (Variable, idx) -> v.[idx]
-                                                            | Some (PreviousResult, idx) -> prevResult.[idx]  // Make sure the idx is a possible index of array.
-                                                            | Some (Constant,idx) -> constant.[idx] 
-                                                            | None -> v.[i])
-    
-    let foldGraphTimeSeries nextParamF nextVarF nextGraphF nextInnovF (array:float array) graph = 
-        let (Graph(state,sk)) = graph
-        let updateGraphState state x = 
-            let currentResult = Graph.forwardPass (Graph(state,sk))
-            let (GraphState(_,_,_,_,c)) = state
-            GraphState(nextParamF x state, state |> nextGraphF x currentResult |>  nextVarF x, nextInnovF x state, [|currentResult|],c)
-        Array.scan updateGraphState state array |> Array.skip 1
-
     let sample (n:int) (T(_,graph,updateStrat)) = 
         let result = Array.zeroCreate n
         let distr = Distributions.Norm(0.0, 1.0) |> create
-        foldGraphTimeSeries (fun _ (GraphState(p,_,_,_,_)) -> p)
-                            (fun _ state -> updateVariables updateStrat state)
-                            (fun _ currentResult (GraphState(p,v,i,_,c)) -> GraphState(p,v,i,[|currentResult|],c))
-                            (fun _ (GraphState(_,_,innov,_,_)) -> [| for i in 0..innov.Length-1 do distr |> Distributions.sample |])
-                            result
-                            graph
+        Graph.TimeSerie.fold (fun _ (GraphState(p,_,_,_,_)) -> p)
+                                  (fun _ state -> Graph.TimeSerie.updateVariables updateStrat state)
+                                  (fun _ currentResult (GraphState(p,v,i,_,c)) -> GraphState(p,v,i,[|currentResult|],c))
+                                  (fun _ (GraphState(_,_,innov,_,_)) -> [| for i in 0..innov.Length-1 do distr |> Distributions.sample |])
+                                  result
+                                  graph
                 |> Array.map (fun (GraphState(_,_,_,prev,_)) -> prev.[0])
 
     let fit (array:float array) (T(name,graph,updateStrat)) = 
@@ -125,12 +108,12 @@ module Model =
         let mutable finalVariables = initVariables
 
         let leastSquareFunction pa = 
-            let tmp = foldGraphTimeSeries (fun _ (GraphState(p,_,_,_,_)) -> p)
-                                          (fun _ g -> updateVariables updateStrat g)
-                                          (fun dataPoint expect g -> updateGraphWithTruth dataPoint expect g)
-                                          (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
-                                          array
-                                          (Graph(GraphState(pa,initVariables,initInnov,initPrev,initConstants),initSkeleton))
+            let tmp = Graph.TimeSerie.fold (fun _ (GraphState(p,_,_,_,_)) -> p)
+                                           (fun _ g -> Graph.TimeSerie.updateVariables updateStrat g)
+                                           (fun dataPoint expect g -> updateGraphWithTruth dataPoint expect g)
+                                           (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
+                                           array
+                                           (Graph(GraphState(pa,initVariables,initInnov,initPrev,initConstants),initSkeleton))
             let (GraphState(_,v,_,_,_)) = Array.last tmp
             finalVariables <- v
             tmp |> Array.map2 (fun x (GraphState(_,_,_,prev,_)) -> (x - prev.[0]) * (x - prev.[0])) array
@@ -152,12 +135,12 @@ module Model =
         T(name, Graph(GraphState(fittedParameters,finalVariables,initInnov,initPrev,initConstants),initSkeleton),updateStrat)
 
     let conditionalExpectation steps (T(name,graph,updateStrat)) = 
-        foldGraphTimeSeries (fun _ (GraphState(p,_,_,_,_)) -> p)
-                            (fun _ g -> updateVariables updateStrat g)
-                            (fun _ currentResult (GraphState(p,v,i,_,c)) -> GraphState(p,v,i,[|currentResult|],c))
-                            (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
-                            (Array.zeroCreate steps)
-                            graph
+        Graph.TimeSerie.fold (fun _ (GraphState(p,_,_,_,_)) -> p)
+                             (fun _ g -> Graph.TimeSerie.updateVariables updateStrat g)
+                             (fun _ currentResult (GraphState(p,v,i,_,c)) -> GraphState(p,v,i,[|currentResult|],c))
+                             (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
+                             (Array.zeroCreate steps)
+                             graph
                 |> Array.map (fun (GraphState(_,_,_,prev,_)) -> prev.[0])
 
 

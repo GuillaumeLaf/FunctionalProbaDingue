@@ -1,7 +1,6 @@
 ﻿namespace Backtester
 
 open System
-open XPlot.Plotly
 
 module M =
     let run (M f) initialState = f initialState

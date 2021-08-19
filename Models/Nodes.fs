@@ -39,7 +39,7 @@ module Node =
     let inline ( <. ) (N1:Skeleton) (N2:Skeleton) = Node(LessThan, N1, N2)
 
     let shiftSkeletonBy shift sk = 
-        Graph.foldSkeleton (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> Node(op,lacc,racc) |> k)))
+        Graph.Skeleton.fold (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> Node(op,lacc,racc) |> k)))
                            (fun input x idx pullFrom n k -> let nb = InputCounter.AmountOf input shift
                                                             let shiftedStrat = Option.map (fun x -> fst x, (snd x) + (InputCounter.AmountOf (fst x) shift)) pullFrom
                                                             Leaf(input,x,idx+nb,shiftedStrat) |> k)
@@ -50,8 +50,8 @@ module Node =
     // Parameters : mixingNode -> Node that should output between [0;1].
     //              sk -> Skeleton to be duplicated
     let mixture mixingNode sk1 sk2 = 
-        let inputNodeSk1 = Graph.countNodeByInputFromSK sk1 |> InputCounter.fromArray
-        let inputNodeSk2 = Graph.countNodeByInputFromSK sk2 |> InputCounter.fromArray
+        let inputNodeSk1 = Graph.Skeleton.countNodeByInput sk1 |> InputCounter.fromArray
+        let inputNodeSk2 = Graph.Skeleton.countNodeByInput sk2 |> InputCounter.fromArray
 
         let shiftedSk2 = shiftSkeletonBy inputNodeSk1 sk2
 
