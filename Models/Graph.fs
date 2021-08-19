@@ -72,6 +72,7 @@ module Graph =
     let getUpdatingStrategy (Graph(state,skeleton)) = Skeleton.updatingStrategy skeleton
 
     module TimeSerie = 
+        
         let fold nextParamF nextVarF nextGraphF nextInnovF (array:float array) (Graph(initialState,sk)) = 
             let (GraphState(_,_,_,_,c)) = initialState
             let updateGraphState state x = 

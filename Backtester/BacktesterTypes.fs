@@ -40,4 +40,4 @@ module BacktesterTypes =
                              positionSizeStrategy:PositionSizeStrategy
                              windowSize:int}
 
-    type M<'T> = M of (State -> 'T * State)
+    
