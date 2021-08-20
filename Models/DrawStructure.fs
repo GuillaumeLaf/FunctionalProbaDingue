@@ -19,7 +19,7 @@ module DrawStructure =
                             e.Graphics.DrawLine(pen, float32(x+radius/2.5), float32(y-radius/2.5), float32(x-radius/2.5), float32(y+radius/2.5))
         | _ -> ()
 
-    let graphHeigth = Graph.heightSkeleton
+    let graphHeigth = Graph.Skeleton.height
     
     let degreeToRadian degree = degree * Math.PI / 180.0
     let radianToDegree radian = radian * 180.0 / Math.PI

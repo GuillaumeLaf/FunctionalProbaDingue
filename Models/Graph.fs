@@ -6,6 +6,9 @@ module Graph =
     let inline ( -. ) (N1:Skeleton) (N2:Skeleton) = Node(Substraction, N1, N2)
     let inline ( <. ) (N1:Skeleton) (N2:Skeleton) = Node(LessThan, N1, N2)
 
+    let (<*>) = Monad.apply
+    let (<!>) = Monad.map
+
     let emptyState = GraphState([||],[||],[||],[||],[||])
 
     module Skeleton = 
@@ -69,40 +72,50 @@ module Graph =
                                                 | Constant -> constant.[idx] |> k)
                       skeleton
 
+    let updateVariables (UpdateVariableStrategy(pullfrom)) (GraphState(p,v,innov,prevResult,constant)) = 
+        Array.zeroCreate v.Length |> Array.mapi (fun i _ -> match pullfrom.[i] with  
+                                                            | Some (Innovation, idx) -> innov.[idx]
+                                                            | Some (Parameter, idx) -> p.[idx]
+                                                            | Some (Variable, idx) -> v.[idx]
+                                                            | Some (PreviousResult, idx) -> prevResult.[idx]  // Make sure the idx is a possible index of array.
+                                                            | Some (Constant,idx) -> constant.[idx] 
+                                                            | None -> v.[i])
+
     let getUpdatingStrategy (Graph(state,skeleton)) = Skeleton.updatingStrategy skeleton
 
     module TimeSerie = 
+        let updateStateDataM f = 
+            let innerFunc (state:GraphState) = f state  
+            Monad.M innerFunc
+
+        let forwardPassM skeleton = 
+            let innerFunc (GraphState(p,v,i,prev,c)) = 
+                let result = forwardPass (Graph(GraphState(p,v,i,prev,c),skeleton))
+                result, (GraphState(p,v,i,[|result|],c))
+            Monad.M innerFunc                          
         
-        let fold nextParamF nextVarF nextGraphF nextInnovF (array:float array) (Graph(initialState,sk)) = 
-            let (GraphState(_,_,_,_,c)) = initialState
-            let updateGraphState state x = 
-                let currentResult = forwardPass (Graph(state,sk))
-                GraphState(nextParamF x state, state |> nextGraphF x currentResult |>  nextVarF x, nextInnovF x state, [|currentResult|],c)
-            Array.scan updateGraphState initialState array |> Array.skip 1
+        let reorganizeVariablesM updateStrat = updateStateDataM (fun (GraphState(p,v,i,prev,c)) -> let newVariables = updateVariables updateStrat (GraphState(p,v,i,prev,c))
+                                                                                                   newVariables, GraphState(p,newVariables,i,prev,c) )
+        let randomInnovationsM distr = updateStateDataM (fun (GraphState(p,v,innov,prev,c)) -> let newInnovations = [| for i in 0..innov.Length-1 do distr |> Distributions.sample |]
+                                                                                               newInnovations,GraphState(p,v,newInnovations,prev,c) ) 
+        let inactiveInnovationsM = updateStateDataM (fun (GraphState(p,v,innov,prev,c)) -> let newInnovations = Array.zeroCreate innov.Length
+                                                                                           newInnovations,GraphState(p,v,newInnovations,prev,c) ) 
 
-        let updateVariables (UpdateVariableStrategy(pullfrom)) (GraphState(p,v,innov,prevResult,constant)) = 
-            Array.zeroCreate v.Length |> Array.mapi (fun i _ -> match pullfrom.[i] with  
-                                                                | Some (Innovation, idx) -> innov.[idx]
-                                                                | Some (Parameter, idx) -> p.[idx]
-                                                                | Some (Variable, idx) -> v.[idx]
-                                                                | Some (PreviousResult, idx) -> prevResult.[idx]  // Make sure the idx is a possible index of array.
-                                                                | Some (Constant,idx) -> constant.[idx] 
-                                                                | None -> v.[i])
+        let reorganizeVariableWithTruthM name updateStrat truthPoint = 
+            updateStateDataM (fun (GraphState(p,v,i,prev,c)) -> let updatedGraph = match name with
+                                                                                    | MA -> GraphState(p,v,[|truthPoint - prev.[0]|],prev,c) 
+                                                                                    | AR ->  GraphState(p,v,i,[|truthPoint|],c)
+                                                                                    | SETAR -> GraphState(p,v,i,[|truthPoint|],c) 
+                                                                let newVariables = updateVariables updateStrat updatedGraph 
+                                                                newVariables, GraphState(p,newVariables,i,prev,c)
+                                                                )
+        let fold monad initState array = 
+            array |> Array.map (fun _ -> monad)
+                  |> Array.mapFold (fun state mo -> Monad.run mo state) initState
 
-        let updateGraphWithTruth name (newDataPoint:float) (expectation:float) (GraphState(p,v,i,prev,c)) = 
-            match name with
-            | MA -> GraphState(p,v,[|newDataPoint - expectation|],prev,c)
-            | AR -> GraphState(p,v,i,[|newDataPoint|],c)
-            | SETAR -> GraphState(p,v,i,[|newDataPoint|],c)
-
-        let getGraphStates (array:float array) (T(name,graph,updateStrat)) = 
-            let updateGraph = updateGraphWithTruth name
-            fold (fun _ (GraphState(p,_,_,_,_)) -> p)
-                 (fun _ g -> updateVariables updateStrat g)
-                 (fun dataPoint expect g -> updateGraph dataPoint expect g)
-                 (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
-                 array
-                 graph
+        let fold1 monad initState array = 
+            array |> Array.map (fun x -> monad x)
+                  |> Array.mapFold (fun state mo -> Monad.run mo state) initState
 
 
                     
