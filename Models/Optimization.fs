@@ -18,8 +18,6 @@ module Optimization =
         | ContinuousMethod of ContinuousOptimizationMethod
 
     type OptimizationProblem = OptimizationProblem of OptimizationMethod * ObjectiveFunction
-
-    let run (array:float array) (T(name,graph,updateStrat)) = 
         
 
 
