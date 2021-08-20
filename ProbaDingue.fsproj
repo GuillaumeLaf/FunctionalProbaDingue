@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Monad.fs" />
     <Compile Include="UtilitiesSIMD.fs" />
     <Compile Include="PSO_algorithm.fs" />
     <Compile Include="Utilities.fs" />

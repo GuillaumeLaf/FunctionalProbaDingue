@@ -12,6 +12,9 @@ module Model =
     let inline ( *. ) (N1:Skeleton) (N2:Skeleton) = Node(Multiplication, N1, N2)
     let inline ( -. ) (N1:Skeleton) (N2:Skeleton) = Node(Substraction, N1, N2)
     let inline ( <. ) (N1:Skeleton) (N2:Skeleton) = Node(LessThan, N1, N2)
+
+    let (<*>) = Monad.apply
+    let (<!>) = Monad.map
             
     let updateStrategyMA order = function
         | 0 -> Some (Innovation,0)
@@ -84,6 +87,7 @@ module Model =
         let updateStrategy = Graph.getUpdatingStrategy graph |> UpdateVariableStrategy
         T(name, graph, updateStrategy)
 
+<<<<<<< HEAD
     let sample (n:int) (T(_,graph,updateStrat)) = 
         let result = Array.zeroCreate n
         let distr = Distributions.Norm(0.0, 1.0) |> create
@@ -105,6 +109,24 @@ module Model =
                              (Array.zeroCreate steps)
                              graph
                 |> Array.map (fun (GraphState(_,_,_,prev,_)) -> prev.[0])
+=======
+    let sample (n:int) (T(_,(Graph(state,sk)),updateStrat)) = 
+        let distr = Distributions.Norm(0.0, 1.0) |> Distributions.create
+        let sampleOnceM = 
+            let innerFunc fwdPass variables innovations = fwdPass
+            innerFunc <!> Graph.TimeSerie.forwardPassM sk
+                      <*> Graph.TimeSerie.reorganizeVariablesM updateStrat
+                      <*> Graph.TimeSerie.randomInnovationsM distr
+        Graph.TimeSerie.fold sampleOnceM state (Array.zeroCreate n) |> fst
+
+    let conditionalExpectation steps (T(_,(Graph(state,sk)),updateStrat)) = 
+        let conditionalExpectationM = 
+            let innerFunc fwdPass variables innovations = fwdPass
+            innerFunc <!> Graph.TimeSerie.forwardPassM sk
+                      <*> Graph.TimeSerie.reorganizeVariablesM updateStrat
+                      <*> Graph.TimeSerie.inactiveInnovationsM
+        Graph.TimeSerie.fold conditionalExpectationM state (Array.zeroCreate steps) |> fst
+>>>>>>> Graph_TimeSeries_Refactoring
 
     let rollingConditionalExpectation steps (array:float array) (T(name,graph,updateStrat)) = 
         let updateGraph = Graph.TimeSerie.updateGraphWithTruth name
@@ -121,15 +143,8 @@ module Model =
         let len = array.Length
         let (Graph(GraphState(initParam,initVariables,initInnov,initPrev,initConstants),initSkeleton)) = graph
 
-        let updateGraphWithTruth (dataPoint:float) (expectation:float) (GraphState(p,v,i,prev,c)) = 
-            match name with
-            | MA -> GraphState(p,v,[|dataPoint - expectation|],prev,c)
-            | AR -> GraphState(p,v,i,[|dataPoint|],c)
-            | SETAR -> GraphState(p,v,i,[|dataPoint|],c)
-
-        let mutable finalVariables = initVariables
-
         let leastSquareFunction pa = 
+<<<<<<< HEAD
             let tmp = Graph.TimeSerie.fold Graph.forwardPass
                                            (fun _ (GraphState(p,_,_,_,_)) -> p)
                                            (fun _ g -> Graph.updateVariables updateStrat g)
@@ -141,8 +156,21 @@ module Model =
             finalVariables <- v
             tmp |> Array.map2 (fun x (GraphState(_,_,_,prev,_)) -> (x - prev.[0]) * (x - prev.[0])) array
                 |> Array.reduce (+)
+=======
+            let OneStepRollingForecastM truthPoint = 
+                let innerFunc fwdPass variables innovations = fwdPass
+                innerFunc <!> Graph.TimeSerie.forwardPassM initSkeleton
+                          <*> Graph.TimeSerie.reorganizeVariableWithTruthM name updateStrat truthPoint
+                          <*> Graph.TimeSerie.inactiveInnovationsM
+            Graph.TimeSerie.fold1 OneStepRollingForecastM
+                                  (GraphState(pa,initVariables,initInnov,initPrev,initConstants))
+                                  array
+                              |> fst
+                              |> Array.map2 (fun x pred -> (x - pred) * (x - pred)) array
+                              |> Array.reduce (+)
+>>>>>>> Graph_TimeSeries_Refactoring
             
-            // When optimizing the tested model may not be stationary, we normalized the explosive behavior to continue optimizing.
+        // When optimizing the tested model may not be stationary, we normalized the explosive behavior to continue optimizing.
         let limitGradient x = x |> Array.map (fun x -> if System.Double.IsNaN(x) then 1e10 else x) 
         let limitValueFunction x = if System.Double.IsInfinity(x) then 1e10 else x
         
@@ -155,7 +183,11 @@ module Model =
         let solver = BfgsMinimizer(1e-5, 1e-5, 1e-5, 1000)
         let result = solver.FindMinimum(obj, Vector<float>.Build.Dense initParam)
         let fittedParameters = result.MinimizingPoint.AsArray()
+<<<<<<< HEAD
         T(name, Graph(GraphState(fittedParameters,finalVariables,initInnov,initPrev,initConstants),initSkeleton),updateStrat)
+=======
+        T(name, Graph(GraphState(fittedParameters,initVariables,initInnov,initPrev,initConstants),initSkeleton),updateStrat)
+>>>>>>> Graph_TimeSeries_Refactoring
 
 
                        
