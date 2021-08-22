@@ -76,6 +76,28 @@
         let inline substractScalar (x:^T) (array:^T[]) = map (fun v -> v - Vector< ^T>(x)) (fun i -> i - x) array
         let inline multScalar (x:^T) (array:^T[]) = map (fun v -> v * Vector< ^T>(x)) (fun i -> i * x) array
 
+        let inline sum (array:^T[]) : ^T =
+        
+            let mutable state = Vector< ^T>.Zero    
+            let count = Vector< ^T>.Count
+                
+            let mutable i = 0
+            while i <= array.Length-count do
+                state <-  state + Vector< ^T>(array,i)
+                i <- i + count
+        
+            let mutable result = Unchecked.defaultof< ^T>
+            i <- array.Length-array.Length%count
+            while i < array.Length do
+                result <- result + array.[i]
+                i <- i + 1
+        
+            i <- 0
+            while i < count do
+                result <- result + state.[i]
+                i <- i + 1
+            result
+
     module MatrixSIMD = 
         let inline flatten (M1: ^T[,]) : ^T[] = 
             [| for x in [0..(Array2D.length1 M1)-1] do

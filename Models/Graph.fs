@@ -92,7 +92,7 @@ module Graph =
             let innerFunc (GraphState(p,v,i,prev,c)) = 
                 let result = forwardPass (Graph(GraphState(p,v,i,prev,c),skeleton))
                 result, (GraphState(p,v,i,[|result|],c))
-            Monad.M innerFunc                          
+            Monad.M innerFunc            
         
         let reorganizeVariablesM updateStrat = updateStateDataM (fun (GraphState(p,v,i,prev,c)) -> let newVariables = updateVariables updateStrat (GraphState(p,v,i,prev,c))
                                                                                                    newVariables, GraphState(p,newVariables,i,prev,c) )
@@ -108,7 +108,25 @@ module Graph =
                                                                                     | SETAR -> GraphState(p,v,i,[|truthPoint|],c) 
                                                                 let newVariables = updateVariables updateStrat updatedGraph 
                                                                 newVariables, GraphState(p,newVariables,i,prev,c)
-                                                                )
+                                                                ) 
+
+        let conditionalExpectationM updateStrat sk = 
+            let innerFunc fwdPass variables innovations = fwdPass
+            innerFunc <!> forwardPassM sk
+                      <*> reorganizeVariablesM updateStrat
+                      <*> inactiveInnovationsM
+
+        let oneStepRollingForecastM name updateStrat sk truthPoint =
+            let innerFunc fwdPass variables innovations = fwdPass
+            innerFunc <!> forwardPassM sk
+                      <*> reorganizeVariableWithTruthM name updateStrat truthPoint
+                      <*> inactiveInnovationsM
+
+(*        let rollingConditionalExpectationM steps updateStrat sk truthPoints =
+            truthPoints |> List.map (fun _ -> conditionalExpectationM updateStrat sk)
+                        |> Monad.sequence
+                        |> Monad.map (List.head)*)
+
         let fold monad initState array = 
             array |> Array.map (fun _ -> monad)
                   |> Array.mapFold (fun state mo -> Monad.run mo state) initState
@@ -116,6 +134,8 @@ module Graph =
         let fold1 monad initState array = 
             array |> Array.map (fun x -> monad x)
                   |> Array.mapFold (fun state mo -> Monad.run mo state) initState
+
+        
             
 
 

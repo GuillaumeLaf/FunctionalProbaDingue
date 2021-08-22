@@ -97,24 +97,18 @@ module Model =
         Graph.TimeSerie.fold sampleOnceM state (Array.zeroCreate n) |> fst
 
     let conditionalExpectation steps (T(_,(Graph(state,sk)),updateStrat)) = 
-        let conditionalExpectationM = 
-            let innerFunc fwdPass variables innovations = fwdPass
-            innerFunc <!> Graph.TimeSerie.forwardPassM sk
-                      <*> Graph.TimeSerie.reorganizeVariablesM updateStrat
-                      <*> Graph.TimeSerie.inactiveInnovationsM
+        let conditionalExpectationM = Graph.TimeSerie.conditionalExpectationM updateStrat sk
         Graph.TimeSerie.fold conditionalExpectationM state (Array.zeroCreate steps) |> fst
 
-(*    let rollingConditionalExpectation steps (array:float array) (T(name,graph,updateStrat)) = 
-        let updateGraph = Graph.TimeSerie.updateGraphWithTruth name
-        let conditionalExpectationFromGraph = ( fun g -> (conditionalExpectation steps (T(name,g,updateStrat))).[steps-1] )
-        Graph.TimeSerie.fold conditionalExpectationFromGraph
-                             (fun _ (GraphState(p,_,_,_,_)) -> p)
-                             (fun _ state -> Graph.updateVariables updateStrat state)
-                             (fun dataPoint expect state -> updateGraph dataPoint expect state)
-                             (fun _ (GraphState(_,_,innov,_,_)) -> Array.zeroCreate innov.Length)
-                             array
-                             graph   *)      
-
+    let oneStepRollingForecast array (T(name,(Graph(state,sk)),updateStrat)) = 
+        let oneStepRollingForecastM truthPoint = Graph.TimeSerie.oneStepRollingForecastM name updateStrat sk truthPoint
+        Graph.TimeSerie.fold1 oneStepRollingForecastM state array |> fst
+                             
+(*    let rollingConditionalExpectation steps (array:float array) (T(name,(Graph(state,sk)),updateStrat)) = 
+        let rollingConditionalExpectationM = Graph.TimeSerie.rollingConditionalExpectationM steps updateStrat sk
+        let result = Graph.TimeSerie.fold rollingConditionalExpectationM state array |> fst
+        Array.concat [|Array.zeroCreate (steps-1);result|] // to get same length as 'array'.*)
+               
     let fit (array:float array) (T(name,graph,updateStrat)) = 
         let len = array.Length
         let (Graph(GraphState(initParam,initVariables,initInnov,initPrev,initConstants),initSkeleton)) = graph
