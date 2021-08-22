@@ -17,6 +17,8 @@ The major techniques I use are listed below. I already had an idea about most of
 + Models
   + AR / MA
   + SETAR
++ SIMD instructions
++ Parallelization
 
 # TO DO
 - [ ] Parallel Tree traversal
@@ -35,3 +37,4 @@ The major techniques I use are listed below. I already had an idea about most of
   - [ ] Heteroscedasticity
   - [ ] Normally Distributed
   - [ ] (Non)Stationarity
+- [ ] Rewrite using float32 (faster computations).
