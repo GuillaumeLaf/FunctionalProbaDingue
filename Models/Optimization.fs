@@ -19,6 +19,18 @@ module Optimization =
                        let threshold = Array.init 61 (fun i -> float(i-30)*0.1) |> Discrete // Space defined by Tchebychev inequality. Must be rescaled before use !
                        Array.concat [|coeffs12;[|threshold|];[|delay|]|]
 
+        let continuousBoundsIndexed bounds = 
+            bounds |> Array.indexed
+                   |> Array.choose (function
+                                        | i, Continuous(mn,mx) -> Some (i, (mn,mx))
+                                        | _ -> None)
+
+        let discreteBoundsIndexed bounds = 
+            bounds |> Array.indexed
+                   |> Array.choose (function
+                                        | i, Discrete(pts) -> Some (i, pts)
+                                        | _ -> None)
+                                        
     module Params = 
         type ParameterTier = 
             | Tier1
@@ -37,7 +49,14 @@ module Optimization =
                        let coeffs12 = coeffs12 |> Array.mapi (fun i x -> ContinuousParameter(x,bounds.[i],Tier1))
                        let threshDelay = threshDelay |> Array.mapi (fun i x -> DiscreteParameter(x,bounds.[i],Tier2))
                        Array.concat [|coeffs12;threshDelay|]
-            
+
+        let chooseTierIndexed tier parameters = 
+            parameters |> Array.indexed
+                       |> Array.choose (function 
+                                         | i, ContinuousParameter(x,bounds,t) when t = tier -> Some (i, (x, bounds))
+                                         | i, DiscreteParameter(x,bounds,t) when t = tier -> Some (i, (x, bounds)) 
+                                         | _ -> None )
+
     type ContinuousObjectiveFunction = 
         | LeastSquares
 
@@ -78,19 +97,12 @@ module Optimization =
         | MA -> Problem(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Tier1, End)
         | SETAR -> Problem(IntegerMethod |> DiscreteMethod, LeastSquares |> ContinuousFunction, Params.Tier2, 
                      Problem(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Tier1, End))
- 
-        
-    let indicesOfTier tier parameters = 
-        parameters |> Array.map (fun x -> )
 
     let fit array (T(name,(Graph((GraphState(p,v,i,prev,c)),sk)),updateStrat)) = 
         let parameters = Params.ofModel name p
         let problem = ofModel name
 
         let errorFunction pa = predictionErrors array (T(name,(Graph((GraphState(pa,v,i,prev,c)),sk)),updateStrat))
-
-        let chooseParameter chosenTier func =
-            let 
 
 (*        let solve prob = 
             match prob with
