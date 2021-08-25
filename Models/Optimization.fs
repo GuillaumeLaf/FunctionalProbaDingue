@@ -57,6 +57,23 @@ module Optimization =
                                          | i, DiscreteParameter(x,bounds,t) when t = tier -> Some (i, (x, bounds)) 
                                          | _ -> None )
 
+    module Optimizer = 
+        let J = NumericalJacobian()
+        let limitGradient x = x |> Array.map (fun x -> if System.Double.IsNaN(x) then 1e10 else x) 
+        let limitValueFunction x = if System.Double.IsInfinity(x) then 1e10 else x
+
+        let vectorToArray (v:Vector<'T>) = v.ToArray() 
+        let arrayToVector (array:'T[]) = Vector<'T>.Build.Dense array
+        let limitedVectorFunc f = vectorToArray >> f >> limitValueFunction
+        let jacobianOf (f:float[] -> float) x = J.Evaluate(f,x)
+        let limitedVectorJacobian f = vectorToArray >> jacobianOf f >> limitGradient >> arrayToVector
+
+        let BFGSOptimizer func (initGuess:float[]) =
+            let objective = ObjectiveFunction.Gradient(System.Func<_,_> (limitedVectorFunc func), System.Func<_,_> (limitedVectorJacobian func))
+            let solver = BfgsMinimizer(1e-5, 1e-5, 1e-5, 1000)
+            let result = solver.FindMinimum(objective, Vector<float>.Build.Dense initGuess)
+            result.MinimizingPoint.AsArray()
+            
     type ContinuousObjectiveFunction = 
         | LeastSquares
 
@@ -90,8 +107,19 @@ module Optimization =
     let inline objective objectiveFunc = 
         match objectiveFunc with
             | ContinuousFunction(lossFunc) -> continuousObjective lossFunc
+            
+    let continuousMethod = function
+        | BFGS -> Optimizer.BFGSOptimizer
 
-    let ofModel name =
+    let discreteMethod = function
+        | IntegerMethod -> Optimizer.BFGSOptimizer
+
+    let optimizer method = 
+        match method with
+        | ContinuousMethod(m) -> continuousMethod m
+        | DiscreteMethod(m) -> discreteMethod m
+
+    let problemFor name =
         match name with
         | AR -> Problem(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Tier1, End)
         | MA -> Problem(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Tier1, End)
@@ -100,13 +128,37 @@ module Optimization =
 
     let fit array (T(name,(Graph((GraphState(p,v,i,prev,c)),sk)),updateStrat)) = 
         let parameters = Params.ofModel name p
-        let problem = ofModel name
+        let problem = problemFor name
 
         let errorFunction pa = predictionErrors array (T(name,(Graph((GraphState(pa,v,i,prev,c)),sk)),updateStrat))
 
-(*        let solve prob = 
+        let chosenToOverallParameters (chosenParams:(int * 'a)[]) everyParams (chosenArray:float[]) = 
+            let result = Array.copy everyParams
+            chosenParams |> Array.iteri (fun i (j,_) -> result.[j] <- chosenArray.[i])
+            result
+
+        let errorFuncForChosenParams (chosenParams:(int * 'a)[]) everyParams = 
+            let result = Array.copy everyParams
+            let innerFunc chosenParamArray = 
+                chosenParamArray |> Array.iteri ( fun i x -> result.[(fst (chosenParams.[i]))] <- x )
+                errorFunction result |> fst
+            innerFunc
+
+        let initialGuess chosenParams (initParams:float[]) = 
+            chosenParams |> Array.map (fun (i,_) -> initParams.[i])
+
+        let rec solve prob initParams = 
             match prob with
-            | Problem(method, func, tier, sub) -> *)
+            | Problem(method, loss, tier, sub) -> let chosenParams = Params.chooseTierIndexed tier parameters
+                                                  let initGuess = initialGuess chosenParams initParams
+                                                  let lossFunction = errorFuncForChosenParams chosenParams initParams >> objective loss
+                                                  let fittedParams = optimizer method lossFunction initGuess
+                                                                        |> chosenToOverallParameters chosenParams initParams
+                                                  solve sub fittedParams
+            | End -> initParams
+
+        let fittedParameters = solve problem p
+        (T(name,(Graph((GraphState(fittedParameters,v,i,prev,c)),sk)),updateStrat))
         
         
         

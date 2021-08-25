@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="CSVManagement.fs" />
     <Compile Include="Monad.fs" />
     <Compile Include="UtilitiesSIMD.fs" />
     <Compile Include="PSO_algorithm.fs" />
@@ -29,6 +30,7 @@
 
   <ItemGroup>
     <PackageReference Include="FSharp.Charting" Version="2.1.0" />
+    <PackageReference Include="FSharp.Data" Version="4.2.2" />
     <PackageReference Include="MathNet.Numerics" Version="4.15.0" />
     <PackageReference Include="MathNet.Numerics.FSharp" Version="4.15.0" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
