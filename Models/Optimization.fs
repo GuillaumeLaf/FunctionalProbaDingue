@@ -6,56 +6,44 @@ module Optimization =
     open MathNet.Numerics.LinearAlgebra
 
     module Bounds = 
-        type BoundType<'T> = 
-            | Continuous of 'T * 'T
-            | Discrete of 'T[]
-
+        type ContinuousBound<'T> = ContinuousBound of 'T * 'T
+        type DiscreteBound<'T> = DiscreteBound of 'T[]
+        type B<'T> = ContinuousBound<'T> [] option * DiscreteBound<'T> [] option
+ 
         let ofModel name parameterArray = 
             match name with
-            | AR -> parameterArray |> Array.map (fun _ -> (-1.0,1.0) |> Continuous)
-            | MA -> parameterArray |> Array.map (fun _ -> (-1.0,1.0) |> Continuous)
-            | SETAR -> let coeffs12 = Array.zeroCreate (parameterArray.Length - 2) |> Array.map (fun _ -> (-1.0,1.0) |> Continuous)
-                       let delay = Array.init 11 (fun i -> float(i + 1)) |> Discrete
-                       let threshold = Array.init 61 (fun i -> float(i-30)*0.1) |> Discrete // Space defined by Tchebychev inequality. Must be rescaled before use !
-                       Array.concat [|coeffs12;[|threshold|];[|delay|]|]
-
-        let continuousBoundsIndexed bounds = 
-            bounds |> Array.indexed
-                   |> Array.choose (function
-                                        | i, Continuous(mn,mx) -> Some (i, (mn,mx))
-                                        | _ -> None)
-
-        let discreteBoundsIndexed bounds = 
-            bounds |> Array.indexed
-                   |> Array.choose (function
-                                        | i, Discrete(pts) -> Some (i, pts)
-                                        | _ -> None)
+            | AR -> let cBounds = parameterArray |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
+                    B(Some cBounds, None)
+            | MA -> let cBounds = parameterArray |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
+                    B(Some cBounds, None)
+            | SETAR -> let coeffs12 = Array.zeroCreate (parameterArray.Length - 2) |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
+                       let threshold = Array.init 61 (fun i -> float(i-30)*0.1) |> DiscreteBound
+                       let delay = Array.init 11 (fun i -> float(i + 1)) |> DiscreteBound
+                       B(Some coeffs12, Some [|threshold;delay|])
                                         
-    module Params = 
-        type ParameterTier = 
-            | Tier1
-            | Tier2
+    module Parameter =
+        type ContinuousParameterInfo<'T> = ContinuousParameterInfo of idx:int * Bounds.ContinuousBound<'T>
+        type DiscreteParameterInfo<'T> = DiscreteParameterInfo of idx:int * Bounds.DiscreteBound<'T>
+        type Info<'T> = ContinuousParameterInfo<'T> [] option * DiscreteParameterInfo<'T> [] option
+        type Params<'T> = Params of 'T [] * Info<'T>
 
-        type ParameterType<'T> = 
-            | ContinuousParameter of 'T * Bounds.BoundType<'T> * ParameterTier
-            | DiscreteParameter of 'T * Bounds.BoundType<'T> * ParameterTier
-
-        let ofModel name parameterArray = 
-            let bounds = Bounds.ofModel name parameterArray
-            match name with
-            | AR -> parameterArray |> Array.mapi (fun i x -> ContinuousParameter(x,bounds.[i],Tier1))
-            | MA -> parameterArray |> Array.mapi (fun i x -> ContinuousParameter(x,bounds.[i],Tier1))
-            | SETAR -> let coeffs12, threshDelay = parameterArray |> Array.splitAt (parameterArray.Length-2)
-                       let coeffs12 = coeffs12 |> Array.mapi (fun i x -> ContinuousParameter(x,bounds.[i],Tier1))
-                       let threshDelay = threshDelay |> Array.mapi (fun i x -> DiscreteParameter(x,bounds.[i],Tier2))
-                       Array.concat [|coeffs12;threshDelay|]
-
-        let chooseTierIndexed tier parameters = 
-            parameters |> Array.indexed
-                       |> Array.choose (function 
-                                         | i, ContinuousParameter(x,bounds,t) when t = tier -> Some (i, (x, bounds))
-                                         | i, DiscreteParameter(x,bounds,t) when t = tier -> Some (i, (x, bounds)) 
-                                         | _ -> None )
+        let ofModel name array = 
+            let arrayIndexed = Array.indexed array
+            let cb, db = Bounds.ofModel name array
+            let info = match name with 
+                        | AR -> let cb = cb |> Option.get
+                                let cp = arrayIndexed |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
+                                Info(Some cp, None)
+                        | MA -> let cb = cb |> Option.get
+                                let cp = arrayIndexed |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
+                                Info(Some cp, None)
+                        | SETAR -> let cb = cb |> Option.get
+                                   let db = db |> Option.get
+                                   let coeffs12, threshDelay = arrayIndexed |> Array.splitAt (array.Length-2)
+                                   let coeffs12 = coeffs12 |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
+                                   let threshDelay = threshDelay |> Array.map (fun (i,_) -> DiscreteParameterInfo(i,db.[i]))
+                                   Info(Some coeffs12, Some threshDelay)
+            Params(array, info)
 
     module Optimizer = 
         let J = NumericalJacobian()
@@ -64,6 +52,7 @@ module Optimization =
 
         let vectorToArray (v:Vector<'T>) = v.ToArray() 
         let arrayToVector (array:'T[]) = Vector<'T>.Build.Dense array
+
         let limitedVectorFunc f = vectorToArray >> f >> limitValueFunction
         let jacobianOf (f:float[] -> float) x = J.Evaluate(f,x)
         let limitedVectorJacobian f = vectorToArray >> jacobianOf f >> limitGradient >> arrayToVector
@@ -73,6 +62,9 @@ module Optimization =
             let solver = BfgsMinimizer(1e-5, 1e-5, 1e-5, 1000)
             let result = solver.FindMinimum(objective, Vector<float>.Build.Dense initGuess)
             result.MinimizingPoint.AsArray()
+
+        // let tryAll func (initGuess:float[]) = 
+            
             
     type ContinuousObjectiveFunction = 
         | LeastSquares
@@ -90,9 +82,9 @@ module Optimization =
         | ContinuousMethod of ContinuousOptimizationMethod
         | DiscreteMethod of DiscreteOptimizationMethod
 
-    type OptimizationProblem = 
-        | Problem of OptimizationMethod * ObjectiveFunction * Params.ParameterTier * OptimizationProblem
-        | End
+    type Problem<'T> = 
+        | Classical of OptimizationMethod * ObjectiveFunction * Parameter.Params<'T>
+        | Recursive of OptimizationMethod * ObjectiveFunction * Parameter.Params<'T> * Problem<'T>
 
     let predictionErrors array (T(name,(Graph(state,sk)),updateStrat)) = 
         let oneStepRollingForecastM truthPoint = Graph.TimeSerie.oneStepRollingForecastM name updateStrat sk truthPoint
@@ -112,6 +104,7 @@ module Optimization =
         | BFGS -> Optimizer.BFGSOptimizer
 
     let discreteMethod = function
+        // | TryAll -> Optimizer.tryAll
         | IntegerMethod -> Optimizer.BFGSOptimizer
 
     let optimizer method = 
@@ -121,41 +114,45 @@ module Optimization =
 
     let problemFor name =
         match name with
-        | AR -> Problem(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Tier1, End)
-        | MA -> Problem(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Tier1, End)
-        | SETAR -> Problem(IntegerMethod |> DiscreteMethod, LeastSquares |> ContinuousFunction, Params.Tier2, 
-                     Problem(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Tier1, End))
+        | AR -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Continuous)
+        | MA -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Continuous)
+        | SETAR -> Recursive(IntegerMethod |> DiscreteMethod, LeastSquares |> ContinuousFunction, Params.Discrete, 
+                     Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Continuous))
 
     let fit array (T(name,(Graph((GraphState(p,v,i,prev,c)),sk)),updateStrat)) = 
-        let parameters = Params.ofModel name p
+        let parametersInfo = ParameterInfo.ofModel name p
         let problem = problemFor name
 
-        let errorFunction pa = predictionErrors array (T(name,(Graph((GraphState(pa,v,i,prev,c)),sk)),updateStrat))
+        let errorFunction pa = predictionErrors array (T(name,(Graph((GraphState(pa,v,i,prev,c)),sk)),updateStrat)) 
 
-        let chosenToOverallParameters (chosenParams:(int * 'a)[]) everyParams (chosenArray:float[]) = 
+        let partialToEntireParameters (partialParameters:(int * 'a)[]) everyParams (partialParametersArray:float[]) = 
             let result = Array.copy everyParams
-            chosenParams |> Array.iteri (fun i (j,_) -> result.[j] <- chosenArray.[i])
+            partialParameters |> Array.iteri (fun i (j,_) -> result.[j] <- partialParametersArray.[i])
             result
 
-        let errorFuncForChosenParams (chosenParams:(int * 'a)[]) everyParams = 
-            let result = Array.copy everyParams
-            let innerFunc chosenParamArray = 
-                chosenParamArray |> Array.iteri ( fun i x -> result.[(fst (chosenParams.[i]))] <- x )
+        let errorFuncForPartialParameters (partialParameters:(int * 'a)[]) f (initParams:float[]) = 
+            let innerFunc partialParametersArray = 
+                let (result:float[]) = f initParams
+                partialParametersArray |> Array.iteri ( fun i x -> result.[(fst (partialParameters.[i]))] <- x )
                 errorFunction result |> fst
             innerFunc
 
-        let initialGuess chosenParams (initParams:float[]) = 
-            chosenParams |> Array.map (fun (i,_) -> initParams.[i])
+        let initialGuess partialParameters (initParams:float[]) = 
+            partialParameters |> Array.map (fun (i,_) -> initParams.[i])
 
-        let rec solve prob initParams = 
+        let solve problem initParams = 
+            match problem with
+            | Classical(m,l,t) -> 
+
+(*        let rec solve prob initParams = 
             match prob with
             | Problem(method, loss, tier, sub) -> let chosenParams = Params.chooseTierIndexed tier parameters
                                                   let initGuess = initialGuess chosenParams initParams
-                                                  let lossFunction = errorFuncForChosenParams chosenParams initParams >> objective loss
-                                                  let fittedParams = optimizer method lossFunction initGuess
-                                                                        |> chosenToOverallParameters chosenParams initParams
-                                                  solve sub fittedParams
-            | End -> initParams
+                                                  let lossFunction = errorFuncForChosenParams chosenParams (solve sub) initParams >> objective loss
+                                                  optimizer method lossFunction initGuess
+                                                          |> chosenToOverallParameters chosenParams initParams
+                                                  
+            | End -> initParams*)
 
         let fittedParameters = solve problem p
         (T(name,(Graph((GraphState(fittedParameters,v,i,prev,c)),sk)),updateStrat))
