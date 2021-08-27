@@ -8,42 +8,81 @@ module Optimization =
     module Bounds = 
         type ContinuousBound<'T> = ContinuousBound of 'T * 'T
         type DiscreteBound<'T> = DiscreteBound of 'T[]
-        type B<'T> = ContinuousBound<'T> [] option * DiscreteBound<'T> [] option
+        type B<'T> = ContinuousBound<'T> [] * DiscreteBound<'T> []
  
         let ofModel name parameterArray = 
             match name with
             | AR -> let cBounds = parameterArray |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
-                    B(Some cBounds, None)
+                    B(cBounds, [||])
             | MA -> let cBounds = parameterArray |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
-                    B(Some cBounds, None)
+                    B(cBounds, [||])
             | SETAR -> let coeffs12 = Array.zeroCreate (parameterArray.Length - 2) |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
                        let threshold = Array.init 61 (fun i -> float(i-30)*0.1) |> DiscreteBound
                        let delay = Array.init 11 (fun i -> float(i + 1)) |> DiscreteBound
-                       B(Some coeffs12, Some [|threshold;delay|])
+                       B(coeffs12,[|threshold;delay|])
                                         
     module Parameter =
+        type ParameterType = 
+            | Continuous
+            | Discrete
         type ContinuousParameterInfo<'T> = ContinuousParameterInfo of idx:int * Bounds.ContinuousBound<'T>
         type DiscreteParameterInfo<'T> = DiscreteParameterInfo of idx:int * Bounds.DiscreteBound<'T>
-        type Info<'T> = ContinuousParameterInfo<'T> [] option * DiscreteParameterInfo<'T> [] option
-        type Params<'T> = Params of 'T [] * Info<'T>
 
+        type Info<'T> = Info of ContinuousParameterInfo<'T> [] * DiscreteParameterInfo<'T> []
+        type PartialInfo<'T> = PartialInfo of ContinuousParameterInfo<'T> [] * DiscreteParameterInfo<'T> []
+
+        type Params<'T> = Params of 'T [] * Info<'T>
+        type PartialParams<'T> = PartialParams of 'T[] * PartialInfo<'T>
+
+        let indexInfo t info = 
+            let (Info(cinfo, dinfo)) = info
+            match t with 
+            | Continuous -> cinfo |> Array.map (fun (ContinuousParameterInfo(i,_)) -> i)  
+            | Discrete -> dinfo |> Array.map (fun (DiscreteParameterInfo(i,_)) -> i)         
+             
         let ofModel name array = 
             let arrayIndexed = Array.indexed array
             let cb, db = Bounds.ofModel name array
             let info = match name with 
-                        | AR -> let cb = cb |> Option.get
-                                let cp = arrayIndexed |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
-                                Info(Some cp, None)
-                        | MA -> let cb = cb |> Option.get
-                                let cp = arrayIndexed |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
-                                Info(Some cp, None)
-                        | SETAR -> let cb = cb |> Option.get
-                                   let db = db |> Option.get
-                                   let coeffs12, threshDelay = arrayIndexed |> Array.splitAt (array.Length-2)
+                        | AR -> let cp = arrayIndexed |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
+                                Info(cp, [||])
+                        | MA -> let cp = arrayIndexed |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
+                                Info(cp, [||])
+                        | SETAR -> let coeffs12, threshDelay = arrayIndexed |> Array.splitAt (array.Length-2)
                                    let coeffs12 = coeffs12 |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
                                    let threshDelay = threshDelay |> Array.map (fun (i,_) -> DiscreteParameterInfo(i,db.[i]))
-                                   Info(Some coeffs12, Some threshDelay)
+                                   Info(coeffs12, threshDelay)
             Params(array, info)
+
+        let toArray (Params(array,_)) = array
+
+        let split (p:Params<'T>) = 
+            let (Params(array,info)) = p
+            let (Info(cinfo,dinfo)) = info
+            let cidx = indexInfo Continuous info
+            let didx = indexInfo Discrete info
+            let cSubArray = [|for i in cidx do array.[i]|]
+            let dSubArray = [|for i in didx do array.[i]|]
+            PartialParams(cSubArray,PartialInfo(cinfo,[||])),PartialParams(dSubArray,PartialInfo([||],dinfo))
+
+        let extractPartial t (p:Params<'T>) = 
+            let cSplit, dSplit = p |> split
+            match t with
+            | Continuous -> cSplit
+            | Discrete -> dSplit
+
+        let group (PartialParams(array1,(PartialInfo(cp1,dp1)))) (PartialParams(array2,(PartialInfo(cp2,dp2)))) = 
+            let array = Array.concat [|array1;array2|]
+            let cp = Array.concat [|cp1;cp2|]
+            let dp = Array.concat [|dp1;dp2|]
+            Params(array,Info(cp,dp))
+
+        let replaceIn (p:Params<'T>) (PartialParams(partialArray, partialInfo)) =
+            let cSplit, dSplit = p |> split
+            match partialInfo with
+            | PartialInfo(c, [||]) -> group (PartialParams(partialArray, partialInfo)) dSplit
+            | PartialInfo([||], d) -> group cSplit (PartialParams(partialArray, partialInfo))
+            | _ -> invalidArg "partialInfo" "Something went wrong with replacing partial parameters into parameters."
 
     module Optimizer = 
         let J = NumericalJacobian()
@@ -83,8 +122,8 @@ module Optimization =
         | DiscreteMethod of DiscreteOptimizationMethod
 
     type Problem<'T> = 
-        | Classical of OptimizationMethod * ObjectiveFunction * Parameter.Params<'T>
-        | Recursive of OptimizationMethod * ObjectiveFunction * Parameter.Params<'T> * Problem<'T>
+        | Classical of OptimizationMethod * ObjectiveFunction * Parameter.ParameterType
+        | Recursive of OptimizationMethod * ObjectiveFunction * Parameter.ParameterType * Problem<'T>
 
     let predictionErrors array (T(name,(Graph(state,sk)),updateStrat)) = 
         let oneStepRollingForecastM truthPoint = Graph.TimeSerie.oneStepRollingForecastM name updateStrat sk truthPoint
@@ -104,7 +143,7 @@ module Optimization =
         | BFGS -> Optimizer.BFGSOptimizer
 
     let discreteMethod = function
-        // | TryAll -> Optimizer.tryAll
+        // | BruteForce -> Optimizer.BruteForce
         | IntegerMethod -> Optimizer.BFGSOptimizer
 
     let optimizer method = 
@@ -114,47 +153,41 @@ module Optimization =
 
     let problemFor name =
         match name with
-        | AR -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Continuous)
-        | MA -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Continuous)
-        | SETAR -> Recursive(IntegerMethod |> DiscreteMethod, LeastSquares |> ContinuousFunction, Params.Discrete, 
-                     Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Params.Continuous))
+        | AR -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous)
+        | MA -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous)
+        | SETAR -> Recursive(IntegerMethod |> DiscreteMethod, LeastSquares |> ContinuousFunction, Parameter.Discrete, 
+                     Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous))
 
     let fit array (T(name,(Graph((GraphState(p,v,i,prev,c)),sk)),updateStrat)) = 
-        let parametersInfo = ParameterInfo.ofModel name p
+        let parameters = Parameter.ofModel name p
         let problem = problemFor name
 
-        let errorFunction pa = predictionErrors array (T(name,(Graph((GraphState(pa,v,i,prev,c)),sk)),updateStrat)) 
+        let errorFunction pa = predictionErrors array (T(name,(Graph((GraphState(pa,v,i,prev,c)),sk)),updateStrat)) |> fst
 
-        let partialToEntireParameters (partialParameters:(int * 'a)[]) everyParams (partialParametersArray:float[]) = 
-            let result = Array.copy everyParams
-            partialParameters |> Array.iteri (fun i (j,_) -> result.[j] <- partialParametersArray.[i])
-            result
+        let partialToParameter partialType (p:Parameter.Params<'T>) partialArray = 
+            let (Parameter.PartialParams(_, partialInfo)) = Parameter.extractPartial partialType p
+            Parameter.replaceIn p (Parameter.PartialParams(partialArray,partialInfo))
 
-        let errorFuncForPartialParameters (partialParameters:(int * 'a)[]) f (initParams:float[]) = 
-            let innerFunc partialParametersArray = 
-                let (result:float[]) = f initParams
-                partialParametersArray |> Array.iteri ( fun i x -> result.[(fst (partialParameters.[i]))] <- x )
-                errorFunction result |> fst
-            innerFunc
+        let initialGuessFrom partialType (p:Parameter.Params<'T>) = 
+            let (Parameter.PartialParams(carray,_)), (Parameter.PartialParams(darray,_)) = p |> Parameter.split
+            match partialType with
+            | Parameter.Continuous -> carray
+            | Parameter.Discrete -> darray
 
-        let initialGuess partialParameters (initParams:float[]) = 
-            partialParameters |> Array.map (fun (i,_) -> initParams.[i])
-
-        let solve problem initParams = 
+        let rec solve problem initParams = 
             match problem with
-            | Classical(m,l,t) -> 
+            | Classical(m,l,t) -> let initGuess = initParams |> initialGuessFrom t
+                                  let lossFunction = partialToParameter t initParams >> Parameter.toArray >> errorFunction>> objective l
+                                  optimizer m lossFunction initGuess
+                                    |> partialToParameter t initParams
 
-(*        let rec solve prob initParams = 
-            match prob with
-            | Problem(method, loss, tier, sub) -> let chosenParams = Params.chooseTierIndexed tier parameters
-                                                  let initGuess = initialGuess chosenParams initParams
-                                                  let lossFunction = errorFuncForChosenParams chosenParams (solve sub) initParams >> objective loss
-                                                  optimizer method lossFunction initGuess
-                                                          |> chosenToOverallParameters chosenParams initParams
-                                                  
-            | End -> initParams*)
+            | Recursive(m,l,t,sub) -> let initGuess = initParams |> initialGuessFrom t
+                                      let recursiveFunc = (fun x -> solve sub (partialToParameter t initParams x))
+                                      let lossFunction = partialToParameter t initParams >> Parameter.toArray >> errorFunction >> objective l
+                                      optimizer m lossFunction initGuess
+                                        |> partialToParameter t initParams
 
-        let fittedParameters = solve problem p
+        let (Parameter.Params(fittedParameters, _)) = solve problem parameters
         (T(name,(Graph((GraphState(fittedParameters,v,i,prev,c)),sk)),updateStrat))
         
         
