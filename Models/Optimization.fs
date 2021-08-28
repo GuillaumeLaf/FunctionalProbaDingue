@@ -49,12 +49,16 @@ module Optimization =
                         | MA -> let cp = arrayIndexed |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
                                 Info(cp, [||])
                         | SETAR -> let coeffs12, threshDelay = arrayIndexed |> Array.splitAt (array.Length-2)
-                                   let coeffs12 = coeffs12 |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
-                                   let threshDelay = threshDelay |> Array.map (fun (i,_) -> DiscreteParameterInfo(i,db.[i]))
+                                   let coeffs12 = coeffs12 |> Array.mapi (fun i _ -> ContinuousParameterInfo(i,cb.[i]))
+                                   let threshDelay = threshDelay |> Array.mapi (fun i _ -> DiscreteParameterInfo(i,db.[i]))
                                    Info(coeffs12, threshDelay)
             Params(array, info)
 
         let toArray (Params(array,_)) = array
+
+        let notType t = function
+            | Continuous -> Discrete
+            | Discrete -> Continuous
 
         let split (p:Params<'T>) = 
             let (Params(array,info)) = p
@@ -84,6 +88,12 @@ module Optimization =
             | PartialInfo([||], d) -> group cSplit (PartialParams(partialArray, partialInfo))
             | _ -> invalidArg "partialInfo" "Something went wrong with replacing partial parameters into parameters."
 
+        let partialArray partialType (p:Params<'T>) = 
+            let (PartialParams(carray,_)), (PartialParams(darray,_)) = p |> split
+            match partialType with
+            | Continuous -> carray
+            | Discrete -> darray
+
     module Optimizer = 
         let J = NumericalJacobian()
         let limitGradient x = x |> Array.map (fun x -> if System.Double.IsNaN(x) then 1e10 else x) 
@@ -102,7 +112,7 @@ module Optimization =
             let result = solver.FindMinimum(objective, Vector<float>.Build.Dense initGuess)
             result.MinimizingPoint.AsArray()
 
-        // let tryAll func (initGuess:float[]) = 
+        // let BruteForce func (initGuess:float[]) = 
             
             
     type ContinuousObjectiveFunction = 
@@ -168,22 +178,15 @@ module Optimization =
             let (Parameter.PartialParams(_, partialInfo)) = Parameter.extractPartial partialType p
             Parameter.replaceIn p (Parameter.PartialParams(partialArray,partialInfo))
 
-        let initialGuessFrom partialType (p:Parameter.Params<'T>) = 
-            let (Parameter.PartialParams(carray,_)), (Parameter.PartialParams(darray,_)) = p |> Parameter.split
-            match partialType with
-            | Parameter.Continuous -> carray
-            | Parameter.Discrete -> darray
-
         let rec solve problem initParams = 
             match problem with
-            | Classical(m,l,t) -> let initGuess = initParams |> initialGuessFrom t
+            | Classical(m,l,t) -> let initGuess = initParams |> Parameter.partialArray t
                                   let lossFunction = partialToParameter t initParams >> Parameter.toArray >> errorFunction>> objective l
                                   optimizer m lossFunction initGuess
-                                    |> partialToParameter t initParams
+                                        |> partialToParameter t initParams
 
-            | Recursive(m,l,t,sub) -> let initGuess = initParams |> initialGuessFrom t
-                                      let recursiveFunc = (fun x -> solve sub (partialToParameter t initParams x))
-                                      let lossFunction = partialToParameter t initParams >> Parameter.toArray >> errorFunction >> objective l
+            | Recursive(m,l,t,sub) -> let initGuess = initParams |> Parameter.partialArray t
+                                      let lossFunction = partialToParameter t initParams >> solve sub >> Parameter.toArray >> errorFunction >> objective l
                                       optimizer m lossFunction initGuess
                                         |> partialToParameter t initParams
 
