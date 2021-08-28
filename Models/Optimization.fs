@@ -20,6 +20,12 @@ module Optimization =
                        let threshold = Array.init 61 (fun i -> float(i-30)*0.1) |> DiscreteBound
                        let delay = Array.init 11 (fun i -> float(i + 1)) |> DiscreteBound
                        B(coeffs12,[|threshold;delay|])
+
+        let continuousToTuple (bounds:ContinuousBound<'T>[]) = bounds |> Array.map (fun (ContinuousBound(mn,mx)) -> (mn,mx))
+        let continuousToSplittedArray (bounds:ContinuousBound<'T>[]) = 
+            let mns = bounds |> Array.map (fun (ContinuousBound(mn,_)) -> mn)
+            let mxs = bounds |> Array.map (fun (ContinuousBound(mx,_)) -> mx)
+            mns, mxs
                                         
     module Parameter =
         type ParameterType = 
@@ -94,7 +100,19 @@ module Optimization =
             | Continuous -> carray
             | Discrete -> darray
 
+        let boundsFrom (p:Params<'T>) = 
+            let (Params(_,Info(cinfo,dinfo))) = p
+            let cBounds = cinfo |> Array.map (fun (ContinuousParameterInfo(_,b)) -> b)
+            let dBounds = dinfo |> Array.map (fun (DiscreteParameterInfo(_,b)) -> b)
+            Bounds.B(cBounds, dBounds)
+
     module Optimizer = 
+        type OptimizerType = 
+            | Continuous of ((float[] -> float) -> float[] -> Bounds.ContinuousBound<float>[] -> float[])
+            | Discrete of ((float[] -> float) -> float[] -> Bounds.DiscreteBound<float>[] -> float[])
+
+
+
         let J = NumericalJacobian()
         let limitGradient x = x |> Array.map (fun x -> if System.Double.IsNaN(x) then 1e10 else x) 
         let limitValueFunction x = if System.Double.IsInfinity(x) then 1e10 else x
@@ -106,13 +124,16 @@ module Optimization =
         let jacobianOf (f:float[] -> float) x = J.Evaluate(f,x)
         let limitedVectorJacobian f = vectorToArray >> jacobianOf f >> limitGradient >> arrayToVector
 
-        let BFGSOptimizer func (initGuess:float[]) =
-            let objective = ObjectiveFunction.Gradient(System.Func<_,_> (limitedVectorFunc func), System.Func<_,_> (limitedVectorJacobian func))
+        let BFGSOptimizer func (initGuess:float[]) (bounds:Bounds.ContinuousBound<float>[]) =
+            let boundsSplit = Bounds.continuousToSplittedArray bounds
+            //let objective = ObjectiveFunction.Gradient(System.Func<_,_> (limitedVectorFunc func), System.Func<_,_> (limitedVectorJacobian func))
+            let objective = ObjectiveFunction.Value(System.Func<_,_> (limitedVectorFunc func))
+            let grad = ObjectiveFunctions.ForwardDifferenceGradientObjectiveFunction(objective, arrayToVector (fst boundsSplit), arrayToVector (snd boundsSplit))
             let solver = BfgsMinimizer(1e-5, 1e-5, 1e-5, 1000)
-            let result = solver.FindMinimum(objective, Vector<float>.Build.Dense initGuess)
+            let result = solver.FindMinimum(grad, Vector<float>.Build.Dense initGuess)
             result.MinimizingPoint.AsArray()
 
-        // let BruteForce func (initGuess:float[]) = 
+        let BruteForce func (initGuess:float[]) (bounds:Bounds.DiscreteBound<float>[]) = 
             
             
     type ContinuousObjectiveFunction = 
@@ -150,11 +171,11 @@ module Optimization =
             | ContinuousFunction(lossFunc) -> continuousObjective lossFunc
             
     let continuousMethod = function
-        | BFGS -> Optimizer.BFGSOptimizer
+        | BFGS -> Optimizer.BFGSOptimizer |> Optimizer.Continuous
 
     let discreteMethod = function
-        // | BruteForce -> Optimizer.BruteForce
-        | IntegerMethod -> Optimizer.BFGSOptimizer
+        // | BruteForce -> Optimizer.BruteForce |> Optimizer.Discrete
+        | IntegerMethod -> Optimizer.BFGSOptimizer |> Optimizer.Continuous
 
     let optimizer method = 
         match method with
@@ -170,6 +191,7 @@ module Optimization =
 
     let fit array (T(name,(Graph((GraphState(p,v,i,prev,c)),sk)),updateStrat)) = 
         let parameters = Parameter.ofModel name p
+        let cbounds,dbounds = Parameter.boundsFrom parameters
         let problem = problemFor name
 
         let errorFunction pa = predictionErrors array (T(name,(Graph((GraphState(pa,v,i,prev,c)),sk)),updateStrat)) |> fst
@@ -178,16 +200,21 @@ module Optimization =
             let (Parameter.PartialParams(_, partialInfo)) = Parameter.extractPartial partialType p
             Parameter.replaceIn p (Parameter.PartialParams(partialArray,partialInfo))
 
+        let run loss initialGuess opt = 
+            match opt with
+            | Optimizer.Continuous(innerFunc) -> innerFunc loss initialGuess cbounds
+            | Optimizer.Discrete(innerFunc) -> innerFunc loss initialGuess dbounds
+
         let rec solve problem initParams = 
             match problem with
             | Classical(m,l,t) -> let initGuess = initParams |> Parameter.partialArray t
                                   let lossFunction = partialToParameter t initParams >> Parameter.toArray >> errorFunction>> objective l
-                                  optimizer m lossFunction initGuess
+                                  run lossFunction initGuess (optimizer m)
                                         |> partialToParameter t initParams
 
             | Recursive(m,l,t,sub) -> let initGuess = initParams |> Parameter.partialArray t
                                       let lossFunction = partialToParameter t initParams >> solve sub >> Parameter.toArray >> errorFunction >> objective l
-                                      optimizer m lossFunction initGuess
+                                      run lossFunction initGuess (optimizer m)
                                         |> partialToParameter t initParams
 
         let (Parameter.Params(fittedParameters, _)) = solve problem parameters
