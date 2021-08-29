@@ -15,3 +15,8 @@
         let a = autocovariance max_lag array
         a |> Array.map (fun x -> x / a.[0])
 
+    let listOfListToArray ll = ll |> Array.ofList |> Array.map (fun l -> l |> Array.ofList)
+
+    let cartesianProductList ll = List.foldBack (fun n g -> [for n' in n do for g' in g do yield n' :: g']) ll [[]]
+    let cartesianProductArray arrayOfArray = arrayOfArray |> Array.toList |> cartesianProductList |> listOfListToArray
+    

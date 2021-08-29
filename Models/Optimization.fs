@@ -17,8 +17,8 @@ module Optimization =
             | MA -> let cBounds = parameterArray |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
                     B(cBounds, [||])
             | SETAR -> let coeffs12 = Array.zeroCreate (parameterArray.Length - 2) |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
-                       let threshold = Array.init 61 (fun i -> float(i-30)*0.1) |> DiscreteBound
-                       let delay = Array.init 11 (fun i -> float(i + 1)) |> DiscreteBound
+                       let threshold = Array.init 10 (fun i -> float(i-30)*0.1) |> DiscreteBound
+                       let delay = Array.init 3 (fun i -> float(i + 1)) |> DiscreteBound
                        B(coeffs12,[|threshold;delay|])
 
         let continuousToTuple (bounds:ContinuousBound<'T>[]) = bounds |> Array.map (fun (ContinuousBound(mn,mx)) -> (mn,mx))
@@ -110,9 +110,7 @@ module Optimization =
         type OptimizerType = 
             | Continuous of ((float[] -> float) -> float[] -> Bounds.ContinuousBound<float>[] -> float[])
             | Discrete of ((float[] -> float) -> float[] -> Bounds.DiscreteBound<float>[] -> float[])
-
-
-
+    
         let J = NumericalJacobian()
         let limitGradient x = x |> Array.map (fun x -> if System.Double.IsNaN(x) then 1e10 else x) 
         let limitValueFunction x = if System.Double.IsInfinity(x) then 1e10 else x
@@ -133,8 +131,13 @@ module Optimization =
             let result = solver.FindMinimum(grad, Vector<float>.Build.Dense initGuess)
             result.MinimizingPoint.AsArray()
 
-        let BruteForce func (initGuess:float[]) (bounds:Bounds.DiscreteBound<float>[]) = 
-            
+        let BruteForce2 func (initGuess:float[]) (bounds:Bounds.DiscreteBound<float>[]) = 
+            let boundsArray = bounds |> Array.map (fun (Bounds.DiscreteBound(possibilities)) -> possibilities)
+            let cartProd = boundsArray |> Utilities.cartesianProductArray
+            let results = cartProd |> Array.Parallel.map (fun arr -> func arr)
+            results |> Array.zip cartProd
+                    |> Array.minBy (fun (_,r) -> r)
+                    |> fst
             
     type ContinuousObjectiveFunction = 
         | LeastSquares
@@ -146,6 +149,7 @@ module Optimization =
         | BFGS
 
     type DiscreteOptimizationMethod = 
+        | BruteForce
         | IntegerMethod
 
     type OptimizationMethod = 
@@ -174,7 +178,7 @@ module Optimization =
         | BFGS -> Optimizer.BFGSOptimizer |> Optimizer.Continuous
 
     let discreteMethod = function
-        // | BruteForce -> Optimizer.BruteForce |> Optimizer.Discrete
+        | BruteForce -> Optimizer.BruteForce2 |> Optimizer.Discrete
         | IntegerMethod -> Optimizer.BFGSOptimizer |> Optimizer.Continuous
 
     let optimizer method = 
@@ -186,7 +190,7 @@ module Optimization =
         match name with
         | AR -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous)
         | MA -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous)
-        | SETAR -> Recursive(IntegerMethod |> DiscreteMethod, LeastSquares |> ContinuousFunction, Parameter.Discrete, 
+        | SETAR -> Recursive(BruteForce |> DiscreteMethod, LeastSquares |> ContinuousFunction, Parameter.Discrete, 
                      Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous))
 
     let fit array (T(name,(Graph((GraphState(p,v,i,prev,c)),sk)),updateStrat)) = 
