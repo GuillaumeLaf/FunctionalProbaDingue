@@ -27,18 +27,17 @@
             (f x), nextState2
         M innerFunc
 
-    let traverse f list =
+    let traverse f list =  // Not tail-recursive for some reason.
         let (>>=) x f = bind f x
         let cons hd tl = hd :: tl
 
         let initState = rets []
-        let folder tail head  =
+        let folder tail head =
             f head >>= (fun h ->
             tail >>= (fun t ->
             rets (cons h t) ))
 
-        List.fold folder initState list
+        List.fold folder initState list  
 
     let sequence list = traverse id list
-            
-        
+

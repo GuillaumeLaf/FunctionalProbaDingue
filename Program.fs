@@ -6,6 +6,7 @@ open CSVManagement
 open Distributions
 open Utilities
 open PSO
+open TimeSeries
 open Models
 open Backtester
 open FSharp.Charting
@@ -19,14 +20,18 @@ open MathNet.Numerics.Optimization
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
-    let ghostModel = Model.build SETAR (SETARparams([|0.6|], [|-1.5|], 0.0, 1))
-    // let ghostModel = Model.build AR (ARparams([|-0.7|]))
+(*    // let ghostModel = Model.build SETAR (SETARparams([|0.6|], [|-1.5|], 0.0, 1))
+    let ghostModel = Model.build AR (ARparams([|-0.7; 0.2|]))
     let (T(_,(Graph(state,sk)),_)) = ghostModel
     let sple = (Model.sample 1000 ghostModel)
 
-    // let m = Model.build AR (ARparams([|0.0|]))
-    let m = Model.build SETAR (SETARparams([|0.0|], [|0.0|], 0.0, 1))
-    printfn "%A" (Optimization.fit sple m)
+    let m = Model.build AR (ARparams([|0.0;0.0|]))
+    // let m = Model.build SETAR (SETARparams([|0.0;0.0;0.0;0.0|], [|0.0;0.0;0.0;0.0|], 0.0, 1))
+    printfn "%A" (Optimization.fit sple m)*)
+
+    let array = Array.init 1000 (fun i -> Some (float(i)))
+    let initState = TimeSeries.State(0, array)
+    printfn "%A" (Monad.run TimeSeries.logDifferencedSeriesM initState)
     
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)

@@ -135,6 +135,7 @@ module Optimization =
             let boundsArray = bounds |> Array.map (fun (Bounds.DiscreteBound(possibilities)) -> possibilities)
             let cartProd = boundsArray |> Utilities.cartesianProductArray
             let results = cartProd |> Array.Parallel.map (fun arr -> func arr)
+            printfn "%A" results
             results |> Array.zip cartProd
                     |> Array.minBy (fun (_,r) -> r)
                     |> fst
@@ -213,11 +214,11 @@ module Optimization =
             match problem with
             | Classical(m,l,t) -> let initGuess = initParams |> Parameter.partialArray t
                                   let lossFunction = partialToParameter t initParams >> Parameter.toArray >> errorFunction>> objective l
-                                  run lossFunction initGuess (optimizer m)
-                                        |> partialToParameter t initParams
+                                  let result = run lossFunction initGuess (optimizer m) |> partialToParameter t initParams
+                                  result 
 
             | Recursive(m,l,t,sub) -> let initGuess = initParams |> Parameter.partialArray t
-                                      let lossFunction = partialToParameter t initParams >> solve sub >> Parameter.toArray >> errorFunction >> objective l
+                                      let lossFunction = partialToParameter t initParams >> (solve sub) >> Parameter.toArray >> errorFunction >> objective l
                                       run lossFunction initGuess (optimizer m)
                                         |> partialToParameter t initParams
 
