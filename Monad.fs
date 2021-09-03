@@ -20,6 +20,8 @@
             run (f innerType) nextState
         M innerFunc
 
+    let (>>=) x f = bind f x
+
     let apply mf mx = 
         let innerFunc state = 
             let f, nextState = run mf state
@@ -28,7 +30,6 @@
         M innerFunc
 
     let traverse f list =  // Not tail-recursive for some reason.
-        let (>>=) x f = bind f x
         let cons hd tl = hd :: tl
 
         let initState = rets []
@@ -41,3 +42,10 @@
 
     let sequence list = traverse id list
 
+    let inline operation op m1 m2 = 
+        m1 >>= (fun x1 ->
+        m2 >>= (fun x2 ->
+        rets (op x1 x2)))
+
+    let inline add m1 m2 = operation (+) m1 m2
+    let inline mult m1 m2 = operation ( * ) m1 m2

@@ -3,6 +3,7 @@
 
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
+    let (>>=) x f = Monad.bind f x
 
     let stepM = 
         let innerFunc (State(idx,data)) = (), (State(idx+1,data))
@@ -59,6 +60,7 @@
 
     let differencedSeriesM = mapM (differencedM id)
     let logDifferencedSeriesM = mapM (differencedM log)
+        
             
 
 

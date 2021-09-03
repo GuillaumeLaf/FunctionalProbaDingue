@@ -34,9 +34,9 @@ module Model =
                                                              |> ( +. ) (Leaf(Innovation,None,0,None))
 
         | ARparams(coeffs) -> Array.zeroCreate coeffs.Length |> Array.mapi (fun i _ -> Leaf(Parameter,None,i,None))
-                                                                                |> Array.mapi (fun i p -> Leaf(Variable,None,i,updateStrategyAR coeffs.Length i) |> ( *. ) p)
-                                                                                |> Array.reduce ( +. )
-                                                                                |> ( +. ) (Leaf(Innovation,None,0,None))
+                                                             |> Array.mapi (fun i p -> Leaf(Variable,None,i,updateStrategyAR coeffs.Length i) |> ( *. ) p)
+                                                             |> Array.reduce ( +. )
+                                                             |> ( +. ) (Leaf(Innovation,None,0,None))
 
         | SETARparams(coeffs1,coeffs2,threshold,delay) -> let ar1 = buildSkeleton (ModelType(AR,ARparams(coeffs1)))
                                                           let ar2 = buildSkeleton (ModelType(AR,ARparams(coeffs2)))
