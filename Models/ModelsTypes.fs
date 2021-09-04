@@ -6,8 +6,8 @@ module ModelsTypes =
     type Op = 
         | Addition
         | Multiplication
-        //| Substraction
-        //| LessThan // return 1.0 if Left node is less than Rigth node else 0.0 : (l < r)
+        | Substraction
+        | LessThan // return 1.0 if Left node is less than Rigth node else 0.0 : (l < r)
 
     type Input = 
         | Innovation

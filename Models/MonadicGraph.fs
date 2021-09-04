@@ -1,7 +1,6 @@
 ﻿namespace Model
 
 module MonadicGraph = 
-
     type Op = 
         | Addition
         | Multiplication
@@ -21,11 +20,11 @@ module MonadicGraph =
     let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Addition, N1, N2)
     let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Multiplication, N1, N2)
 
-    let parameterM idx = 
+    let fixedParameterM idx = 
         let innerFunc (State(p,v)) = p.[idx], (State(p,v))
         Monad.M innerFunc
 
-    let variableM idx = 
+    let fixedVariableM idx = 
         let innerFunc (State(p,v)) = v.[idx], (State(p,v))
         Monad.M innerFunc
 
@@ -36,7 +35,7 @@ module MonadicGraph =
                 | Leaf(input) -> leafV input n k
         loop sk id
 
-    let forwardPass skeleton = 
+    let inline skeletonM parameterM variableM innovationM skeleton = 
         fold (fun op kl kr _ k -> match op with
                                     | Addition -> kl (fun lacc -> kr (fun racc -> (Monad.add lacc racc) |> k)) 
                                     | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Monad.mult lacc racc) |> k))
@@ -44,7 +43,7 @@ module MonadicGraph =
              (fun input _ k -> match input with
                                 | Parameter(idx) -> parameterM idx |> k
                                 | Variable(idx) -> variableM idx |> k
-                                | Innovation(idx) -> Monad.rets 0.0 |> k  
+                                | Innovation(idx) -> innovationM idx |> k  
                                 | Constant(value) -> Monad.rets value |> k)
              skeleton 
 

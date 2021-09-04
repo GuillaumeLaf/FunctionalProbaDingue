@@ -47,5 +47,6 @@
         m2 >>= (fun x2 ->
         rets (op x1 x2)))
 
-    let inline add m1 m2 = operation (+) m1 m2
+    let inline add m1 m2 = operation ( + ) m1 m2
     let inline mult m1 m2 = operation ( * ) m1 m2
+

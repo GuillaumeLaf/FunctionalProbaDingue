@@ -4,8 +4,8 @@ module MonadicGraph =
 
     let inline ( +. ) (N1:Skeleton) (N2:Skeleton) = Node(Addition, N1, N2)
     let inline ( *. ) (N1:Skeleton) (N2:Skeleton) = Node(Multiplication, N1, N2)
-    //let inline ( -. ) (N1:Skeleton) (N2:Skeleton) = Node(Substraction, N1, N2)
-    //let inline ( <. ) (N1:Skeleton) (N2:Skeleton) = Node(LessThan, N1, N2)
+    let inline ( -. ) (N1:Skeleton) (N2:Skeleton) = Node(Substraction, N1, N2)
+    let inline ( <. ) (N1:Skeleton) (N2:Skeleton) = Node(LessThan, N1, N2)
 
     let fold nodeF leafV sk = 
         let rec loop n k = 
