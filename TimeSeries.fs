@@ -1,7 +1,7 @@
 ﻿namespace TimeSeries
 
 module UnivariateTimeSeries = 
-    type State<'T> = State of int * 'T option [] * innovations:'T[]  // Option type to handle missing data
+    type State<'T> = State of int * 'T option [] * innovations:'T option []  // Option type to handle missing data
 
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
@@ -39,7 +39,7 @@ module UnivariateTimeSeries =
     let innovationAtLagM lag = 
         let innerFunc (State(idx,data,innovations)) = 
             if idx-lag < 0 then
-                0.0, (State(idx,data,innovations))
+                None, (State(idx,data,innovations))
             else
                 innovations.[idx-lag], (State(idx,data,innovations))
         Monad.M innerFunc
@@ -55,7 +55,7 @@ module UnivariateTimeSeries =
     let innovationAtLeadM lead = 
         let innerFunc (State(idx,data,innovations)) = 
             if (idx+lead) >= data.Length then
-                0.0, (State(idx,data,innovations))
+                None, (State(idx,data,innovations))
             else 
                 innovations.[idx+lead], (State(idx,data,innovations))
         Monad.M innerFunc
@@ -92,13 +92,13 @@ module MultivariateTimeSeries =
 
     let mapTuple f1 f2 (x1,x2) = f1 x1, f2 x2
 
-    let inline mapOverUnivariateStates m (States(s)) = 
+    let inline mapOverStates m (States(s)) = 
         s |> Array.mapFold (fun state x -> Monad.run m x |> mapTuple id (fun x -> x :: state)) []
           |> mapTuple id (Array.ofList >> States)
 
     let inline mapOverUnivariateM m = 
         let innerFunc state = 
-            state |> mapOverUnivariateStates m
+            state |> mapOverStates m
         Monad.M innerFunc
     
     let (stepM:Monad.M<States<float>,unit[]>) = UnivariateTimeSeries.stepM |> mapOverUnivariateM
