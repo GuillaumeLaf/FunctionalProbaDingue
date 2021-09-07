@@ -39,3 +39,8 @@ module ModelsTypes =
     type ModelType = ModelType of ModelName * ModelParameters
 
     type T = T of ModelName * Graph * UpdateVariableStrategy
+
+    type Model = 
+        | AR of order:int
+        | MA of order:int
+        //| SETAR of order:int * delay:int // The two AR models have the same order

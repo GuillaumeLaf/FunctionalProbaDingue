@@ -1,7 +1,11 @@
 ﻿namespace TimeSeries
 
+open Monads
+
 module UnivariateTimeSeries = 
     type State<'T> = State of int * 'T option [] * innovations:'T option []  // Option type to handle missing data
+
+    let defaultState n = State(0, Array.init n (fun _ -> Some 0.0), Array.init n (fun _ -> Some 0.0))
 
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
@@ -18,6 +22,18 @@ module UnivariateTimeSeries =
 
     let StateM = 
         let innerFunc (State(idx,data,innovations)) = data, (State(idx,data,innovations))
+        Monad.M innerFunc
+
+    let setCurrentElementM x = 
+        let innerFunc (State(idx,data,innovations)) = 
+            data.[idx] <- Some x
+            x, (State(idx,data,innovations))
+        Monad.M innerFunc
+
+    let setCurrentInnovationM x = 
+        let innerFunc (State(idx,data,innovations)) = 
+            innovations.[idx] <- Some x
+            x, (State(idx,data,innovations))
         Monad.M innerFunc
 
     let currentElementM = 

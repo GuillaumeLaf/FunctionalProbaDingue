@@ -1,6 +1,14 @@
-﻿namespace Model
+﻿namespace Models
+
+open MathNet.Numerics.Distributions
+open Monads
 
 module MonadicGraph = 
+
+    let (<*>) = Monad.apply
+    let (<!>) = Monad.map
+    let (>>=) x f = Monad.bind f x
+
     type Op = 
         | Addition
         | Multiplication
@@ -14,11 +22,19 @@ module MonadicGraph =
     type Skeleton<'T> = 
         | Leaf of Input<'T> 
         | Node of Op * Skeleton<'T> * Skeleton<'T>
+
+    type SkeletonType = 
+        | Sampling
+        | Fitting
     
     type State<'T> = State of parameters:'T[] * variables:'T[]
 
     let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Addition, N1, N2)
     let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Multiplication, N1, N2)
+
+    let defaultState = function
+        | AR(order) | MA(order) -> State(Array.zeroCreate order, Array.zeroCreate order)
+        //| SETAR(order,delay) -> State(Array.zeroCreate (2*order+1), Array.zeroCreate (order+1))
 
     let fixedParameterM idx = 
         let innerFunc (State(p,v)) = p.[idx], (State(p,v))
@@ -27,6 +43,33 @@ module MonadicGraph =
     let fixedVariableM idx = 
         let innerFunc (State(p,v)) = v.[idx], (State(p,v))
         Monad.M innerFunc
+
+    let randomInnovationM idx = Monad.rets (Normal.Sample(0.0,1.0))
+    let inactiveInnovationM idx = Monad.rets 0.0
+
+    let setParameterM idx x = 
+        let innerFunc (State(p,v)) = 
+            p.[idx] <- x
+            x, (State(p,v))
+        Monad.M innerFunc
+
+    let setVariableM idx x = 
+        let innerFunc (State(p,v)) = 
+            v.[idx] <- x
+            x, (State(p,v))
+        Monad.M innerFunc
+
+    let setParametersM array = 
+        array |> Array.indexed
+              |> Array.toList
+              |> Monad.traverse (fun (i,x) -> setParameterM i x)
+              |> Monad.map (Array.ofList)
+
+    let setVariablesM array = 
+        array |> Array.indexed
+              |> Array.toList
+              |> Monad.traverse (fun (i,x) -> setVariableM i x)
+              |> Monad.map (Array.ofList)
 
     let inline fold nodeF leafV sk = 
         let rec loop n k = 
@@ -47,52 +90,35 @@ module MonadicGraph =
                                 | Constant(value) -> Monad.rets value |> k)
              skeleton 
 
-    type Model = 
-        | AR of order:int
-        | MA of order:int
-        | SETAR of order:int * delay:int // The two AR models have the same order
+    let defaultSkeleton = function
+        | AR(order) | MA(order) -> Array.zeroCreate order |> Array.mapi (fun i _ -> Leaf(Parameter(i)) .*. Leaf(Variable(i)))
+                                                          |> Array.reduce (.+.)
+                                                          |> (.+.) (Leaf(Innovation(0)))
 
-(*    let defaultState = function
-        | AR(order) -> State(Array.zeroCreate order, Array.zeroCreate order)
-        | MA(order) -> State(Array.zeroCreate order, Array.zeroCreate order)
-        | SETAR(order,delay) -> State(Array.zeroCreate (2*order+1), Array.zeroCreate (order+1))*)
+    let activateSkeletonM sk = function
+        | Sampling -> skeletonM fixedParameterM fixedVariableM randomInnovationM sk
+        | Fitting -> skeletonM fixedParameterM fixedVariableM inactiveInnovationM sk
 
-    // Variable update must be made at a specific time ! (Be careful of look-ahead bias).
-    let rec variableUpdate = function
-        | AR(order) -> [| for i in 1..order do TimeSeries.UnivariateTimeSeries.elementAtLagM i |]
-        | MA(order) -> [| for i in 1..order do TimeSeries.UnivariateTimeSeries.innovationAtLagM i |]
-        | SETAR(order,delay) -> Array.concat [|variableUpdate (AR(order)); [|TimeSeries.UnivariateTimeSeries.elementAtLagM delay|]|]
+    let modelM = defaultSkeleton >> activateSkeletonM
 
-(*    let updateVariableM m = 
-        let innerFunc tsState = 
-            (variableUpdate m) |> Array.map (fun x -> Monad.run x tsState |> fst), tsState
-        Monad.M innerFunc*)
+(*    
 
-    let sampleModelTimeSeriesM m skM (State(p,v)) = 
-        let innerFunc (TimeSeries.UnivariateTimeSeries.State(idx,data,innovation)) =
-            let result, graphState = Monad.run skM (State(p,v))
-            data.[idx] <- result
-            let newVariables = (variableUpdate m) |> Array.map (fun x -> Monad.run x (TimeSeries.UnivariateTimeSeries.State(idx,data,innovation)) |> fst |> Option.defaultValue 0.0)
-            (State(p,newVariables)), (TimeSeries.UnivariateTimeSeries.State(idx,data,innovation))
-        Monad.M innerFunc
+    let variableUpdateTSM m =  
+        variableUpdate m |> Array.toList
+                         |> Monad.sequence
+                         |> Monad.map (Array.ofList)
+                         |> Monad.map (Array.map (fun x -> Option.defaultValue 0.0 x))
 
+    // Output Graph Monad with result and updated graph state.
+    let currentModelTSM m skM = 
+        // May gain speed by not reconstructing the variable update array each time.
+        let tmpInnerFunc newVar sk = sk
+        variableUpdateTSM m >>= (fun newVar -> tmpInnerFunc <!> setVariablesM newVar
+                                                            <*> skM
+                                                            |> Monad.rets)
 
-
-// The final Monad must be a Time Series Monad which gives me either its state or the Monad graph (I don't know yet which). 
-// The latter contains either the simulated TS or the original TS with error of the model.
-
-(*    let modelM model skM (State(p,v)) =
-        let innerFunc (TimeSeries.UnivariateTimeSeries.State(idx,data,innovation)) = 
-            // here execute the loop through the TS state
-            // Then repack the whole thing into a TS Monad.*)
-
-
-
-
-            
-
-            
-            
-
-
-    let ma1:Skeleton<float> = Leaf(Parameter(0)) .*. Leaf(Variable(0)) .+. Leaf(Constant(1.0))
+    let foldTimeSeries m (TimeSeries.UnivariateTimeSeries.State(idx,data,innovation)) initStateGraph = 
+        data |> Array.skip idx
+             |> Array.mapFold (fun (sTS,sG) _ -> Monad.run m sTS ||> (fun mG nxSTS -> let result, nxSG = Monad.run mG sG
+                                                                                      result, (nxSTS,nxSG)))
+                              ((TimeSeries.UnivariateTimeSeries.State(idx,data,innovation)), initStateGraph)*)

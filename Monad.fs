@@ -1,14 +1,10 @@
-﻿module Monad
+﻿namespace Monads
+
+module Monad =
 
     type M<'State,'T> = M of ('State -> 'T * 'State)
 
     let run (M f) initialState = f initialState
-
-    let map f m = 
-        let innerFunc state = 
-            let innerType, nextState = run m state
-            (f innerType), nextState
-        M innerFunc
 
     let rets x = 
         let innerFunc state = x, state
@@ -22,23 +18,29 @@
 
     let (>>=) x f = bind f x
 
-    let apply mf mx = 
+    let map f m = m >>= (fun x -> rets (f x))
+
+    let apply mf mx =
+        mf >>= (fun f -> 
+        mx >>= (fun x -> 
+        rets (f x)))
+
+    let modify f = 
         let innerFunc state = 
-            let f, nextState = run mf state
-            let x, nextState2 = run mx nextState
-            (f x), nextState2
+            let newState = f state
+            (), newState
         M innerFunc
 
     let traverse f list =  // Not tail-recursive for some reason.
         let cons hd tl = hd :: tl
 
         let initState = rets []
-        let folder tail head =
+        let folder head tail =
             f head >>= (fun h ->
             tail >>= (fun t ->
             rets (cons h t) ))
 
-        List.fold folder initState list  
+        List.foldBack folder list initState
 
     let sequence list = traverse id list
 
@@ -49,4 +51,35 @@
 
     let inline add m1 m2 = operation ( + ) m1 m2
     let inline mult m1 m2 = operation ( * ) m1 m2
+
+module BiMonad = 
+    type M<'State1,'State2,'T,'U> = M of ('State1 -> 'State2 -> 'T * 'U * 'State1 * 'State2)
+
+    let run (M f) initState1 initState2 = f initState1 initState2
+
+    let rets x y = 
+        let innerFunc state1 state2 = x, y, state1, state2
+        M innerFunc
+
+    let bind f m = 
+        let innerFunc state1 state2 = 
+            let innerType1, innerType2, nextState1, nextState2 = run m state1 state2
+            run (f innerType1 innerType2) nextState1 nextState2
+        M innerFunc
+
+    let (>>=) x f = bind f x
+
+    let map f1 f2 m = m >>= (fun x1 x2 -> rets (f1 x1) (f2 x2))
+
+    let apply mf mx = 
+        mf >>= (fun f1 f2 ->
+        mx >>= (fun x1 x2 ->
+        rets (f1 x1) (f2 x2)))
+
+    let modify f = 
+        let innerFunc state1 state2 = 
+            let newState1, newState2 = f state1 state2
+            (), (), newState1, newState2
+        M innerFunc
+            
 

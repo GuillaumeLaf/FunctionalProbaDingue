@@ -1,37 +1,5 @@
 ﻿namespace Models
 
-module MonadicGraph = 
-
-    let inline ( +. ) (N1:Skeleton) (N2:Skeleton) = Node(Addition, N1, N2)
-    let inline ( *. ) (N1:Skeleton) (N2:Skeleton) = Node(Multiplication, N1, N2)
-    let inline ( -. ) (N1:Skeleton) (N2:Skeleton) = Node(Substraction, N1, N2)
-    let inline ( <. ) (N1:Skeleton) (N2:Skeleton) = Node(LessThan, N1, N2)
-
-    let fold nodeF leafV sk = 
-        let rec loop n k = 
-            match n with
-                | Node(op,left,right) -> nodeF op (loop left) (loop right) n k
-                | Leaf(input,x,idx,pullFrom) -> leafV input x idx pullFrom n k
-        loop sk id
-
-    let forwardPass (Graph(GraphState(p,v,innov,prevResult,constant),skeleton)) = 
-        fold (fun op kl kr _ k -> match op with
-                                    | Addition -> kl (fun lacc -> kr (fun racc -> (Monad.add lacc racc) |> k)) 
-                                    | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Monad.mult lacc racc) |> k))
-                                    //| Substraction -> kl (fun lacc -> kr (fun racc -> (lacc - racc) |> k))
-                                    //| LessThan -> kl (fun lacc -> kr (fun racc -> (if lacc < racc then 1.0 else 0.0) |> k))
-                                    )
-             (fun input x idx _ _ k -> match input with
-                                         | Innovation -> innov.[idx] |> k   // input arrays must at least be the same length as the number of innovation nodes.
-                                         | Parameter -> p.[idx] |> k
-                                         | Variable -> v.[idx] |> k
-                                         | PreviousResult -> prevResult.[idx] |> k // never reached
-                                         | Constant -> constant.[idx] |> k)
-             skeleton
-
-
-
-
 module Graph = 
     let inline ( +. ) (N1:Skeleton) (N2:Skeleton) = Node(Addition, N1, N2)
     let inline ( *. ) (N1:Skeleton) (N2:Skeleton) = Node(Multiplication, N1, N2)
