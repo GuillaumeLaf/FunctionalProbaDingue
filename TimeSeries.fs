@@ -27,13 +27,13 @@ module UnivariateTimeSeries =
     let setCurrentElementM x = 
         let innerFunc (State(idx,data,innovations)) = 
             data.[idx] <- Some x
-            x, (State(idx,data,innovations))
+            (), (State(idx,data,innovations))
         Monad.M innerFunc
 
     let setCurrentInnovationM x = 
         let innerFunc (State(idx,data,innovations)) = 
             innovations.[idx] <- Some x
-            x, (State(idx,data,innovations))
+            (), (State(idx,data,innovations))
         Monad.M innerFunc
 
     let currentElementM = 

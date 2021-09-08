@@ -13,10 +13,14 @@ let main argv =
     let modelSkeleton = MonadicGraph.defaultSkeleton modelName
     let modelM = MonadicGraph.modelM modelName MonadicGraph.Sampling
 
-    let graphTSM = GraphTimeSeries.runModelM modelM
+    let updateVarM = GraphTimeSeries.updateVariablesM modelName 
 
-    let defaultStates = GraphTimeSeries.defaultState modelName 500
-    printfn "%A" (defaultStates ||> BiMonad.run graphTSM)
+    let graphBM = GraphTimeSeries.sampleOnceM modelM updateVarM
+
+    let (stateTS,stateG) = GraphTimeSeries.defaultState modelName 1000
+    //let stateG = MonadicGraph.State([|0.7|],[|0.0|])
+
+    printfn "%A" (GraphTimeSeries.foldRun graphBM stateTS stateG)
 
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)

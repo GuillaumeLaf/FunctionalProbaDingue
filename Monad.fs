@@ -81,5 +81,8 @@ module BiMonad =
             let newState1, newState2 = f state1 state2
             (), (), newState1, newState2
         M innerFunc
+
+    let modifyWithMonads m1 m2 = 
+        modify (fun s1 s2 -> Monad.run m1 s1 |> snd, Monad.run m2 s2 |> snd)
             
 

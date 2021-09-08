@@ -44,7 +44,7 @@ module MonadicGraph =
         let innerFunc (State(p,v)) = v.[idx], (State(p,v))
         Monad.M innerFunc
 
-    let randomInnovationM idx = Monad.rets (Normal.Sample(0.0,1.0))
+    let randomInnovationM idx = Monad.rets ((fun _ -> Normal.Sample(0.0,1.0)) idx)
     let inactiveInnovationM idx = Monad.rets 0.0
 
     let setParameterM idx x = 
@@ -101,24 +101,3 @@ module MonadicGraph =
 
     let modelM = defaultSkeleton >> activateSkeletonM
 
-(*    
-
-    let variableUpdateTSM m =  
-        variableUpdate m |> Array.toList
-                         |> Monad.sequence
-                         |> Monad.map (Array.ofList)
-                         |> Monad.map (Array.map (fun x -> Option.defaultValue 0.0 x))
-
-    // Output Graph Monad with result and updated graph state.
-    let currentModelTSM m skM = 
-        // May gain speed by not reconstructing the variable update array each time.
-        let tmpInnerFunc newVar sk = sk
-        variableUpdateTSM m >>= (fun newVar -> tmpInnerFunc <!> setVariablesM newVar
-                                                            <*> skM
-                                                            |> Monad.rets)
-
-    let foldTimeSeries m (TimeSeries.UnivariateTimeSeries.State(idx,data,innovation)) initStateGraph = 
-        data |> Array.skip idx
-             |> Array.mapFold (fun (sTS,sG) _ -> Monad.run m sTS ||> (fun mG nxSTS -> let result, nxSG = Monad.run mG sG
-                                                                                      result, (nxSTS,nxSG)))
-                              ((TimeSeries.UnivariateTimeSeries.State(idx,data,innovation)), initStateGraph)*)
