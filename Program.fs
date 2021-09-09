@@ -18,9 +18,12 @@ let main argv =
     let graphBM = GraphTimeSeries.sampleOnceM modelM updateVarM
 
     let (stateTS,stateG) = GraphTimeSeries.defaultState modelName 1000
-    //let stateG = MonadicGraph.State([|0.7|],[|0.0|])
+    let stateG = MonadicGraph.State([|0.7|],[|0.0|],[|0.0|])
 
-    printfn "%A" (GraphTimeSeries.foldRun graphBM stateTS stateG)
+    let (TimeSeries.UnivariateTimeSeries.State(idx,data,innov)), _ = GraphTimeSeries.foldRun graphBM stateTS stateG
+    printfn "%A" (TimeSeries.UnivariateTimeSeries.State(idx,data,innov))
+    let finaldata = Array.map (fun x -> Option.defaultValue 0.0 x) data
+    printfn "%A" (Utilities.autocorrelation 10 finaldata)
 
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)

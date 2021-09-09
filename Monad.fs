@@ -31,6 +31,8 @@ module Monad =
             (), newState
         M innerFunc
 
+    let compose g f = (fun x -> (g x) >>= f)
+
     let traverse f list =  // Not tail-recursive for some reason.
         let cons hd tl = hd :: tl
 
@@ -84,5 +86,10 @@ module BiMonad =
 
     let modifyWithMonads m1 m2 = 
         modify (fun s1 s2 -> Monad.run m1 s1 |> snd, Monad.run m2 s2 |> snd)
+
+    let crossModify f1 f2 = 
+        
+
+    let compose g f = (fun x1 x2 -> (g x1 x2) >>= f)
             
 

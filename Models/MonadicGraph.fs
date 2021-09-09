@@ -27,36 +27,45 @@ module MonadicGraph =
         | Sampling
         | Fitting
     
-    type State<'T> = State of parameters:'T[] * variables:'T[]
+    type State<'T> = State of parameters:'T[] * variables:'T[] * innovations:'T[]
 
     let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Addition, N1, N2)
     let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Multiplication, N1, N2)
 
     let defaultState = function
-        | AR(order) | MA(order) -> State(Array.zeroCreate order, Array.zeroCreate order)
+        | AR(order) | MA(order) -> State(Array.zeroCreate order, Array.zeroCreate order,[|0.0|])
         //| SETAR(order,delay) -> State(Array.zeroCreate (2*order+1), Array.zeroCreate (order+1))
 
-    let fixedParameterM idx = 
-        let innerFunc (State(p,v)) = p.[idx], (State(p,v))
+    let getParameterM idx = 
+        let innerFunc (State(p,v,i)) = p.[idx], (State(p,v,i))
         Monad.M innerFunc
 
-    let fixedVariableM idx = 
-        let innerFunc (State(p,v)) = v.[idx], (State(p,v))
+    let getVariableM idx = 
+        let innerFunc (State(p,v,i)) = v.[idx], (State(p,v,i))
         Monad.M innerFunc
 
-    let randomInnovationM idx = Monad.rets ((fun _ -> Normal.Sample(0.0,1.0)) idx)
+    let getInnovationM idx = 
+        let innerFunc (State(p,v,i)) = i.[idx], (State(p,v,i))
+        Monad.M innerFunc
+
     let inactiveInnovationM idx = Monad.rets 0.0
 
     let setParameterM idx x = 
-        let innerFunc (State(p,v)) = 
+        let innerFunc (State(p,v,i)) = 
             p.[idx] <- x
-            x, (State(p,v))
+            x, (State(p,v,i))
         Monad.M innerFunc
 
     let setVariableM idx x = 
-        let innerFunc (State(p,v)) = 
+        let innerFunc (State(p,v,i)) = 
             v.[idx] <- x
-            x, (State(p,v))
+            x, (State(p,v,i))
+        Monad.M innerFunc
+
+    let setInnovationM idx x = 
+        let innerFunc (State(p,v,i)) = 
+            i.[idx] <- x
+            x, (State(p,v,i))
         Monad.M innerFunc
 
     let setParametersM array = 
@@ -69,6 +78,12 @@ module MonadicGraph =
         array |> Array.indexed
               |> Array.toList
               |> Monad.traverse (fun (i,x) -> setVariableM i x)
+              |> Monad.map (Array.ofList)
+
+    let setInnovationsM array = 
+        array |> Array.indexed
+              |> Array.toList
+              |> Monad.traverse (fun (i,x) -> setInnovationM i x)
               |> Monad.map (Array.ofList)
 
     let inline fold nodeF leafV sk = 
@@ -96,8 +111,9 @@ module MonadicGraph =
                                                           |> (.+.) (Leaf(Innovation(0)))
 
     let activateSkeletonM sk = function
-        | Sampling -> skeletonM fixedParameterM fixedVariableM randomInnovationM sk
-        | Fitting -> skeletonM fixedParameterM fixedVariableM inactiveInnovationM sk
+        | Sampling -> Monad.modify (fun (State(p,v,i)) -> State(p,v,[|Normal.Sample(0.0,1.0)|]))
+                        >>= (fun _ -> skeletonM getParameterM getVariableM getInnovationM sk)
+        | Fitting -> skeletonM getParameterM getVariableM inactiveInnovationM sk
 
     let modelM = defaultSkeleton >> activateSkeletonM
 
