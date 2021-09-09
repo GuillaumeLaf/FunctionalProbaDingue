@@ -88,7 +88,9 @@ module BiMonad =
         modify (fun s1 s2 -> Monad.run m1 s1 |> snd, Monad.run m2 s2 |> snd)
 
     let crossModify f1 f2 = 
-        
+        let innerFunc state1 state2 = 
+            (),(),(f1 state1 state2),(f2 state1 state2)
+        M innerFunc
 
     let compose g f = (fun x1 x2 -> (g x1 x2) >>= f)
             

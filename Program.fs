@@ -15,7 +15,7 @@ let main argv =
 
     let updateVarM = GraphTimeSeries.updateVariablesM modelName 
 
-    let graphBM = GraphTimeSeries.sampleOnceM modelM updateVarM
+    let graphBM = modelM |> GraphTimeSeries.sampleOnceM updateVarM
 
     let (stateTS,stateG) = GraphTimeSeries.defaultState modelName 1000
     let stateG = MonadicGraph.State([|0.7|],[|0.0|],[|0.0|])
