@@ -7,7 +7,5 @@ module Nodes =
     let linearCombinaisons n = 
         Array.zeroCreate n |> Array.mapi (fun i _ -> Leaf(Parameter(i)) .*. Leaf(Variable(i)))
         |> Array.reduce (.+.)
-
-    let convertToErrorSkeleton sk = 
         
 

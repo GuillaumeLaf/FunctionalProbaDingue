@@ -6,6 +6,8 @@ module UnivariateTimeSeries =
     type State<'T> = State of int * 'T option [] * innovations:'T option []  // Option type to handle missing data
 
     let defaultState n = State(0, Array.init n (fun _ -> Some 0.0), Array.init n (fun _ -> Some 0.0))
+    let defaultStateFrom array = 
+        State(0, array, Array.init array.Length (fun _ -> Some 0.0))
 
     let (<*>) = Monad.apply
     let (<!>) = Monad.map

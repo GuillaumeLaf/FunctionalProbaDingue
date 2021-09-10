@@ -90,19 +90,24 @@ module BiMonad =
     let modifyFirstWithMonad m1 = modifyWithMonads m1 (Monad.rets ())
     let modifySecondWithMonad m2 = modifyWithMonads (Monad.rets ()) m2
 
-    let crossModify f1 f2 = 
-        let innerFunc state1 state2 = 
-            (),(),(f1 state1 state2),(f2 state1 state2)
-        M innerFunc
-
     let compose g f = (fun x1 x2 -> (g x1 x2) >>= f)
 
-    let inline operation op m1 m2 = 
+    let inline operationPair op1 op2 m1 m2 = 
         m1 >>= (fun x1 x2 ->
         m2 >>= (fun y1 y2 ->
-        rets (op x1 x2) (op y1 y2)))
+        rets (op1 x1 y1) (op2 x2 y2)))
 
-    let inline add m1 m2 = operation ( + ) m1 m2
-    let inline mult m1 m2 = operation ( * ) m1 m2
+    let inline operationSingle op = operationPair op op 
+
+    let inline add m1 m2 = operationSingle ( + ) m1 m2
+    let inline mult m1 m2 = operationSingle ( * ) m1 m2
+
+    // The newly created monad has the same second element as the second monad input
+    let inline add1 m1 m2 = operationPair ( + ) (fun _ y2 -> y2) m1 m2
+    let inline mult1 m1 m2 = operationPair ( * ) (fun _ y2 -> y2) m1 m2
+
+    // The newly created monad has the same first element as the second monad input
+    let inline add2 m1 m2 = operationPair (fun _ y1 -> y1) ( + ) m1 m2
+    let inline mult2 m1 m2 = operationPair (fun _ y1 -> y1) ( * ) m1 m2
             
 
