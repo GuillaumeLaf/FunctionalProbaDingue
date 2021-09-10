@@ -87,6 +87,9 @@ module BiMonad =
     let modifyWithMonads m1 m2 = 
         modify (fun s1 s2 -> Monad.run m1 s1 |> snd, Monad.run m2 s2 |> snd)
 
+    let modifyFirstWithMonad m1 = modifyWithMonads m1 (Monad.rets ())
+    let modifySecondWithMonad m2 = modifyWithMonads (Monad.rets ()) m2
+
     let crossModify f1 f2 = 
         let innerFunc state1 state2 = 
             (),(),(f1 state1 state2),(f2 state1 state2)

@@ -9,32 +9,24 @@ module MonadicGraph =
     let (<!>) = Monad.map
     let (>>=) x f = Monad.bind f x
 
-    type Op = 
-        | Addition
-        | Multiplication
-
-    type Input<'T> = 
-        | Parameter of idx:int 
-        | Variable of idx:int
-        | Innovation of idx:int
-        | Constant of value:'T
-
-    type Skeleton<'T> = 
-        | Leaf of Input<'T> 
-        | Node of Op * Skeleton<'T> * Skeleton<'T>
-
-    type SkeletonType = 
-        | Sampling
-        | Fitting
-    
     type State<'T> = State of parameters:'T[] * variables:'T[] * innovations:'T[]
 
     let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Addition, N1, N2)
     let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Multiplication, N1, N2)
 
-    let defaultState = function
-        | AR(order) | MA(order) -> State(Array.zeroCreate order, Array.zeroCreate order,[|0.0|])
+    let convertModelToParameters = function
+        | AR(order) -> ARp(Array.zeroCreate order)
+        | MA(order) -> MAp(Array.zeroCreate order)
+
+    let defaultStateForSampling = function
+        | ARp(coeffs) | MAp(coeffs) -> State(coeffs, Array.zeroCreate coeffs.Length, [|0.0|])
         //| SETAR(order,delay) -> State(Array.zeroCreate (2*order+1), Array.zeroCreate (order+1))
+
+    let defaultStateForFitting = convertModelToParameters >> defaultStateForSampling
+
+    let defaultState = function
+        | Sampling(mparameters) -> defaultStateForSampling mparameters
+        | Fitting(model) -> defaultStateForFitting model
 
     let getParameterM idx = 
         let innerFunc (State(p,v,i)) = p.[idx], (State(p,v,i))
@@ -105,15 +97,17 @@ module MonadicGraph =
                                 | Constant(value) -> Monad.rets value |> k)
              skeleton 
 
-    let defaultSkeleton = function
-        | AR(order) | MA(order) -> Array.zeroCreate order |> Array.mapi (fun i _ -> Leaf(Parameter(i)) .*. Leaf(Variable(i)))
-                                                          |> Array.reduce (.+.)
-                                                          |> (.+.) (Leaf(Innovation(0)))
+    let defaultSkeletonFoSampling = function
+        | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))
 
-    let activateSkeletonM sk = function
-        | Sampling -> Monad.modify (fun (State(p,v,i)) -> State(p,v,[|Normal.Sample(0.0,1.0)|]))
-                        >>= (fun _ -> skeletonM getParameterM getVariableM getInnovationM sk)
-        | Fitting -> skeletonM getParameterM getVariableM inactiveInnovationM sk
+    let defaultSkeletonForFitting = convertModelToParameters >> defaultSkeletonFoSampling
 
-    let modelM = defaultSkeleton >> activateSkeletonM
+    let activateSkeletonForSamplingM sk = Monad.modify (fun (State(p,v,i)) -> State(p,v,[|Normal.Sample(0.0,1.0)|]))
+                                            >>= (fun _ -> skeletonM getParameterM getVariableM getInnovationM sk)
+
+    let activateSkeletonForFittingM sk = skeletonM getParameterM getVariableM inactiveInnovationM sk
+
+    let modelM = function
+        | Sampling(mparameters) -> (defaultSkeletonFoSampling >> activateSkeletonForSamplingM) mparameters
+        | Fitting(model) -> (defaultSkeletonForFitting >> activateSkeletonForFittingM) model
 

@@ -9,21 +9,10 @@ open Monads
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
-    let modelName = AR(1)
-    let modelSkeleton = MonadicGraph.defaultSkeleton modelName
-    let modelM = MonadicGraph.modelM modelName MonadicGraph.Sampling
-
-    let updateVarM = GraphTimeSeries.updateVariablesM modelName 
-
-    let graphBM = modelM |> GraphTimeSeries.sampleOnceM updateVarM
-
-    let (stateTS,stateG) = GraphTimeSeries.defaultState modelName 1000
-    let stateG = MonadicGraph.State([|0.7|],[|0.0|],[|0.0|])
-
-    let (TimeSeries.UnivariateTimeSeries.State(idx,data,innov)), _ = GraphTimeSeries.foldRun graphBM stateTS stateG
-    printfn "%A" (TimeSeries.UnivariateTimeSeries.State(idx,data,innov))
-    let finaldata = Array.map (fun x -> Option.defaultValue 0.0 x) data
-    printfn "%A" (Utilities.autocorrelation 10 finaldata)
+    let samplingModel = MAp([|0.7|]) |> Sampling
+    let (TimeSeries.UnivariateTimeSeries.State(_,data,innov)) = GraphTimeSeries.sample 100000 samplingModel
+    let finalData = data |> Array.map (fun x -> x |> Option.defaultValue 0.0)
+    printfn "%A" (Utilities.autocorrelation 10 finalData)
 
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)
