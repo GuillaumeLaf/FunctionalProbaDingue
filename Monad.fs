@@ -96,5 +96,13 @@ module BiMonad =
         M innerFunc
 
     let compose g f = (fun x1 x2 -> (g x1 x2) >>= f)
+
+    let inline operation op m1 m2 = 
+        m1 >>= (fun x1 x2 ->
+        m2 >>= (fun y1 y2 ->
+        rets (op x1 x2) (op y1 y2)))
+
+    let inline add m1 m2 = operation ( + ) m1 m2
+    let inline mult m1 m2 = operation ( * ) m1 m2
             
 

@@ -1,4 +1,8 @@
-﻿namespace Models
+﻿module test2
+
+    let x = 0
+
+(*namespace Models
 
 module Optimization = 
     open MathNet.Numerics.Optimization
@@ -234,3 +238,4 @@ module Optimization =
 
     
 
+*)

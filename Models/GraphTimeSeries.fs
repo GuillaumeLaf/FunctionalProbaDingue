@@ -45,6 +45,9 @@ module GraphTimeSeries =
     let sampleOnceM updateM skM = 
         (_activateModelM >>=>> _setCurrentElementM >>=>> _setCurrentInnovationM >>=>> _stepM >>=>> (fun _ _ -> updateM)) () skM
 
+    let fitOnceM errorSkM = 
+        (_activateModelM >>=>>)
+
     let foldRun m (TimeSeries.UnivariateTimeSeries.State(idx,data,innov)) initStateG =
         data |> Array.fold (fun (s1,s2) x -> let _,_,nxS1,nxS2 = BiMonad.run m s1 s2
                                              (nxS1,nxS2)) 
@@ -52,6 +55,7 @@ module GraphTimeSeries =
 
     let sample n = function
         | Sampling(mparameters) -> let initStateTS = TimeSeries.UnivariateTimeSeries.defaultState n
+
                                    let initStateG = MonadicGraph.defaultStateForSampling mparameters
                                    let skM = MonadicGraph.modelM (Sampling(mparameters))
                                    let updteVarM = updateVariablesForSamplingM mparameters

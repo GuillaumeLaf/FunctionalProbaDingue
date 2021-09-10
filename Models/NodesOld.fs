@@ -1,4 +1,8 @@
-﻿namespace Models
+﻿
+module test1
+
+    let x = 0
+(*namespace Models
 
 module InputCounter =
     type T = T of (Input * int) array
@@ -59,5 +63,5 @@ module Node =
         let shiftedMixingNode = shiftSkeletonBy totalCount mixingNode
         
 
-        (shiftedMixingNode *. sk1) +. ((Leaf(Constant, Some 1.0,0,None) -. shiftedMixingNode) *. shiftedSk2)
+        (shiftedMixingNode *. sk1) +. ((Leaf(Constant, Some 1.0,0,None) -. shiftedMixingNode) *. shiftedSk2)*)
 
