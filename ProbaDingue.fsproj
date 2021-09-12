@@ -17,21 +17,27 @@
     <Compile Include="Distributions.fs" />
     <Compile Include="TimeSeries.fs" />
     <Compile Include="Models\ModelsTypes.fs" />
-    <Compile Include="Models\Graph.fs" />
     <Compile Include="Models\Nodes.fs" />
+    <Compile Include="Models\Graph.fs" />
+    <Compile Include="Models\GraphTimeSeries.fs" />
+    <Compile Include="Models\GraphOld.fs" />
+    <Compile Include="Models\NodesOld.fs" />
     <Compile Include="Models\Optimization.fs" />
-    <Compile Include="Models\Models.fs" />
-    <Compile Include="Models\DrawStructure.fs" />
+    <Compile Include="Models\ModelsOld.fs" />
+    <!--
+	<Compile Include="Models\DrawStructure.fs" />
     <Compile Include="Backtester\BacktesterTypes.fs" />
     <Compile Include="Backtester\DataHandling.fs" />
     <Compile Include="Backtester\Strategies.fs" />
     <Compile Include="Backtester\Backtester.fs" />
+	-->
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FSharp.Charting" Version="2.1.0" />
     <PackageReference Include="FSharp.Data" Version="4.2.2" />
+    <PackageReference Include="FSharpPlus" Version="1.2.1" />
     <PackageReference Include="MathNet.Numerics" Version="4.15.0" />
     <PackageReference Include="MathNet.Numerics.FSharp" Version="4.15.0" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />

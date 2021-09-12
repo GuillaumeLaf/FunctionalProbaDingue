@@ -19,4 +19,7 @@
 
     let cartesianProductList ll = List.foldBack (fun n g -> [for n' in n do for g' in g do yield n' :: g']) ll [[]]
     let cartesianProductArray arrayOfArray = arrayOfArray |> Array.toList |> cartesianProductList |> listOfListToArray
+
+    let extractFst arrayTuples = arrayTuples |> Array.map (fun (x1,_) -> x1)
+    let extractSnd arrayTuples = arrayTuples |> Array.map (fun (_,x2) -> x2)
     

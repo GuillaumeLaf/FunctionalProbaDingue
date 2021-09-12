@@ -1,142 +1,113 @@
 ﻿namespace Models
 
-module Graph = 
-    let inline ( +. ) (N1:Skeleton) (N2:Skeleton) = Node(Addition, N1, N2)
-    let inline ( *. ) (N1:Skeleton) (N2:Skeleton) = Node(Multiplication, N1, N2)
-    let inline ( -. ) (N1:Skeleton) (N2:Skeleton) = Node(Substraction, N1, N2)
-    let inline ( <. ) (N1:Skeleton) (N2:Skeleton) = Node(LessThan, N1, N2)
+open MathNet.Numerics.Distributions
+open Monads
+
+module MonadicGraph = 
 
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
+    let (>>=) x f = Monad.bind f x
 
-    let emptyState = GraphState([||],[||],[||],[||],[||])
+    type State<'T> = State of parameters:'T[] * variables:'T[] * innovations:'T[]
 
-    module Skeleton = 
-        let fold nodeF leafV sk = 
-            let rec loop n k = 
-                match n with
-                    | Node(op,left,right) -> nodeF op (loop left) (loop right) n k
-                    | Leaf(input,x,idx,pullFrom) -> leafV input x idx pullFrom n k
-            loop sk id
+    let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Addition, N1, N2)
+    let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Multiplication, N1, N2)
 
-        let height skeleton = 
-            fold (fun _ kl kr _ k -> kl (fun lacc -> kr (fun racc -> (1 + max lacc racc) |> k)))
-                 (fun _ _ _ _ _ k -> 1 |> k)
-                 skeleton
- 
-        let countNodeByInput skeleton = 
-            fold (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> (fun l -> lacc (racc l)) |> k)))
-                 (fun input x idx _ _ k -> (fun l -> input::l) |> k)
-                 skeleton
-                 []
-                |> Array.ofList
-                |> Array.countBy id
+    let convertModelToParameters = function
+        | AR(order) -> ARp(Array.zeroCreate order)
+        | MA(order) -> MAp(Array.zeroCreate order)
 
-        let updatingStrategy skeleton = 
-            fold (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> (fun l -> lacc (racc l)) |> k)))
-                 (fun input x idx pullFrom _ k -> (fun l -> (input,(idx, pullFrom))::l) |> k)
-                 skeleton
-                 []
-                |> Array.ofList 
-                |> Array.filter (fun x -> (fst x) = Variable)
-                |> Array.sortBy (fun x -> fst (snd x))
-                |> Array.map (fun x -> snd (snd x))
+    let defaultStateForSampling = function
+        | ARp(coeffs) | MAp(coeffs) -> State(coeffs, Array.zeroCreate coeffs.Length, [|0.0|])
+        //| SETAR(order,delay) -> State(Array.zeroCreate (2*order+1), Array.zeroCreate (order+1))
 
-        let valueOfConstants skeleton = 
-            fold (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> (fun acc -> lacc (racc acc)) |> k)))
-                 (fun input x idx pullFrom _ k -> (fun acc -> if input = Constant then (idx,x)::acc else acc) |> k)
-                 skeleton
-                 []
-            |> Array.ofList
-            |> Array.sortBy (fun x -> fst x)
-            |> Array.map (fun x -> (snd x) |> Option.defaultValue 0.0)
+    let defaultStateForFitting = convertModelToParameters >> defaultStateForSampling
 
-        // 'groups' array contains the group of each Innovation Node (where the idx of array is the initial idx of the Node).
-        let groupInnovations (groups:int []) skeleton = 
-            fold (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> Node(op,lacc,racc) |> k)))
-                 (fun input x idx pullFrom n k -> (if input = Innovation then (Leaf(Innovation,x,groups.[idx],pullFrom)) else (Leaf(input,x,idx,pullFrom))) |> k)
-                 skeleton
+    let defaultState = function
+        | Sampling(mparameters) -> defaultStateForSampling mparameters
+        | Fitting(model) -> defaultStateForFitting model
 
-    let forwardPass (Graph(GraphState(p,v,innov,prevResult,constant),skeleton)) = 
-        Skeleton.fold (fun op kl kr _ k -> match op with
-                                            | Addition -> kl (fun lacc -> kr (fun racc -> (lacc + racc) |> k))
-                                            | Multiplication -> kl (fun lacc -> kr (fun racc ->  (lacc * racc) |> k))
-                                            | Substraction -> kl (fun lacc -> kr (fun racc -> (lacc - racc) |> k))
-                                            | LessThan -> kl (fun lacc -> kr (fun racc -> (if lacc < racc then 1.0 else 0.0) |> k))
-                                            )
-                      (fun input x idx _ _ k -> match input with
-                                                | Innovation -> innov.[idx] |> k   // input arrays must at least be the same length as the number of innovation nodes.
-                                                | Parameter -> p.[idx] |> k
-                                                | Variable -> v.[idx] |> k
-                                                | PreviousResult -> prevResult.[idx] |> k // never reached
-                                                | Constant -> constant.[idx] |> k)
-                      skeleton
+    let getParameterM idx = 
+        let innerFunc (State(p,v,i)) = p.[idx], (State(p,v,i))
+        Monad.M innerFunc
 
-    let updateVariables (UpdateVariableStrategy(pullfrom)) (GraphState(p,v,innov,prevResult,constant)) = 
-        Array.zeroCreate v.Length |> Array.mapi (fun i _ -> match pullfrom.[i] with  
-                                                            | Some (Innovation, idx) -> innov.[idx]
-                                                            | Some (Parameter, idx) -> p.[idx]
-                                                            | Some (Variable, idx) -> v.[idx]
-                                                            | Some (PreviousResult, idx) -> prevResult.[idx]  // Make sure the idx is a possible index of array.
-                                                            | Some (Constant,idx) -> constant.[idx] 
-                                                            | None -> v.[i])
+    let getVariableM idx = 
+        let innerFunc (State(p,v,i)) = v.[idx], (State(p,v,i))
+        Monad.M innerFunc
 
-    let getUpdatingStrategy (Graph(state,skeleton)) = Skeleton.updatingStrategy skeleton 
+    let getInnovationM idx = 
+        let innerFunc (State(p,v,i)) = i.[idx], (State(p,v,i))
+        Monad.M innerFunc
 
-    module TimeSerie = 
-        let updateStateDataM f = 
-            let innerFunc (state:GraphState) = f state  
-            Monad.M innerFunc
+    let inactiveInnovationM idx = Monad.rets 0.0
 
-        let forwardPassM skeleton = 
-            let innerFunc (GraphState(p,v,i,prev,c)) = 
-                let result = forwardPass (Graph(GraphState(p,v,i,prev,c),skeleton))
-                result, (GraphState(p,v,i,[|result|],c))
-            Monad.M innerFunc            
-        
-        let reorganizeVariablesM updateStrat = updateStateDataM (fun (GraphState(p,v,i,prev,c)) -> let newVariables = updateVariables updateStrat (GraphState(p,v,i,prev,c))
-                                                                                                   newVariables, GraphState(p,newVariables,i,prev,c) )
-        let randomInnovationsM distr = updateStateDataM (fun (GraphState(p,v,innov,prev,c)) -> let newInnovations = [| for i in 0..innov.Length-1 do distr |> Distributions.sample |]
-                                                                                               newInnovations,GraphState(p,v,newInnovations,prev,c) ) 
-        let inactiveInnovationsM = updateStateDataM (fun (GraphState(p,v,innov,prev,c)) -> let newInnovations = Array.zeroCreate innov.Length
-                                                                                           newInnovations,GraphState(p,v,newInnovations,prev,c) ) 
+    let setParameterM idx x = 
+        let innerFunc (State(p,v,i)) = 
+            p.[idx] <- x
+            x, (State(p,v,i))
+        Monad.M innerFunc
 
-        let reorganizeVariableWithTruthM name updateStrat truthPoint = 
-            updateStateDataM (fun (GraphState(p,v,i,prev,c)) -> let updatedGraph = match name with
-                                                                                    | MA -> GraphState(p,v,[|truthPoint - prev.[0]|],prev,c) 
-                                                                                    | AR ->  GraphState(p,v,i,[|truthPoint|],c)
-                                                                                    | SETAR -> GraphState(p,v,i,[|truthPoint|],c) 
-                                                                let newVariables = updateVariables updateStrat updatedGraph 
-                                                                newVariables, GraphState(p,newVariables,i,prev,c)
-                                                                ) 
+    let setVariableM idx x = 
+        let innerFunc (State(p,v,i)) = 
+            v.[idx] <- x
+            x, (State(p,v,i))
+        Monad.M innerFunc
 
-        let conditionalExpectationM updateStrat sk = 
-            let innerFunc fwdPass variables innovations = fwdPass
-            innerFunc <!> forwardPassM sk
-                      <*> reorganizeVariablesM updateStrat
-                      <*> inactiveInnovationsM
+    let setInnovationM idx x = 
+        let innerFunc (State(p,v,i)) = 
+            i.[idx] <- x
+            x, (State(p,v,i))
+        Monad.M innerFunc
 
-        let oneStepRollingForecastM name updateStrat sk truthPoint =
-            let innerFunc fwdPass variables innovations = fwdPass
-            innerFunc <!> forwardPassM sk
-                      <*> reorganizeVariableWithTruthM name updateStrat truthPoint
-                      <*> inactiveInnovationsM
+    let setParametersM array = 
+        array |> Array.indexed
+              |> Array.toList
+              |> Monad.traverse (fun (i,x) -> setParameterM i x)
+              |> Monad.map (Array.ofList)
 
-(*        let rollingConditionalExpectationM steps updateStrat sk truthPoints =
-            truthPoints |> List.map (fun _ -> conditionalExpectationM updateStrat sk)
-                        |> Monad.sequence
-                        |> Monad.map (List.head)*)
+    let setVariablesM array = 
+        array |> Array.indexed
+              |> Array.toList
+              |> Monad.traverse (fun (i,x) -> setVariableM i x)
+              |> Monad.map (Array.ofList)
 
-        let fold monad initState array = 
-            array |> Array.map (fun _ -> monad)
-                  |> Array.mapFold (fun state mo -> Monad.run mo state) initState
+    let setInnovationsM array = 
+        array |> Array.indexed
+              |> Array.toList
+              |> Monad.traverse (fun (i,x) -> setInnovationM i x)
+              |> Monad.map (Array.ofList)
 
-        let fold1 monad initState array = 
-            array |> Array.map (fun x -> monad x)
-                  |> Array.mapFold (fun state mo -> Monad.run mo state) initState
+    let inline fold nodeF leafV sk = 
+        let rec loop n k = 
+            match n with
+                | Node(op,left,right) -> nodeF op (loop left) (loop right) n k
+                | Leaf(input) -> leafV input n k
+        loop sk id
 
-        
-            
+    let inline skeletonM parameterM variableM innovationM skeleton = 
+        fold (fun op kl kr _ k -> match op with
+                                    | Addition -> kl (fun lacc -> kr (fun racc -> (Monad.add lacc racc) |> k)) 
+                                    | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Monad.mult lacc racc) |> k))
+                                    )
+             (fun input _ k -> match input with
+                                | Parameter(idx) -> parameterM idx |> k
+                                | Variable(idx) -> variableM idx |> k
+                                | Innovation(idx) -> innovationM idx |> k  
+                                | Constant(value) -> Monad.rets value |> k)
+             skeleton 
 
+    let defaultSkeletonFoSampling = function
+        | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))
 
-                    
+    let defaultSkeletonForFitting = convertModelToParameters >> defaultSkeletonFoSampling
+
+    let activateSkeletonForSamplingM sk = Monad.modify (fun (State(p,v,i)) -> State(p,v,[|Normal.Sample(0.0,1.0)|]))
+                                            >>= (fun _ -> skeletonM getParameterM getVariableM getInnovationM sk)
+
+    let activateSkeletonForFittingM sk = skeletonM getParameterM getVariableM inactiveInnovationM sk
+
+    let modelM = function
+        | Sampling(mparameters) -> (defaultSkeletonFoSampling >> activateSkeletonForSamplingM) mparameters
+        | Fitting(model) -> (defaultSkeletonForFitting >> activateSkeletonForFittingM) model
+
