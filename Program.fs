@@ -10,7 +10,7 @@ let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
     let samplingModel = ARp([|0.7|]) |> Sampling
-    let (TimeSeries.UnivariateTimeSeries.State(_,data,innov)) = GraphTimeSeries.sample 100000 samplingModel
+    let (TimeSeries.UnivariateTimeSeries.State(_,data,innov)) = GraphTimeSeries.sample 1000 samplingModel
 
     let fittingModel = AR(1)
     let fittedModel = Optimization.fit fittingModel data

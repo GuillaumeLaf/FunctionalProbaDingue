@@ -28,6 +28,8 @@ module Optimization =
         // Extract in distinct arrays the minimum and maximum value of several continuous bounds.
         let continuousToSplittedArray (bounds:ContinuousBound<'T>[]) = 
             (continuousToTuple >> Utilities.extractFst) bounds, (continuousToTuple >> Utilities.extractSnd) bounds 
+
+        let discreteToArray (bounds:DiscreteBound<'T>[]) = bounds |> Array.map (fun (DiscreteBound(possibilities)) -> possibilities)
                                         
     module Parameter =
         // Important Note : the current implementation of parameters only make the distinction between continuous and discrete parameters.
@@ -49,6 +51,8 @@ module Optimization =
         // Extract the array of parameters from a 'Params' type.
         let toArray (Params(array,_)) = array
         let toInfo (Params(_,info)) = info
+        let partialToArray (PartialParams(array,_)) = array
+        let partialToPartialInfo (PartialParams(_,partialInfo)) = partialInfo
 
         // Get a default array representing the disposition of parameters inside the model.
         let defaultParametersArrayForModel = function
@@ -67,10 +71,15 @@ module Optimization =
             | PartialInfo([||],d) -> d |> Array.map (fun (DiscreteParameterInfo(i,_)) -> i)
             | PartialInfo(_,_) -> invalidArg "partialInfo" "Something went wront with getting the index of a partial info. Maybe trying to get a mix of continuous and discrete info."
    
+        let boundsFrom (p:Params<'T>) = 
+            let (Params(_,Info(cinfo,dinfo))) = p
+            let cBounds = cinfo |> Array.map (fun (ContinuousParameterInfo(_,b)) -> b)
+            let dBounds = dinfo |> Array.map (fun (DiscreteParameterInfo(_,b)) -> b)
+            Bounds.B(cBounds, dBounds)
+
         let indexFromInfo info = partialInfoFromInfo info >> indexFromPartialInfo
         let indexFromParams p = (toInfo >> indexFromInfo) p
 
-        // Get the default 'Params' type for a given model 
         let ofModel name = 
             let p = defaultParametersArrayForModel name
             let cb, db = Bounds.ofModel name
@@ -99,8 +108,7 @@ module Optimization =
         // Split the given 'Params' into 'PartialParams'.
         // The first one contains the continuous parameters (along with its info).
         // The second one has the discrete parameters (along with its info).
-        let split p = partialInfoFromParams p Continuous, partialInfoFromParams p Discrete
-            
+        let split p = PartialParamsFromParams p Continuous, PartialParamsFromParams p Discrete
 
         // Extract the 'PartialParams' of a 'Params' type given the parameter type desired.
         let extractPartial (p:Params<'T>) = function 
@@ -110,13 +118,10 @@ module Optimization =
         // Create a 'Params' type from two 'PartialParams'.
         // Note that the 'Params' should contain all the parameters for a model. 
         // Only 'PartialParams' should have some and not all parameters of a model.
-        // The first 'PartialParams' should correspond to the first coefficients of the model.
+        // The first 'PartialParams' should correspond to the continuous parameters.
         // To avoid switching things up, I should sort the array by the parameter's index.
-        let group (PartialParams(array1,(PartialInfo(cp1,dp1)))) (PartialParams(array2,(PartialInfo(cp2,dp2)))) = 
-            let array = Array.concat [|array1;array2|]
-            let cp = Array.concat [|cp1;cp2|]
-            let dp = Array.concat [|dp1;dp2|]
-            Params(array,Info(cp,dp))
+        let group (PartialParams(array1,(PartialInfo(cp1,_)))) (PartialParams(array2,(PartialInfo(_,dp2)))) = 
+           (Array.concat [|array1;array2|],Info(cp1,dp2)) |> Params
 
         // replace in a 'Params' type the corresponding 'PartialParams'
         // Note that the 'PartialParams' should correspond either to continuous or discrete parameters but not a mix. 
@@ -127,17 +132,8 @@ module Optimization =
             | PartialInfo([||], d) -> group cSplit (PartialParams(partialArray, partialInfo))
             | _ -> invalidArg "partialInfo" "Something went wrong with replacing partial parameters into parameters."
 
-        let partialArray partialType (p:Params<'T>) = 
-            let (PartialParams(carray,_)), (PartialParams(darray,_)) = p |> split
-            match partialType with
-            | Continuous -> carray
-            | Discrete -> darray
-
-        let boundsFrom (p:Params<'T>) = 
-            let (Params(_,Info(cinfo,dinfo))) = p
-            let cBounds = cinfo |> Array.map (fun (ContinuousParameterInfo(_,b)) -> b)
-            let dBounds = dinfo |> Array.map (fun (DiscreteParameterInfo(_,b)) -> b)
-            Bounds.B(cBounds, dBounds)
+        // Get partial parameter array from a 'Params' for a given parameter type (continuous or discrete).
+        let partialArray p = extractPartial p >> partialToArray
 
     module Optimizer = 
         type OptimizerType = 
@@ -151,10 +147,16 @@ module Optimization =
         let vectorToArray (v:Vector<'T>) = v.ToArray() 
         let arrayToVector (array:'T[]) = Vector<'T>.Build.Dense array
 
+        // Transform a function to accept vectors as input and limit its value if it explodes.
         let limitedVectorFunc f = vectorToArray >> f >> limitValueFunction
+
+        // Get the jacobian of a function at a point 'x'
         let jacobianOf (f:float[] -> float) x = J.Evaluate(f,x)
+
+        // Transform the jacobian of a function to accept vectors as input and limit its value if it explodes.
         let limitedVectorJacobian f = vectorToArray >> jacobianOf f >> limitGradient >> arrayToVector
 
+        // Output the optimal parameters as an array
         let BFGSOptimizer func (initGuess:float[]) (bounds:Bounds.ContinuousBound<float>[]) =
             let boundsSplit = Bounds.continuousToSplittedArray bounds
             //let objective = ObjectiveFunction.Gradient(System.Func<_,_> (limitedVectorFunc func), System.Func<_,_> (limitedVectorJacobian func))
@@ -164,8 +166,9 @@ module Optimization =
             let result = solver.FindMinimum(grad, Vector<float>.Build.Dense initGuess)
             result.MinimizingPoint.AsArray()
 
+        // Output the optimal parameters as an array
         let BruteForce2 func (initGuess:float[]) (bounds:Bounds.DiscreteBound<float>[]) = 
-            let boundsArray = bounds |> Array.map (fun (Bounds.DiscreteBound(possibilities)) -> possibilities)
+            let boundsArray = bounds |> Bounds.discreteToArray
             let cartProd = boundsArray |> Utilities.cartesianProductArray
             let results = cartProd |> Array.Parallel.map (fun arr -> func arr)
             printfn "%A" results
@@ -243,7 +246,7 @@ module Optimization =
             error |> Array.map (fun x -> Option.defaultValue 0.0 x)
 
         let partialToParameter partialType (p:Parameter.Params<'T>) partialArray = 
-            let (Parameter.PartialParams(_, partialInfo)) = Parameter.extractPartial partialType p
+            let partialInfo = Parameter.partialInfoFromParams p partialType
             Parameter.replaceIn p (Parameter.PartialParams(partialArray,partialInfo))
 
         let run loss initialGuess opt = 
@@ -253,12 +256,12 @@ module Optimization =
 
         let rec solve problem initParams = 
             match problem with
-            | Classical(m,l,t) -> let initGuess = initParams |> Parameter.partialArray t
+            | Classical(m,l,t) -> let initGuess = t |> Parameter.partialArray initParams
                                   let lossFunction = partialToParameter t initParams >> Parameter.toArray >> errorFunction>> objective l
                                   let result = run lossFunction initGuess (optimizer m) |> partialToParameter t initParams
                                   result 
 
-            | Recursive(m,l,t,sub) -> let initGuess = initParams |> Parameter.partialArray t
+            | Recursive(m,l,t,sub) -> let initGuess = t |> Parameter.partialArray initParams
                                       let lossFunction = partialToParameter t initParams >> (solve sub) >> Parameter.toArray >> errorFunction >> objective l
                                       run lossFunction initGuess (optimizer m)
                                         |> partialToParameter t initParams

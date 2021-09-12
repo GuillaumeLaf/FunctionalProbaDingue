@@ -22,7 +22,7 @@
     <Compile Include="Models\GraphTimeSeries.fs" />
     <Compile Include="Models\GraphOld.fs" />
     <Compile Include="Models\NodesOld.fs" />
-    <Compile Include="Models\OptimizationOld.fs" />
+    <Compile Include="Models\Optimization.fs" />
     <Compile Include="Models\ModelsOld.fs" />
     <!--
 	<Compile Include="Models\DrawStructure.fs" />
