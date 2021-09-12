@@ -53,6 +53,7 @@ module Monad =
 
     let inline add m1 m2 = operation ( + ) m1 m2
     let inline mult m1 m2 = operation ( * ) m1 m2
+    let inline sub m1 m2 = operation ( - ) m1 m2
 
 module BiMonad = 
     type M<'State1,'State2,'T,'U> = M of ('State1 -> 'State2 -> 'T * 'U * 'State1 * 'State2)
@@ -101,6 +102,7 @@ module BiMonad =
 
     let inline add m1 m2 = operationSingle ( + ) m1 m2
     let inline mult m1 m2 = operationSingle ( * ) m1 m2
+    let inline sub m1 m2 = operationSingle ( - ) m1 m2
 
     // The newly created monad has the same second element as the second monad input
     let inline add1 m1 m2 = operationPair ( + ) (fun _ y2 -> y2) m1 m2

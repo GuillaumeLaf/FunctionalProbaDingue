@@ -17,6 +17,7 @@
     <Compile Include="Distributions.fs" />
     <Compile Include="TimeSeries.fs" />
     <Compile Include="Models\ModelsTypes.fs" />
+    <Compile Include="Models\Skeletons.fs" />
     <Compile Include="Models\Nodes.fs" />
     <Compile Include="Models\Graph.fs" />
     <Compile Include="Models\GraphTimeSeries.fs" />

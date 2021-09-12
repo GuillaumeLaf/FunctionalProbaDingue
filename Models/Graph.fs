@@ -4,23 +4,24 @@ open MathNet.Numerics.Distributions
 open Monads
 
 module MonadicGraph = 
-
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
     let (>>=) x f = Monad.bind f x
 
     type State<'T> = State of parameters:'T[] * variables:'T[] * innovations:'T[]
 
-    let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Addition, N1, N2)
-    let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node(Multiplication, N1, N2)
+    let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Addition, N1, N2)
+    let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Multiplication, N1, N2)
 
-    let convertModelToParameters = function
+    let rec convertModelToParameters = function
         | AR(order) -> ARp(Array.zeroCreate order)
         | MA(order) -> MAp(Array.zeroCreate order)
+        | STAR(order,_,_,innerModel) -> STARp(Array.zeroCreate order, 0.0, 1.0, convertModelToParameters innerModel)
 
-    let defaultStateForSampling = function
+    let rec defaultStateForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> State(coeffs, Array.zeroCreate coeffs.Length, [|0.0|])
-        //| SETAR(order,delay) -> State(Array.zeroCreate (2*order+1), Array.zeroCreate (order+1))
+        | STARp(coeffs,_,_,innerModelp) -> let (State(innerCoeffs,_,_)) = defaultStateForSampling innerModelp
+                                           State(Array.concat [|coeffs;innerCoeffs|],Array.zeroCreate (coeffs.Length+innerCoeffs.Length),[|0.0|])
 
     let defaultStateForFitting = convertModelToParameters >> defaultStateForSampling
 
@@ -78,27 +79,28 @@ module MonadicGraph =
               |> Monad.traverse (fun (i,x) -> setInnovationM i x)
               |> Monad.map (Array.ofList)
 
-    let inline fold nodeF leafV sk = 
-        let rec loop n k = 
-            match n with
-                | Node(op,left,right) -> nodeF op (loop left) (loop right) n k
-                | Leaf(input) -> leafV input n k
-        loop sk id
-
     let inline skeletonM parameterM variableM innovationM skeleton = 
-        fold (fun op kl kr _ k -> match op with
-                                    | Addition -> kl (fun lacc -> kr (fun racc -> (Monad.add lacc racc) |> k)) 
-                                    | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Monad.mult lacc racc) |> k))
-                                    )
-             (fun input _ k -> match input with
-                                | Parameter(idx) -> parameterM idx |> k
-                                | Variable(idx) -> variableM idx |> k
-                                | Innovation(idx) -> innovationM idx |> k  
-                                | Constant(value) -> Monad.rets value |> k)
-             skeleton 
+        SkeletonTree.fold (fun op nk _ k -> match op with
+                                                | Apply(f) -> nk (fun nacc -> Monad.map f nacc |> k))
+                          (fun op kl kr _ k -> match op with
+                                                | Addition -> kl (fun lacc -> kr (fun racc -> (Monad.add lacc racc) |> k)) 
+                                                | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Monad.mult lacc racc) |> k))
+                                                | Substraction -> kl (fun lacc -> kr (fun racc ->  (Monad.sub lacc racc) |> k))
+                                                )
+                          (fun input _ k -> match input with
+                                                | Parameter(idx) -> parameterM idx |> k
+                                                | Variable(idx) -> variableM idx |> k
+                                                | Innovation(idx) -> innovationM idx |> k  
+                                                | Constant(value) -> Monad.rets value |> k)
+                          skeleton 
 
-    let defaultSkeletonFoSampling = function
+    let rec defaultSkeletonFoSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))
+        | STARp(coeffs,loc,scale,innerModelp) -> let ARs = defaultSkeletonFoSampling (ARp(coeffs))
+                                                 let expTerm x = ((-x+loc)/scale) |> exp
+                                                 let logisticFunc x = 1.0 / (1.0 + expTerm x) 
+                                                 let mixingNode = Node1(Apply(logisticFunc),defaultSkeletonFoSampling innerModelp)
+                                                 (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode
 
     let defaultSkeletonForFitting = convertModelToParameters >> defaultSkeletonFoSampling
 

@@ -20,10 +20,12 @@ module GraphTimeSeries =
     
     // Variable update must be made at a specific time ! (Be careful of look-ahead bias).
     let rec _defineUpdatesTSM modelName = 
-        match modelName with
-        | ARp(order) -> [ for i in 1..order.Length do TimeSeries.UnivariateTimeSeries.elementAtLagM i ]
-        | MAp(order) -> [ for i in 1..order.Length do TimeSeries.UnivariateTimeSeries.innovationAtLagM i ] 
-        // | SETAR(order,delay) -> Array.concat [|variableUpdate (AR(order)); [|TimeSeries.UnivariateTimeSeries.elementAtLagM delay|]|] |> Array.toList |> Monad.sequence
+        let rec updateSequenceTSM = function
+            | ARp(coeffs) -> [ for i in 1..coeffs.Length do TimeSeries.UnivariateTimeSeries.elementAtLagM i ]
+            | MAp(coeffs) -> [ for i in 1..coeffs.Length do TimeSeries.UnivariateTimeSeries.innovationAtLagM i ] 
+            | STARp(coeffs,_,_,innerModelp) -> updateSequenceTSM (ARp(coeffs)) @ updateSequenceTSM innerModelp        
+        
+        updateSequenceTSM modelName
         |> Monad.sequence
         |> Monad.map (Array.ofList)
         |> Monad.map (Array.map (fun x -> x |> Option.defaultValue 0.0))
@@ -31,7 +33,6 @@ module GraphTimeSeries =
     let _updateM updateSequenceTSM = // have to update the graph state via the TimeSeries Monad.
         BiMonad.modify (fun s1 (MonadicGraph.State(p,_,i)) -> let newVariables, _ = Monad.run updateSequenceTSM s1
                                                               s1, (MonadicGraph.State(p,newVariables,i)))
-
     let updateVariablesForSamplingM = _defineUpdatesTSM >> _updateM
     let updateVariablesForFittingM = MonadicGraph.convertModelToParameters >> updateVariablesForSamplingM
     

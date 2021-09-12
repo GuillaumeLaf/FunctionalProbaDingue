@@ -8,15 +8,19 @@ module Optimization =
     module Bounds = 
         type ContinuousBound<'T> = ContinuousBound of 'T * 'T
         type DiscreteBound<'T> = DiscreteBound of 'T[]
-        type B<'T> = ContinuousBound<'T> [] * DiscreteBound<'T> []
+        type B<'T> = 
+            | Simple of ContinuousBound<'T> [] * DiscreteBound<'T> []
+            | Recursive of ContinuousBound<'T> [] * DiscreteBound<'T> [] * B<'T>
  
         // Create the bounds for each model.
         // When continuous, bounds are defined by a minimum and maximum value.
         // When discrete, bounds are defined by an array of possiblities.
-        let ofModel name = 
+        let rec ofModel name = 
             match name with
             | AR(order) | MA(order) -> let cBounds = Array.zeroCreate order |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
-                                       B(cBounds, [||])
+                                       Simple(cBounds, [||])
+            | STAR(order,_,_,innerModel) -> let cBounds = Array.zeroCreate order |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
+                                            Recursive(cBounds,[||],ofModel innerModel)
 (*            | SETAR -> let coeffs12 = Array.zeroCreate (parameterArray.Length - 2) |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
                        let threshold = Array.init 10 (fun i -> float(i-30)*0.1) |> DiscreteBound
                        let delay = Array.init 3 (fun i -> float(i + 1)) |> DiscreteBound
@@ -55,8 +59,9 @@ module Optimization =
         let partialToPartialInfo (PartialParams(_,partialInfo)) = partialInfo
 
         // Get a default array representing the disposition of parameters inside the model.
-        let defaultParametersArrayForModel = function
+        let rec defaultParametersArrayForModel = function
             | AR(order) | MA(order) -> Array.zeroCreate order
+            | STAR(order,loc,scale,innerModel) -> Array.concat [|Array.zeroCreate order; defaultParametersArrayForModel innerModel|]
 
         // Get the 'PartialInfo' about a particular parameter type (continuous or discrete) from an 'Info' type.
         let partialInfoFromInfo (Info(cinfo, dinfo)) = function
