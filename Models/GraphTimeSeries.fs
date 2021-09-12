@@ -71,14 +71,10 @@ module GraphTimeSeries =
 
     // This must fit the data (the initial graph state makes all parameters equal to zero.)
     // I must somehow find a way to make it possible to choose the parameters.
-    let getError array = function
-        | Sampling(_) -> invalidArg "model" "Cannot fit a Sampling model type. Convert it to a Fitting type."
-        | Fitting(model) -> let initStateTS = TimeSeries.UnivariateTimeSeries.defaultStateFrom array
-                            let (MonadicGraph.State(p,v,i)) = MonadicGraph.defaultStateForFitting model
-                            let initStateG = (MonadicGraph.State([|0.7|],v,i))
-                            let skM = MonadicGraph.modelM (Fitting(model))
-                            let updteVarM = updateVariablesForFittingM model
-                            let fittingM = fitOnceM updteVarM skM
-                            foldRun fittingM initStateTS initStateG |> fst
-        
+    let getError model array stateG = 
+        let initStateTS = TimeSeries.UnivariateTimeSeries.defaultStateFrom array
+        let skM = MonadicGraph.modelM (Fitting(model))
+        let updteVarM = updateVariablesForFittingM model
+        let fittingM = fitOnceM updteVarM skM
+        foldRun fittingM initStateTS stateG |> fst
             

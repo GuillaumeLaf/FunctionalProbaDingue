@@ -1,8 +1,4 @@
-﻿module test2
-
-    let x = 0
-
-(*namespace Models
+﻿namespace Models
 
 module Optimization = 
     open MathNet.Numerics.Optimization
@@ -14,28 +10,34 @@ module Optimization =
         type DiscreteBound<'T> = DiscreteBound of 'T[]
         type B<'T> = ContinuousBound<'T> [] * DiscreteBound<'T> []
  
-        let ofModel name parameterArray = 
+        // Create the bounds for each model.
+        // When continuous, bounds are defined by a minimum and maximum value.
+        // When discrete, bounds are defined by an array of possiblities.
+        let ofModel name = 
             match name with
-            | AR -> let cBounds = parameterArray |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
-                    B(cBounds, [||])
-            | MA -> let cBounds = parameterArray |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
-                    B(cBounds, [||])
-            | SETAR -> let coeffs12 = Array.zeroCreate (parameterArray.Length - 2) |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
+            | AR(order) | MA(order) -> let cBounds = Array.zeroCreate order |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
+                                       B(cBounds, [||])
+(*            | SETAR -> let coeffs12 = Array.zeroCreate (parameterArray.Length - 2) |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
                        let threshold = Array.init 10 (fun i -> float(i-30)*0.1) |> DiscreteBound
                        let delay = Array.init 3 (fun i -> float(i + 1)) |> DiscreteBound
-                       B(coeffs12,[|threshold;delay|])
+                       B(coeffs12,[|threshold;delay|])*)
 
+        // Extract the minimum and maximum value for several continous bounds.
         let continuousToTuple (bounds:ContinuousBound<'T>[]) = bounds |> Array.map (fun (ContinuousBound(mn,mx)) -> (mn,mx))
+
+        // Extract in distinct arrays the minimum and maximum value of several continuous bounds.
         let continuousToSplittedArray (bounds:ContinuousBound<'T>[]) = 
-            let mns = bounds |> Array.map (fun (ContinuousBound(mn,_)) -> mn)
-            let mxs = bounds |> Array.map (fun (ContinuousBound(mx,_)) -> mx)
-            mns, mxs
+            (continuousToTuple >> Utilities.extractFst) bounds, (continuousToTuple >> Utilities.extractSnd) bounds 
                                         
     module Parameter =
+        // Important Note : the current implementation of parameters only make the distinction between continuous and discrete parameters.
+        // Future implementation should also encompass the possibility to have different tiers of continuous and discrete parameters. 
         type ParameterType = 
             | Continuous
             | Discrete
-        type ContinuousParameterInfo<'T> = ContinuousParameterInfo of idx:int * Bounds.ContinuousBound<'T>
+
+        // The 'idx' should correspond to a unique index in the parameter array of the model.
+        type ContinuousParameterInfo<'T> = ContinuousParameterInfo of idx:int * Bounds.ContinuousBound<'T> 
         type DiscreteParameterInfo<'T> = DiscreteParameterInfo of idx:int * Bounds.DiscreteBound<'T>
 
         type Info<'T> = Info of ContinuousParameterInfo<'T> [] * DiscreteParameterInfo<'T> []
@@ -44,53 +46,80 @@ module Optimization =
         type Params<'T> = Params of 'T [] * Info<'T>
         type PartialParams<'T> = PartialParams of 'T[] * PartialInfo<'T>
 
-        let indexInfo t info = 
-            let (Info(cinfo, dinfo)) = info
-            match t with 
-            | Continuous -> cinfo |> Array.map (fun (ContinuousParameterInfo(i,_)) -> i)  
-            | Discrete -> dinfo |> Array.map (fun (DiscreteParameterInfo(i,_)) -> i)         
-             
-        let ofModel name array = 
-            let arrayIndexed = Array.indexed array
-            let cb, db = Bounds.ofModel name array
-            let info = match name with 
-                        | AR -> let cp = arrayIndexed |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
-                                Info(cp, [||])
-                        | MA -> let cp = arrayIndexed |> Array.map (fun (i,_) -> ContinuousParameterInfo(i,cb.[i]))
-                                Info(cp, [||])
-                        | SETAR -> let coeffs12, threshDelay = arrayIndexed |> Array.splitAt (array.Length-2)
-                                   let coeffs12 = coeffs12 |> Array.mapi (fun i _ -> ContinuousParameterInfo(i,cb.[i]))
-                                   let threshDelay = threshDelay |> Array.mapi (fun i _ -> DiscreteParameterInfo(i,db.[i]))
-                                   Info(coeffs12, threshDelay)
-            Params(array, info)
-
+        // Extract the array of parameters from a 'Params' type.
         let toArray (Params(array,_)) = array
+        let toInfo (Params(_,info)) = info
 
+        // Get a default array representing the disposition of parameters inside the model.
+        let defaultParametersArrayForModel = function
+            | AR(order) | MA(order) -> Array.zeroCreate order
+
+        // Get the 'PartialInfo' about a particular parameter type (continuous or discrete) from an 'Info' type.
+        let partialInfoFromInfo (Info(cinfo, dinfo)) = function
+            | Continuous -> PartialInfo(cinfo, [||])
+            | Discrete -> PartialInfo([||],dinfo)
+
+        let partialInfoFromParams p t = (toInfo >> partialInfoFromInfo) p t
+
+        // Get the index of continuous or discrete parameters from a 'PartialInfo'.
+        let indexFromPartialInfo = function
+            | PartialInfo(c,[||]) -> c |> Array.map (fun (ContinuousParameterInfo(i,_)) -> i)
+            | PartialInfo([||],d) -> d |> Array.map (fun (DiscreteParameterInfo(i,_)) -> i)
+            | PartialInfo(_,_) -> invalidArg "partialInfo" "Something went wront with getting the index of a partial info. Maybe trying to get a mix of continuous and discrete info."
+   
+        let indexFromInfo info = partialInfoFromInfo info >> indexFromPartialInfo
+        let indexFromParams p = (toInfo >> indexFromInfo) p
+
+        // Get the default 'Params' type for a given model 
+        let ofModel name = 
+            let p = defaultParametersArrayForModel name
+            let cb, db = Bounds.ofModel name
+            let info = match name with 
+                        | AR(order) | MA(order) -> let cp = Array.zeroCreate order |> Array.mapi (fun i _ -> ContinuousParameterInfo(i,cb.[i]))
+                                                   Info(cp, [||])
+(*                        | SETAR -> let coeffs12, threshDelay = arrayIndexed |> Array.splitAt (array.Length-2)
+                                   let coeffs12 = coeffs12 |> Array.mapi (fun i _ -> ContinuousParameterInfo(i,cb.[i]))
+                                   let threshDelay = threshDelay |> Array.mapi (fun i _ -> DiscreteParameterInfo(i+coeffs12.Length,db.[i]))
+                                   Info(coeffs12, threshDelay)*)
+            Params(p, info)
+
+        // Get the complement type of a given one.
         let notType t = function
             | Continuous -> Discrete
             | Discrete -> Continuous
 
-        let split (p:Params<'T>) = 
-            let (Params(array,info)) = p
-            let (Info(cinfo,dinfo)) = info
-            let cidx = indexInfo Continuous info
-            let didx = indexInfo Discrete info
-            let cSubArray = [|for i in cidx do array.[i]|]
-            let dSubArray = [|for i in didx do array.[i]|]
-            PartialParams(cSubArray,PartialInfo(cinfo,[||])),PartialParams(dSubArray,PartialInfo([||],dinfo))
+        let subArrayFromParams ((Params(array:'T[],info))) = function 
+            | Continuous -> let cidx = indexFromParams ((Params(array,info))) Continuous
+                            [|for i in cidx do array.[i]|]
+            | Discrete -> let didx = indexFromParams ((Params(array,info))) Discrete
+                          [|for i in didx do array.[i]|]
 
-        let extractPartial t (p:Params<'T>) = 
-            let cSplit, dSplit = p |> split
-            match t with
-            | Continuous -> cSplit
-            | Discrete -> dSplit
+        let PartialParamsFromParams p t = (subArrayFromParams p t, partialInfoFromParams p t) |> PartialParams
 
+        // Split the given 'Params' into 'PartialParams'.
+        // The first one contains the continuous parameters (along with its info).
+        // The second one has the discrete parameters (along with its info).
+        let split p = partialInfoFromParams p Continuous, partialInfoFromParams p Discrete
+            
+
+        // Extract the 'PartialParams' of a 'Params' type given the parameter type desired.
+        let extractPartial (p:Params<'T>) = function 
+            | Continuous -> p |> split |> fst
+            | Discrete -> p |> split |> snd
+
+        // Create a 'Params' type from two 'PartialParams'.
+        // Note that the 'Params' should contain all the parameters for a model. 
+        // Only 'PartialParams' should have some and not all parameters of a model.
+        // The first 'PartialParams' should correspond to the first coefficients of the model.
+        // To avoid switching things up, I should sort the array by the parameter's index.
         let group (PartialParams(array1,(PartialInfo(cp1,dp1)))) (PartialParams(array2,(PartialInfo(cp2,dp2)))) = 
             let array = Array.concat [|array1;array2|]
             let cp = Array.concat [|cp1;cp2|]
             let dp = Array.concat [|dp1;dp2|]
             Params(array,Info(cp,dp))
 
+        // replace in a 'Params' type the corresponding 'PartialParams'
+        // Note that the 'PartialParams' should correspond either to continuous or discrete parameters but not a mix. 
         let replaceIn (p:Params<'T>) (PartialParams(partialArray, partialInfo)) =
             let cSplit, dSplit = p |> split
             match partialInfo with
@@ -165,14 +194,14 @@ module Optimization =
         | Classical of OptimizationMethod * ObjectiveFunction * Parameter.ParameterType
         | Recursive of OptimizationMethod * ObjectiveFunction * Parameter.ParameterType * Problem<'T>
 
-    let predictionErrors array (T(name,(Graph(state,sk)),updateStrat)) = 
+(*    let predictionErrors array (T(name,(Graph(state,sk)),updateStrat)) = 
         let oneStepRollingForecastM truthPoint = Graph.TimeSerie.oneStepRollingForecastM name updateStrat sk truthPoint
         let pred, finalState = Graph.TimeSerie.fold1 oneStepRollingForecastM state array
         let error = UtilitiesSIMD.ArraySIMD.substract array pred
-        (error,finalState)
+        (error,finalState)*)
 
     let inline continuousObjective lossFunction = 
-        match lossFunction with
+        match lossFunction with  
             | LeastSquares -> (fun error -> UtilitiesSIMD.ArraySIMD.mult error error |> UtilitiesSIMD.ArraySIMD.sum)
 
     let inline objective objectiveFunc = 
@@ -193,17 +222,25 @@ module Optimization =
 
     let problemFor name =
         match name with
-        | AR -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous)
-        | MA -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous)
-        | SETAR -> Recursive(BruteForce |> DiscreteMethod, LeastSquares |> ContinuousFunction, Parameter.Discrete, 
-                     Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous))
+        | AR(_) | MA(_) -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous)
+        (*| SETAR -> Recursive(BruteForce |> DiscreteMethod, LeastSquares |> ContinuousFunction, Parameter.Discrete, 
+                     Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous))*)
 
-    let fit array (T(name,(Graph((GraphState(p,v,i,prev,c)),sk)),updateStrat)) = 
-        let parameters = Parameter.ofModel name p
+    let fit name array = 
+        let parameters = Parameter.ofModel name
         let cbounds,dbounds = Parameter.boundsFrom parameters
         let problem = problemFor name
 
-        let errorFunction pa = predictionErrors array (T(name,(Graph((GraphState(pa,v,i,prev,c)),sk)),updateStrat)) |> fst
+        let initStateTS = TimeSeries.UnivariateTimeSeries.defaultStateFrom array
+        let skM = MonadicGraph.modelM (Fitting(name))
+        let updteVarM = GraphTimeSeries.updateVariablesForFittingM name
+        let fittingM = GraphTimeSeries.fitOnceM updteVarM skM
+
+        let (MonadicGraph.State(_,v,i)) = MonadicGraph.defaultStateForFitting name
+
+        let errorFunction pa = 
+            let (TimeSeries.UnivariateTimeSeries.State(_,_,error)) = GraphTimeSeries.foldRun fittingM initStateTS (MonadicGraph.State(pa,v,i)) |> fst
+            error |> Array.map (fun x -> Option.defaultValue 0.0 x)
 
         let partialToParameter partialType (p:Parameter.Params<'T>) partialArray = 
             let (Parameter.PartialParams(_, partialInfo)) = Parameter.extractPartial partialType p
@@ -227,7 +264,7 @@ module Optimization =
                                         |> partialToParameter t initParams
 
         let (Parameter.Params(fittedParameters, _)) = solve problem parameters
-        (T(name,(Graph((GraphState(fittedParameters,v,i,prev,c)),sk)),updateStrat))
+        MonadicGraph.State(fittedParameters,v,i)
         
         
         
@@ -238,4 +275,3 @@ module Optimization =
 
     
 
-*)
