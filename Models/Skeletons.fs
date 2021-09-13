@@ -14,12 +14,12 @@ module SkeletonTree =
 
     let shift parameterShift variableShift innovationShift skeleton = 
         fold (fun op nk _ k -> nk (fun nacc -> Node1(op, nacc) |> k))
-             ( fun op kl kr _ k -> kl (fun lacc -> kr (fun racc -> Node2(op, lacc, racc) |> k)) )
+             (fun op kl kr _ k -> kl (fun lacc -> kr (fun racc -> Node2(op, lacc, racc) |> k)))
              (fun input _ k -> match input with
-                                | Parameter(idx) -> Leaf(Parameter(idx+parameterShift))
-                                | Variable(idx) -> Leaf(Variable(idx+variableShift))
-                                | Innovation(idx) -> Leaf(Innovation(idx+innovationShift))
-                                | Constant(value) -> Leaf(Constant(value)))
+                                | Parameter(idx) -> Leaf(Parameter(idx+parameterShift)) |> k
+                                | Variable(idx) -> Leaf(Variable(idx+variableShift)) |> k
+                                | Innovation(idx) -> Leaf(Innovation(idx+innovationShift)) |> k
+                                | Constant(value) -> Leaf(Constant(value)) |> k)
              skeleton
 
     // count the number of leaves by type: 
@@ -36,3 +36,9 @@ module SkeletonTree =
                                  )
              skeleton |> ignore
         count
+
+    let height skeleton = 
+        fold (fun op nk _ k -> nk (fun nacc -> (nacc + 1) |> k))
+             (fun _ kl kr _ k -> kl (fun lacc -> kr (fun racc -> (1 + max lacc racc) |> k)))
+             (fun _ _ k -> 1 |> k)
+             skeleton

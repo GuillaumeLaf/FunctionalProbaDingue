@@ -23,7 +23,7 @@ module GraphTimeSeries =
         let rec updateSequenceTSM = function
             | ARp(coeffs) -> [ for i in 1..coeffs.Length do TimeSeries.UnivariateTimeSeries.elementAtLagM i ]
             | MAp(coeffs) -> [ for i in 1..coeffs.Length do TimeSeries.UnivariateTimeSeries.innovationAtLagM i ] 
-            | STARp(coeffs,_,_,innerModelp) -> updateSequenceTSM (ARp(coeffs)) @ updateSequenceTSM innerModelp        
+            | STARp(coeffs1,coeffs2,_,_,innerModelp) -> updateSequenceTSM (ARp(coeffs1)) @ updateSequenceTSM innerModelp        
         
         updateSequenceTSM modelName
         |> Monad.sequence

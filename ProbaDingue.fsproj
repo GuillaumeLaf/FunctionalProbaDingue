@@ -25,8 +25,8 @@
     <Compile Include="Models\NodesOld.fs" />
     <Compile Include="Models\Optimization.fs" />
     <Compile Include="Models\ModelsOld.fs" />
-    <!--
 	<Compile Include="Models\DrawStructure.fs" />
+    <!--
     <Compile Include="Backtester\BacktesterTypes.fs" />
     <Compile Include="Backtester\DataHandling.fs" />
     <Compile Include="Backtester\Strategies.fs" />

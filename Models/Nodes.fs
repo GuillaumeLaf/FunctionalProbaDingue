@@ -20,8 +20,8 @@ module Nodes =
                                               (innovationShiftF nLeaves1.[2])
                                               node2
         let nLeaves12 = SkeletonTree.countLeaves (node1 .+. node2)
-        let shiftedMixingNode = SkeletonTree.shift (nLeaves12.[0]) 0 (nLeaves12.[2]) mixingNode
-        (shiftedMixingNode .*. node1) .+. (Leaf(Constant(1.0)) .-. shiftedMixingNode) .*. shiftedNode2
+        let shiftedMixingNode = SkeletonTree.shift (nLeaves12.[0]) 0 0 mixingNode
+        (shiftedMixingNode .*. node1) .+. ((Leaf(Constant(1.0)) .-. shiftedMixingNode) .*. shiftedNode2)
 
 
 

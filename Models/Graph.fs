@@ -16,12 +16,12 @@ module MonadicGraph =
     let rec convertModelToParameters = function
         | AR(order) -> ARp(Array.zeroCreate order)
         | MA(order) -> MAp(Array.zeroCreate order)
-        | STAR(order,_,_,innerModel) -> STARp(Array.zeroCreate order, 0.0, 1.0, convertModelToParameters innerModel)
+        | STAR(order,_,_,innerModel) -> STARp(Array.zeroCreate order, Array.zeroCreate order, 0.0, 1.0, convertModelToParameters innerModel)
 
     let rec defaultStateForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> State(coeffs, Array.zeroCreate coeffs.Length, [|0.0|])
-        | STARp(coeffs,_,_,innerModelp) -> let (State(innerCoeffs,_,_)) = defaultStateForSampling innerModelp
-                                           State(Array.concat [|coeffs;innerCoeffs|],Array.zeroCreate (coeffs.Length+innerCoeffs.Length),[|0.0|])
+        | STARp(coeffs1,coeffs2,_,_,innerModelp) -> let (State(innerCoeffs,_,_)) = defaultStateForSampling innerModelp
+                                                    State(Array.concat [|coeffs1;coeffs2;innerCoeffs|],Array.zeroCreate (coeffs1.Length+innerCoeffs.Length),[|0.0|])
 
     let defaultStateForFitting = convertModelToParameters >> defaultStateForSampling
 
@@ -94,15 +94,16 @@ module MonadicGraph =
                                                 | Constant(value) -> Monad.rets value |> k)
                           skeleton 
 
-    let rec defaultSkeletonFoSampling = function
+    let rec defaultSkeletonForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))
-        | STARp(coeffs,loc,scale,innerModelp) -> let ARs = defaultSkeletonFoSampling (ARp(coeffs))
-                                                 let expTerm x = ((-x+loc)/scale) |> exp
-                                                 let logisticFunc x = 1.0 / (1.0 + expTerm x) 
-                                                 let mixingNode = Node1(Apply(logisticFunc),defaultSkeletonFoSampling innerModelp)
-                                                 (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode
+        | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let ARs = defaultSkeletonForSampling (ARp(coeffs1))
+                                                          let expTerm x = ((-x+loc)/scale) |> exp
+                                                          let logisticFunc x = 1.0 / (1.0 + expTerm x) 
+                                                          let mixingNode = Node1(Apply(logisticFunc),defaultSkeletonForSampling innerModelp)
+                                                          //let mixingNode = Node1(Apply(logisticFunc),Nodes.linearCombinaisons coeffs1.Length)
+                                                          (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode
 
-    let defaultSkeletonForFitting = convertModelToParameters >> defaultSkeletonFoSampling
+    let defaultSkeletonForFitting = convertModelToParameters >> defaultSkeletonForSampling
 
     let activateSkeletonForSamplingM sk = Monad.modify (fun (State(p,v,i)) -> State(p,v,[|Normal.Sample(0.0,1.0)|]))
                                             >>= (fun _ -> skeletonM getParameterM getVariableM getInnovationM sk)
@@ -110,6 +111,6 @@ module MonadicGraph =
     let activateSkeletonForFittingM sk = skeletonM getParameterM getVariableM inactiveInnovationM sk
 
     let modelM = function
-        | Sampling(mparameters) -> (defaultSkeletonFoSampling >> activateSkeletonForSamplingM) mparameters
+        | Sampling(mparameters) -> (defaultSkeletonForSampling >> activateSkeletonForSamplingM) mparameters
         | Fitting(model) -> (defaultSkeletonForFitting >> activateSkeletonForFittingM) model
 

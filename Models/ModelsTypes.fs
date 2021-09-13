@@ -12,7 +12,7 @@ module ModelsTypes =
     type ModelParameters<'T> = 
         | ARp of 'T[]
         | MAp of 'T[]
-        | STARp of 'T[] * 'T * 'T * ModelParameters<'T>
+        | STARp of 'T[] * 'T[] * 'T * 'T * ModelParameters<'T>
 
     type ModelType<'T> = 
         | Sampling of ModelParameters<'T> 

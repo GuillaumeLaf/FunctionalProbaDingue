@@ -8,9 +8,8 @@ module Optimization =
     module Bounds = 
         type ContinuousBound<'T> = ContinuousBound of 'T * 'T
         type DiscreteBound<'T> = DiscreteBound of 'T[]
-        type B<'T> = 
-            | Simple of ContinuousBound<'T> [] * DiscreteBound<'T> []
-            | Recursive of ContinuousBound<'T> [] * DiscreteBound<'T> [] * B<'T>
+        type B<'T> = B of ContinuousBound<'T> [] * DiscreteBound<'T> []
+ 
  
         // Create the bounds for each model.
         // When continuous, bounds are defined by a minimum and maximum value.
@@ -18,9 +17,10 @@ module Optimization =
         let rec ofModel name = 
             match name with
             | AR(order) | MA(order) -> let cBounds = Array.zeroCreate order |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
-                                       Simple(cBounds, [||])
+                                       B(cBounds, [||])
             | STAR(order,_,_,innerModel) -> let cBounds = Array.zeroCreate order |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
-                                            Recursive(cBounds,[||],ofModel innerModel)
+                                            let (B(innerC,innerD)) = ofModel innerModel
+                                            B(Array.concat [|cBounds;innerC|],innerD)
 (*            | SETAR -> let coeffs12 = Array.zeroCreate (parameterArray.Length - 2) |> Array.map (fun _ -> (-1.0,1.0) |> ContinuousBound)
                        let threshold = Array.init 10 (fun i -> float(i-30)*0.1) |> DiscreteBound
                        let delay = Array.init 3 (fun i -> float(i + 1)) |> DiscreteBound
@@ -47,6 +47,7 @@ module Optimization =
         type DiscreteParameterInfo<'T> = DiscreteParameterInfo of idx:int * Bounds.DiscreteBound<'T>
 
         type Info<'T> = Info of ContinuousParameterInfo<'T> [] * DiscreteParameterInfo<'T> []
+
         type PartialInfo<'T> = PartialInfo of ContinuousParameterInfo<'T> [] * DiscreteParameterInfo<'T> []
 
         type Params<'T> = Params of 'T [] * Info<'T>
@@ -61,7 +62,7 @@ module Optimization =
         // Get a default array representing the disposition of parameters inside the model.
         let rec defaultParametersArrayForModel = function
             | AR(order) | MA(order) -> Array.zeroCreate order
-            | STAR(order,loc,scale,innerModel) -> Array.concat [|Array.zeroCreate order; defaultParametersArrayForModel innerModel|]
+            | STAR(order,_,_,innerModel) -> Array.concat [|Array.zeroCreate order; defaultParametersArrayForModel innerModel|]
 
         // Get the 'PartialInfo' about a particular parameter type (continuous or discrete) from an 'Info' type.
         let partialInfoFromInfo (Info(cinfo, dinfo)) = function
@@ -87,15 +88,23 @@ module Optimization =
 
         let ofModel name = 
             let p = defaultParametersArrayForModel name
-            let cb, db = Bounds.ofModel name
-            let info = match name with 
-                        | AR(order) | MA(order) -> let cp = Array.zeroCreate order |> Array.mapi (fun i _ -> ContinuousParameterInfo(i,cb.[i]))
-                                                   Info(cp, [||])
-(*                        | SETAR -> let coeffs12, threshDelay = arrayIndexed |> Array.splitAt (array.Length-2)
-                                   let coeffs12 = coeffs12 |> Array.mapi (fun i _ -> ContinuousParameterInfo(i,cb.[i]))
-                                   let threshDelay = threshDelay |> Array.mapi (fun i _ -> DiscreteParameterInfo(i+coeffs12.Length,db.[i]))
-                                   Info(coeffs12, threshDelay)*)
-            Params(p, info)
+
+            // 'shift' allows to shift the index reference of the parameter.
+            let rec loop shift name = 
+                let (Bounds.B(cb,db)) = Bounds.ofModel name
+                match name with 
+                    | AR(order) | MA(order) -> let cp = Array.zeroCreate order |> Array.mapi (fun i _ -> ContinuousParameterInfo(i+shift,cb.[i]))
+                                               Info(cp, [||])
+                    | STAR(order,loc,scale,innerModel) -> let cp1 = Array.zeroCreate order |> Array.mapi (fun i _ -> ContinuousParameterInfo(i+shift,cb.[i]))
+                                                          let cp2 = Array.zeroCreate order |> Array.mapi (fun i _ -> ContinuousParameterInfo(i+shift+order,cb.[i]))
+                                                          let (Info(innerC,innerD)) = loop order innerModel
+                                                          Info(Array.concat [|cp1;cp2;innerC|],innerD)
+                                                              
+    (*                        | SETAR -> let coeffs12, threshDelay = arrayIndexed |> Array.splitAt (array.Length-2)
+                                       let coeffs12 = coeffs12 |> Array.mapi (fun i _ -> ContinuousParameterInfo(i,cb.[i]))
+                                       let threshDelay = threshDelay |> Array.mapi (fun i _ -> DiscreteParameterInfo(i+coeffs12.Length,db.[i]))
+                                       Info(coeffs12, threshDelay)*)
+            Params(p, (loop 0 name))
 
         // Get the complement type of a given one.
         let notType t = function
@@ -230,13 +239,11 @@ module Optimization =
 
     let problemFor name =
         match name with
-        | AR(_) | MA(_) -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous)
-        (*| SETAR -> Recursive(BruteForce |> DiscreteMethod, LeastSquares |> ContinuousFunction, Parameter.Discrete, 
-                     Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous))*)
+        | AR(_) | MA(_) | STAR(_,_,_,_) -> Classical(BFGS |> ContinuousMethod, LeastSquares |> ContinuousFunction, Parameter.Continuous)
 
     let fit name array = 
         let parameters = Parameter.ofModel name
-        let cbounds,dbounds = Parameter.boundsFrom parameters
+        let (Bounds.B(cbounds,dbounds)) = Parameter.boundsFrom parameters
         let problem = problemFor name
 
         let initStateTS = TimeSeries.UnivariateTimeSeries.defaultStateFrom array

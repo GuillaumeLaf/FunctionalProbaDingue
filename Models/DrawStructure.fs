@@ -19,7 +19,7 @@ module DrawStructure =
                             e.Graphics.DrawLine(pen, float32(x+radius/2.5), float32(y-radius/2.5), float32(x-radius/2.5), float32(y+radius/2.5))
         | _ -> ()
 
-    let graphHeigth = Graph.Skeleton.height
+    let graphHeigth = SkeletonTree.height
     
     let degreeToRadian degree = degree * Math.PI / 180.0
     let radianToDegree radian = radian * 180.0 / Math.PI
@@ -61,23 +61,22 @@ module DrawStructure =
             let leftPoint = currentX - currentShift/2.0, float(depth+1)*50.0
             let rightPoint = currentX + currentShift/2.0, float(depth+1)*50.0
             match n with
-            | Node(op,left,right) -> DrawBranch e branchPen (endPointFrom radius (angleBetween point leftPoint) currentX currentY) (endPointFrom radius (angleBetween leftPoint point) (fst leftPoint) (snd leftPoint))
-                                     DrawBranch e branchPen (endPointFrom radius (angleBetween point rightPoint) currentX currentY) (endPointFrom radius (angleBetween rightPoint point) (fst rightPoint) (snd rightPoint))
-                                     match op with
-                                     | Addition -> drawNodeAt point ("+"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
-                                     | Multiplication -> drawNodeAt point ("*"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
-                                     | Substraction -> drawNodeAt point ("-"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
-                                     | LessThan -> drawNodeAt point ("<"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
-            | Leaf(input,x,idx,_) -> match input with
-                                     | Innovation -> (drawLeafAt innovationPen point (string(idx))) |> k   // input arrays must at least be the same length as the number of innovation nodes.
-                                     | Parameter -> (drawLeafAt parameterPen point (string(idx))) |> k
-                                     | Variable -> (drawLeafAt variablePen point (string(idx))) |> k
-                                     | PreviousResult -> (drawLeafAt nodePen point (string(idx))) |> k
-                                     | Constant -> (drawLeafAt constantPen point (string(idx))) |> k
+            | Node1(op,next) -> drawNodeAt point ("f"); loop next (currentX,float(depth+1)*50.0) (depth+1) (fun nacc -> () |> k)
+            | Node2(op,left,right) -> DrawBranch e branchPen (endPointFrom radius (angleBetween point leftPoint) currentX currentY) (endPointFrom radius (angleBetween leftPoint point) (fst leftPoint) (snd leftPoint))
+                                      DrawBranch e branchPen (endPointFrom radius (angleBetween point rightPoint) currentX currentY) (endPointFrom radius (angleBetween rightPoint point) (fst rightPoint) (snd rightPoint))
+                                      match op with
+                                      | Addition -> drawNodeAt point ("+"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
+                                      | Multiplication -> drawNodeAt point ("*"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
+                                      | Substraction -> drawNodeAt point ("-"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
+            | Leaf(input) -> match input with
+                             | Innovation(idx) -> (drawLeafAt innovationPen point (string(idx))) |> k   // input arrays must at least be the same length as the number of innovation nodes.
+                             | Parameter(idx) -> (drawLeafAt parameterPen point (string(idx))) |> k
+                             | Variable(idx) -> (drawLeafAt variablePen point (string(idx))) |> k
+                             | Constant(value) -> (drawLeafAt constantPen point (string(value))) |> k
         loop skeleton initialCenter 1 id
   
         
-    let Model (T(name,Graph(_,skeleton),_)) = 
+    let Model skeleton = 
         let form = new Form()
         form.Size <- new Size(1600,800)
 
