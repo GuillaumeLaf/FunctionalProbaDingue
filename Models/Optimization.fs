@@ -189,7 +189,15 @@ module Optimization =
             results |> Array.zip cartProd
                     |> Array.minBy (fun (_,r) -> r)
                     |> fst
-            
+
+        let PSOoptimizer func (initGuess:float[]) (bds:Bounds.ContinuousBound<float>[]) = 
+            let boundsSplit = Bounds.continuousToTuple bds
+            let boundsfloat32 = boundsSplit |> Array.map (fun (mn,mx) -> [|float32 mn;float32 mx|])
+            let settings = ({PSO.Settings.bounds=boundsfloat32;PSO.Settings.ndim=initGuess.Length;
+                             PSO.Settings.c1=2.0f;PSO.Settings.c2=2.0f;PSO.Settings.inertia=PSO.Linear(0.4f,1.2f,1000);
+                             PSO.Settings.nParticles=50;PSO.Settings.nIter=1000})
+            PSO.minimize settings func |> fst |> Array.map(fun x -> x |> float)
+
     type ContinuousObjectiveFunction = 
         | LeastSquares
 
@@ -198,6 +206,7 @@ module Optimization =
 
     type ContinuousOptimizationMethod = 
         | BFGS
+        | ParticleOpt
 
     type DiscreteOptimizationMethod = 
         | BruteForce
@@ -227,6 +236,7 @@ module Optimization =
             
     let continuousMethod = function
         | BFGS -> Optimizer.BFGSOptimizer |> Optimizer.Continuous
+        | ParticleOpt -> Optimizer.PSOoptimizer |> Optimizer.Continuous
 
     let discreteMethod = function
         | BruteForce -> Optimizer.BruteForce2 |> Optimizer.Discrete

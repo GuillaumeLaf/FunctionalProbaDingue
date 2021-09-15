@@ -10,15 +10,17 @@ open FSharp.Charting
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
-    let samplingModel = STARp([|0.6|],[|-1.5|],0.0,1.0,ARp([|0.7|])) |> Sampling
-    let (TimeSeries.UnivariateTimeSeries.State(_,data,innov)) = GraphTimeSeries.sample 10000 samplingModel
-    let plotData = data |> Array.map (fun x -> Option.defaultValue 0.0 x)
-    printfn "%A" (Utilities.autocorrelation 20 plotData)
-    Chart.Line plotData |> Chart.Show
-    
-
-(*  
-    let fittingModel = STAR(1,0.0,1.0,AR(1))
+    let samplingModel = STARp([|0.5|],[|-0.7|],0.0,1.0,ARp([|0.7|])) |> Sampling
+    //let samplingModel = ARp([|0.7|]) |> Sampling
+    //let (TimeSeries.UnivariateTimeSeries.State(_,data,innov)) = GraphTimeSeries.sample 2500 samplingModel
+    //let plotData = data |> Array.map (fun x -> Option.defaultValue 0.0 x)
+    let sampleTS = GraphTimeSeries.sample 2500 samplingModel
+    let result,nxtState = (Monad.run (TimeSeries.UnivariateTimeSeries.demeanedM) sampleTS)
+    printfn "%A" (Monad.run (TimeSeries.UnivariateTimeSeries.meanM) nxtState)
+    // Chart.Line plotData |> Chart.Show
+  
+(*    let fittingModel = STAR(1,0.0,1.0,AR(1))
+    // let fittingModel = AR(1)
     let fittedModel = Optimization.fit fittingModel data
     printfn "%A" (fittedModel)*)
 

@@ -100,6 +100,30 @@ module UnivariateTimeSeries =
 
     let differencedSeriesM = mapM (differencedM id)
     let logDifferencedSeriesM = mapM (differencedM log)
+
+    let cumSumM = StateM |> Monad.map (Array.fold (fun s x -> Option.fold (fun s x -> s+x) s x) 0.0) 
+
+    let meanM = 
+        let tmpFunc sum length = sum / length
+        tmpFunc <!> cumSumM <*> (StateM |> Monad.map (fun array -> array.Length |> float))
+
+    let applyWithoutModif m = Array.map <!> m <*> StateM
+
+    let apply m = 
+        let innerFunc (State(idx,data,innovations)) = 
+            let result = Monad.run (applyWithoutModif m) (State(idx,data,innovations)) 
+                                |> fst
+                                |> Array.map (fun x -> Some x)
+            result, (State(idx,result,innovations))
+        Monad.M innerFunc
+            
+    let demeanedM = 
+        let innerFunc state = 
+            let mean = Monad.run meanM state |> fst
+            (fun x -> Option.defaultValue 0.0 x - mean),state
+        Monad.M innerFunc |> apply
+
+        
         
 module MultivariateTimeSeries = 
     type States<'T> = States of UnivariateTimeSeries.State<'T>[]  
