@@ -9,7 +9,7 @@ module Backtester =
 
     let makeTradingSignalUpdateM = 
         let innerFunc (state:State) =
-            match state.strategy with
+            match state.strategy with 
             | NaiveStrategy -> TradingSignalStrategies.naiveStrategy state
             | ModelStrategy(m) -> TradingSignalStrategies.ModelStrategy m state
         Monad.M innerFunc
@@ -39,13 +39,13 @@ module Backtester =
           positionSize=positionSize}
 
     let backtestPointM data = 
-        createBacktestPoint 
+        createBacktestPoint    
         <!> (makeSettingsUpdateM data) 
         <*> makeStrategyUpdateM 
         <*> makeTradingSignalUpdateM 
         <*> makePositionSizeUpdateM 
 
-    let run ({strategy=strategy; positionSizeStrategy=positionSizeStrategy;windowSize=windowSize}) (TimeSeries.UnivariateTimeSeries.State(idx,data,innovation)) = 
+(*    let run ({strategy=strategy; positionSizeStrategy=positionSizeStrategy;windowSize=windowSize}) (TimeSeries.Univariate.State(idx,data,innovation)) = 
         let windowedData = data |> Array.map (fun x -> Option.defaultValue 0.0 x) |> Data.fromArray |> Array.windowed windowSize
         let initialState = {data=windowedData.[0];strategy=strategy;tradingSignal=NoSignal;positionSize=PositionSize(positionSizeStrategy,0.0)}
 
@@ -55,7 +55,7 @@ module Backtester =
 
         windowedData |> Array.fold folder (initialState,[])
                      |> snd
-                     |> List.toArray
+                     |> List.toArray*)
 
     let computePnL backtestData = 
         let getPosition (PositionSize(_,p)) = p

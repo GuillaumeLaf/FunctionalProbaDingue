@@ -11,7 +11,7 @@ module TradingSignalStrategies =
 
     let ModelStrategy m (state:State) = 
         // let transformedDataArray = Array.map (fun x -> x.transformedData) state.data
-        match (Model.conditionalExpectation 1 m).[0] with
+        match 1.0 with
         | x when x > 0.0 -> Entry, {state with tradingSignal=Entry}
         | x when x <= 0.0 -> Exit, {state with tradingSignal=Exit}
         | _ -> NoSignal, {state with tradingSignal=NoSignal}
@@ -28,6 +28,6 @@ module PositionSizingStrategies =
 module UpdateStrategyStrategies = 
     let ModelStrategy m (state:State) = 
         let transformedDataArray = Array.map (fun x -> x.transformedData) state.data
-        let newFittedModel = Model.fit transformedDataArray m
+        let newFittedModel =  m
         ModelStrategy(newFittedModel), {state with strategy=ModelStrategy(newFittedModel)}
         

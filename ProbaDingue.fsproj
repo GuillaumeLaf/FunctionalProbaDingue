@@ -15,7 +15,9 @@
     <Compile Include="PSO_algorithm.fs" />
     <Compile Include="Utilities.fs" />
     <Compile Include="Distributions.fs" />
-    <Compile Include="TimeSeries.fs" />
+    <Compile Include="TimeSeries\TimeSeries.fs" />
+    <Compile Include="TimeSeries\Statistics.fs" />
+    <Compile Include="TimeSeries\Transformations.fs" />
     <Compile Include="Models\ModelsTypes.fs" />
     <Compile Include="Models\Skeletons.fs" />
     <Compile Include="Models\Nodes.fs" />

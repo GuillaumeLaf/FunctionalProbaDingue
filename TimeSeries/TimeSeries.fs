@@ -2,7 +2,7 @@
 
 open Monads
 
-module UnivariateTimeSeries = 
+module Univariate = 
     type State<'T> = State of int * 'T option [] * innovations:'T option []  // Option type to handle missing data
 
     let defaultState n = State(0, Array.init n (fun _ -> Some 0.0), Array.init n (fun _ -> Some 0.0))
@@ -18,18 +18,32 @@ module UnivariateTimeSeries =
         let innerFunc (State(idx,data,innovations)) = (), (State(idx+1,data,innovations))
         Monad.M innerFunc
 
-    let stepping m = 
-        let tmpFunc m step = m
-        tmpFunc <!> m
-                <*> stepM
+    // The stepping monad must be last since it updates the state index.
+    let stepping m = (fun m _ -> m) <!> m <*> stepM
 
     let StateM = 
+        let innerFunc (State(idx,data,innovations)) = (State(idx,data,innovations)), (State(idx,data,innovations))
+        Monad.M innerFunc
+
+    let dataM = 
         let innerFunc (State(idx,data,innovations)) = data, (State(idx,data,innovations))
         Monad.M innerFunc
 
-    let lengthM = 
-        let innerFunc (State(idx,data,innovations)) = float data.Length, (State(idx,data,innovations))
+    let idxM = 
+        let innerFunc (State(idx,data,innovations)) = idx, (State(idx,data,innovations))
         Monad.M innerFunc
+
+    let setDataM data = 
+        let innerFunc (State(idx,_,innovations)) = data, (State(idx,data,innovations))
+        Monad.M innerFunc
+
+    let dataUpdating m = m >>= (fun x -> setDataM x)
+
+(*    let lengthM = 
+        let innerFunc (State(idx,data,innovations)) = float data.Length, (State(idx,data,innovations))
+        Monad.M innerFunc*)
+
+    let length () = float <!> (Array.length <!> dataM)
 
     let setCurrentElementM x = 
         let innerFunc (State(idx,data,innovations)) = 
@@ -87,55 +101,15 @@ module UnivariateTimeSeries =
         [1..maxLag] |> Monad.traverse elementAtLagM
                     |> Monad.map (Array.ofList)
 
-    let differencedM f = 
-        let innerFuncVanilla (current:float) (previous:float) = f current - f previous
-        let innerFuncOption current previous = Option.map2 (fun c p -> innerFuncVanilla c p) current previous
-        innerFuncOption <!> currentElementM
-                        <*> elementAtLagM 1
+    // This map function doesn't update the state. 
+    let mapM m = fst <!> (Array.mapFold (fun s _ -> Monad.run (stepping m) s) <!> StateM <*> dataM)
 
-    let mapM m = 
-        let innerFunc (State(idx,data,innovations)) = 
-            let sequenceM = data |> Array.skip idx
-                                 |> Array.map ( fun _ -> stepping m )
-                                 |> Array.toList
-                                 |> Monad.sequence
-            let result = Monad.run sequenceM (State(idx,data,innovations)) |> fst |> Array.ofList
-            result, (State(idx,result,innovations))
-        Monad.M innerFunc
+    // This map function extends the previous one by updating the state with the result.
+    let mapReplaceM m = dataUpdating (mapM m)
+        
 
-    let differencedSeriesM = mapM (differencedM id)
-    let logDifferencedSeriesM = mapM (differencedM log)
-
-    let cumSumM f = StateM |> Monad.map (Array.fold (fun s x -> Option.fold (fun s x -> s + f x) s x) 0.0) 
-
-    let meanM = 
-        let tmpFunc sum length = sum / length
-        tmpFunc <!> cumSumM id <*> lengthM
-
-    let stdM = 
-        let tmpFunc sumSquared mean length = sumSquared / length - (mean*mean) |> sqrt
-        tmpFunc <!> cumSumM (fun x -> x*x) <*> meanM <*> lengthM
-
-    let applyWithoutModif m = Array.map <!> m <*> StateM
-
-    let apply m = 
-        let innerFunc (State(idx,data,innovations)) = 
-            let result = Monad.run (applyWithoutModif m) (State(idx,data,innovations)) |> fst
-            result, (State(idx,result,innovations))
-        Monad.M innerFunc
-            
-    let demeanedM = 
-        let tmpFunc mean = Option.map (fun x -> x - mean)
-        tmpFunc <!> meanM |> apply
-
-    let standardizeM = 
-        let tmpFunc std = Option.map (fun x -> (x)/std)
-        tmpFunc <!> stdM |> apply
-
-    let normalizeM = demeanedM >>= (fun _ -> standardizeM)
-
-module MultivariateTimeSeries = 
-    type States<'T> = States of UnivariateTimeSeries.State<'T>[]  
+(*module Multivariate = 
+    type States<'T> = States of Univariate.State<'T>[]  
 
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
@@ -152,19 +126,19 @@ module MultivariateTimeSeries =
             state |> mapOverStates m
         Monad.M innerFunc
     
-    let (stepM:Monad.M<States<float>,unit[]>) = UnivariateTimeSeries.stepM |> mapOverUnivariateM
-    let (StateM:Monad.M<States<float>,float option[][]>) = UnivariateTimeSeries.StateM |> mapOverUnivariateM
-    let (currentElementM:Monad.M<States<float>,float option[]>) = UnivariateTimeSeries.currentElementM |> mapOverUnivariateM
-    let elementAtLagM lag = (UnivariateTimeSeries.elementAtLagM lag) |> mapOverUnivariateM
-    let innovationAtLagM lag = (UnivariateTimeSeries.innovationAtLagM lag) |> mapOverUnivariateM
-    let elementAtLeadM lead = (UnivariateTimeSeries.elementAtLeadM lead) |> mapOverUnivariateM
-    let innovationAtLeadM lead = (UnivariateTimeSeries.innovationAtLeadM lead) |> mapOverUnivariateM
-    let differencedM f = (UnivariateTimeSeries.differencedM f) |> mapOverUnivariateM
+    let (stepM:Monad.M<States<float>,unit[]>) = Univariate.stepM |> mapOverUnivariateM
+    let (StateM:Monad.M<States<float>,float option[][]>) = Univariate.StateM |> mapOverUnivariateM
+    let (currentElementM:Monad.M<States<float>,float option[]>) = Univariate.currentElementM |> mapOverUnivariateM
+    let elementAtLagM lag = (Univariate.elementAtLagM lag) |> mapOverUnivariateM
+    let innovationAtLagM lag = (Univariate.innovationAtLagM lag) |> mapOverUnivariateM
+    let elementAtLeadM lead = (Univariate.elementAtLeadM lead) |> mapOverUnivariateM
+    let innovationAtLeadM lead = (Univariate.innovationAtLeadM lead) |> mapOverUnivariateM
+    let differencedM f = (Univariate.differencedM f) |> mapOverUnivariateM
 
     let stepping m = 
         let tmpFunc m step = m
         tmpFunc <!> m
-                <*> stepM
+                <*> stepM*)
             
 
 
