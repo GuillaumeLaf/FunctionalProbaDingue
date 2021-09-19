@@ -194,8 +194,8 @@ module Optimization =
             let boundsSplit = Bounds.continuousToTuple bds
             let boundsfloat32 = boundsSplit |> Array.map (fun (mn,mx) -> [|float32 mn;float32 mx|])
             let settings = ({PSO.Settings.bounds=boundsfloat32;PSO.Settings.ndim=initGuess.Length;
-                             PSO.Settings.c1=2.0f;PSO.Settings.c2=2.0f;PSO.Settings.inertia=PSO.Linear(0.4f,1.2f,1000);
-                             PSO.Settings.nParticles=50;PSO.Settings.nIter=1000})
+                             PSO.Settings.c1=2.0f;PSO.Settings.c2=2.0f;PSO.Settings.inertia=PSO.Linear(0.4f,1.2f,500);
+                             PSO.Settings.nParticles=25;PSO.Settings.nIter=500})
             PSO.minimize settings func |> fst |> Array.map(fun x -> x |> float)
 
     type ContinuousObjectiveFunction = 

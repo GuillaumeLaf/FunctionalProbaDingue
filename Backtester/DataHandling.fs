@@ -12,19 +12,19 @@ module DataTransformations = // must output an array of same length as the given
             result.[i-1] <- f (array.[i]) - f (array.[i-1])
             i <- i + 1
         result
-
+(*
     let takeLogReturn array = mapDiff log array
-    let takeDifference array = mapDiff id array
+    let takeDifference array = mapDiff id array*)
 
 module Data = 
 
     let roll (arr:_[]) (target:_[]) = Array.blit arr 0 target 1 (arr.Length - 1)
     
-    let fromArray array = 
+    (*let fromArray array = 
         let logReturns = array |> DataTransformations.takeDifference
         let transfoData = Array.zeroCreate array.Length
         transfoData |> roll logReturns;
-        array |> Array.mapi (fun i x -> {time=i;price=x;logReturn=logReturns.[i];transformedData=transfoData.[i]})
+        array |> Array.mapi (fun i x -> {time=i;price=x;logReturn=logReturns.[i];transformedData=transfoData.[i]})*)
              
         
         

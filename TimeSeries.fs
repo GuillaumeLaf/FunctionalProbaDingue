@@ -12,6 +12,7 @@ module UnivariateTimeSeries =
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
     let (>>=) x f = Monad.bind f x
+    let (>=>) g f = Monad.compose g f
 
     let stepM = 
         let innerFunc (State(idx,data,innovations)) = (), (State(idx+1,data,innovations))
@@ -24,6 +25,10 @@ module UnivariateTimeSeries =
 
     let StateM = 
         let innerFunc (State(idx,data,innovations)) = data, (State(idx,data,innovations))
+        Monad.M innerFunc
+
+    let lengthM = 
+        let innerFunc (State(idx,data,innovations)) = float data.Length, (State(idx,data,innovations))
         Monad.M innerFunc
 
     let setCurrentElementM x = 
@@ -101,30 +106,34 @@ module UnivariateTimeSeries =
     let differencedSeriesM = mapM (differencedM id)
     let logDifferencedSeriesM = mapM (differencedM log)
 
-    let cumSumM = StateM |> Monad.map (Array.fold (fun s x -> Option.fold (fun s x -> s+x) s x) 0.0) 
+    let cumSumM f = StateM |> Monad.map (Array.fold (fun s x -> Option.fold (fun s x -> s + f x) s x) 0.0) 
 
     let meanM = 
         let tmpFunc sum length = sum / length
-        tmpFunc <!> cumSumM <*> (StateM |> Monad.map (fun array -> array.Length |> float))
+        tmpFunc <!> cumSumM id <*> lengthM
+
+    let stdM = 
+        let tmpFunc sumSquared mean length = sumSquared / length - (mean*mean) |> sqrt
+        tmpFunc <!> cumSumM (fun x -> x*x) <*> meanM <*> lengthM
 
     let applyWithoutModif m = Array.map <!> m <*> StateM
 
     let apply m = 
         let innerFunc (State(idx,data,innovations)) = 
-            let result = Monad.run (applyWithoutModif m) (State(idx,data,innovations)) 
-                                |> fst
-                                |> Array.map (fun x -> Some x)
+            let result = Monad.run (applyWithoutModif m) (State(idx,data,innovations)) |> fst
             result, (State(idx,result,innovations))
         Monad.M innerFunc
             
     let demeanedM = 
-        let innerFunc state = 
-            let mean = Monad.run meanM state |> fst
-            (fun x -> Option.defaultValue 0.0 x - mean),state
-        Monad.M innerFunc |> apply
+        let tmpFunc mean = Option.map (fun x -> x - mean)
+        tmpFunc <!> meanM |> apply
 
-        
-        
+    let standardizeM = 
+        let tmpFunc std = Option.map (fun x -> (x)/std)
+        tmpFunc <!> stdM |> apply
+
+    let normalizeM = demeanedM >>= (fun _ -> standardizeM)
+
 module MultivariateTimeSeries = 
     type States<'T> = States of UnivariateTimeSeries.State<'T>[]  
 

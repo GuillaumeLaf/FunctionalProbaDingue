@@ -50,6 +50,12 @@ module GraphTimeSeries =
                                      innov.[idx] <- (currentElement |> Option.defaultValue 0.0) - x |> Some
                                      s1,s2)
 
+    let rec conditionalExpectationM updateM skM steps () () = 
+        if steps = 1 then
+            _activateModelM () skM
+        else
+            (_activateModelM >>=>> _setCurrentElementM >>=>> _stepM >>=>> (fun _ _ -> updateM) >>=>> conditionalExpectationM updateM skM (steps-1)) () skM
+
     let sampleOnceM updateM skM = 
         (_activateModelM >>=>> _setCurrentElementM >>=>> _setCurrentInnovationM >>=>> _stepM >>=>> (fun _ _ -> updateM)) () skM
 
@@ -70,8 +76,6 @@ module GraphTimeSeries =
                                    foldRun samplingM initStateTS initStateG |> fst
         | Fitting(m) -> invalidArg "model" "Cannot sample with a Fitting model type. Convert it to a Sampling type."
 
-    // This must fit the data (the initial graph state makes all parameters equal to zero.)
-    // I must somehow find a way to make it possible to choose the parameters.
     let getError model array stateG = 
         let initStateTS = TimeSeries.UnivariateTimeSeries.defaultStateFrom array
         let skM = MonadicGraph.modelM (Fitting(model))

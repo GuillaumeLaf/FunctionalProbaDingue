@@ -99,7 +99,7 @@ module MonadicGraph =
         | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let ARs = defaultSkeletonForSampling (ARp(coeffs1))
                                                           let expTerm x = ((-x+loc)/scale) |> exp
                                                           let logisticFunc x = 1.0 / (1.0 + expTerm x) 
-                                                          let mixingNode = Node1(Apply(logisticFunc),defaultSkeletonForSampling innerModelp)
+                                                          let mixingNode = Node1(Apply(logisticFunc),defaultSkeletonForSampling innerModelp |> SkeletonTree.deactivateInnovations)
                                                           //let mixingNode = Node1(Apply(logisticFunc),Nodes.linearCombinaisons coeffs1.Length)
                                                           (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode
 

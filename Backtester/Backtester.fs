@@ -1,6 +1,7 @@
 ﻿namespace Backtester
 
 open System
+open Monads
 
 module Backtester =
     let (<*>) = Monad.apply
@@ -44,8 +45,8 @@ module Backtester =
         <*> makeTradingSignalUpdateM 
         <*> makePositionSizeUpdateM 
 
-    let run ({strategy=strategy; positionSizeStrategy=positionSizeStrategy;windowSize=windowSize}) array = 
-        let windowedData = array |> Data.fromArray |> Array.windowed windowSize
+    let run ({strategy=strategy; positionSizeStrategy=positionSizeStrategy;windowSize=windowSize}) (TimeSeries.UnivariateTimeSeries.State(idx,data,innovation)) = 
+        let windowedData = data |> Array.map (fun x -> Option.defaultValue 0.0 x) |> Data.fromArray |> Array.windowed windowSize
         let initialState = {data=windowedData.[0];strategy=strategy;tradingSignal=NoSignal;positionSize=PositionSize(positionSizeStrategy,0.0)}
 
         let folder state x = 

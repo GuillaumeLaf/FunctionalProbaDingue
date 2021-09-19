@@ -19,7 +19,7 @@ module BacktesterTypes =
 
     type Strategy = 
         | NaiveStrategy
-        | ModelStrategy of ModelsTypes.T
+        | ModelStrategy of ModelsTypes.Model
 
     type DataElement = {time:TimeStep
                         price:float
