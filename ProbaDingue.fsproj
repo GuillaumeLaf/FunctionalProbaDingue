@@ -23,10 +23,7 @@
     <Compile Include="Models\Nodes.fs" />
     <Compile Include="Models\Graph.fs" />
     <Compile Include="Models\GraphTimeSeries.fs" />
-    <Compile Include="Models\GraphOld.fs" />
-    <Compile Include="Models\NodesOld.fs" />
     <Compile Include="Models\Optimization.fs" />
-    <Compile Include="Models\ModelsOld.fs" />
 	<Compile Include="Models\DrawStructure.fs" />
     <Compile Include="Backtester\BacktesterTypes.fs" />
     <Compile Include="Backtester\DataHandling.fs" />

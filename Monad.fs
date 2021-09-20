@@ -33,6 +33,8 @@ module Monad =
 
     let compose g f = (fun x -> (g x) >>= f)
 
+    let chain g f = g >>= (fun _ -> f)
+
     let traverse f list =  // Not tail-recursive for some reason.
         let cons hd tl = hd :: tl
 

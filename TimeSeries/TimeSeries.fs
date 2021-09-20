@@ -45,7 +45,7 @@ module Univariate =
         let innerFunc (State(idx,_,innovations)) = data, (State(idx,data,innovations))
         Monad.M innerFunc
 
-    let stateKeeping m = (fun state -> Monad.run (m >>= (fun result -> setStateM state >>= (fun _ -> Monad.rets result))) state |> fst) <!> StateM
+    let stateKeeping m = fst <!> (Monad.run (m >>= (fun result -> setStateM <!> StateM >>= (fun _ -> Monad.rets result))) <!> StateM)
                                        
     let dataUpdating m = m >>= (fun x -> setDataM x)
 

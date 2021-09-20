@@ -10,7 +10,7 @@ open FSharp.Charting
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
-    let ts = TimeSeries.Univariate.State(0,Array.init 10 (fun i -> Some (float i)),Array.zeroCreate 10)
+    let ts = TimeSeries.Univariate.State(0,Array.init 1000 (fun i -> Some (float i)),Array.zeroCreate 1000)
     printfn "%A" ts
 
     printfn "%A" (Monad.run Transformations.normalizeM ts)
