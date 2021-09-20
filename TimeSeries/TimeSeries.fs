@@ -33,17 +33,23 @@ module Univariate =
         let innerFunc (State(idx,data,innovations)) = idx, (State(idx,data,innovations))
         Monad.M innerFunc
 
+    let innovationsM = 
+        let innerFunc (State(idx,data,innovations)) = innovations, (State(idx,data,innovations))
+        Monad.M innerFunc
+
+    let setStateM state = 
+        let innerFunc oldState = state, state
+        Monad.M innerFunc
+
     let setDataM data = 
         let innerFunc (State(idx,_,innovations)) = data, (State(idx,data,innovations))
         Monad.M innerFunc
 
+    let stateKeeping m = (fun state -> Monad.run (m >>= (fun result -> setStateM state >>= (fun _ -> Monad.rets result))) state |> fst) <!> StateM
+                                       
     let dataUpdating m = m >>= (fun x -> setDataM x)
 
-(*    let lengthM = 
-        let innerFunc (State(idx,data,innovations)) = float data.Length, (State(idx,data,innovations))
-        Monad.M innerFunc*)
-
-    let length () = float <!> (Array.length <!> dataM)
+    let lengthM () = float <!> (Array.length <!> dataM)
 
     let setCurrentElementM x = 
         let innerFunc (State(idx,data,innovations)) = 
@@ -57,45 +63,20 @@ module Univariate =
             (), (State(idx,data,innovations))
         Monad.M innerFunc
 
-    let currentElementM = 
-        let innerFunc (State(idx,data,innovations)) = data.[idx], (State(idx,data,innovations))
-        Monad.M innerFunc
+    let currentElementM () = Array.get <!> dataM <*> idxM
+    let currentInnovationM () = Array.get <!> innovationsM <*> idxM
 
-    let currentInnovationM = 
-        let innerFunc (State(idx,data,innovations)) = innovations.[idx], (State(idx,data,innovations))
-        Monad.M innerFunc
+    let chooseElementAtLag lag idx (array:'a option[]) = 
+        match (idx-lag) with
+        | x when x < 0 -> None
+        | x when x >= array.Length -> None
+        | x -> array.[x]
 
-    let elementAtLagM lag = 
-        let innerFunc (State(idx,data,innovations)) = 
-            if idx-lag < 0 then
-                None, (State(idx,data,innovations))
-            else
-                data.[idx-lag], (State(idx,data,innovations))
-        Monad.M innerFunc
+    let elementAtLagM lag = (chooseElementAtLag lag) <!> idxM <*> dataM
+    let innovationAtLagM lag = (chooseElementAtLag lag) <!> idxM <*> innovationsM
 
-    let innovationAtLagM lag = 
-        let innerFunc (State(idx,data,innovations)) = 
-            if idx-lag < 0 then
-                None, (State(idx,data,innovations))
-            else
-                innovations.[idx-lag], (State(idx,data,innovations))
-        Monad.M innerFunc
-
-    let elementAtLeadM lead = 
-        let innerFunc (State(idx,data,innovations)) = 
-            if (idx+lead) >= data.Length then
-                None, (State(idx,data,innovations))
-            else 
-                data.[idx+lead], (State(idx,data,innovations))
-        Monad.M innerFunc
-
-    let innovationAtLeadM lead = 
-        let innerFunc (State(idx,data,innovations)) = 
-            if (idx+lead) >= data.Length then
-                None, (State(idx,data,innovations))
-            else 
-                innovations.[idx+lead], (State(idx,data,innovations))
-        Monad.M innerFunc
+    let elementAtLeadM lead = elementAtLagM (-lead)
+    let innovationAtLeadM lead = innovationAtLagM (-lead)
 
     let previousElementsM maxLag = 
         [1..maxLag] |> Monad.traverse elementAtLagM

@@ -13,9 +13,9 @@ module Statistics =
 
     let meanM = 
         (fun length -> Option.map (fun sum -> sum / length))
-            <!> Univariate.lengthM <*> sumM id
+            <!> Univariate.lengthM () <*> sumM id
     
     let stdM = 
         (fun length -> Option.map2 (fun sumSquared mean -> sumSquared / length - (mean*mean) |> sqrt))
-            <!> Univariate.lengthM <*> sumM (fun x -> x*x) <*> meanM
+            <!> Univariate.lengthM () <*> sumM (fun x -> x*x) <*> meanM
 

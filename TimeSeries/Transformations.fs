@@ -11,7 +11,7 @@ module Transformations =
 
     let inline differencedM (f:'a->'a) = 
         Option.map2 (fun current previous -> f current - f previous) 
-                <!> Univariate.currentElementM
+                <!> Univariate.currentElementM ()
                 <*> Univariate.elementAtLagM 1
 
     let differencedSeriesM = Univariate.mapM (differencedM id)
@@ -19,18 +19,22 @@ module Transformations =
         
     let demeanM = 
         Option.map2 (fun current mean -> current - mean)
-            <!> Univariate.currentElementM
+            <!> Univariate.currentElementM ()
             <*> Statistics.meanM
             |> Univariate.mapM
     
     let standardizeM = 
         Option.map2 (fun current std -> current / std)
-            <!> Univariate.currentElementM
+            <!> Univariate.currentElementM ()
             <*> Statistics.stdM
             |> Univariate.mapM
 
-    // This normalize function does not have the required form for a transformation monad.
-    // It should not modify the input state (but here it does cause of 'dataUpdating').
-    // I should find a way of remembering the input state. 
-    let normalizeM = Univariate.dataUpdating demeanM >>= (fun _ -> standardizeM)
+    let normalizeM = Univariate.dataUpdating demeanM >>= (fun _ -> standardizeM) |> Univariate.stateKeeping
+
+(*    let normalizeM =   
+        let innerFunc (Univariate.State(idx,data,innovation)) = 
+            let _, nxtState = Monad.run (Univariate.dataUpdating demeanM) (Univariate.State(idx,data,innovation))
+            let result2, _ = Monad.run standardizeM nxtState
+            result2, (Univariate.State(idx,data,innovation))
+        Monad.M innerFunc*)
                              

@@ -45,7 +45,7 @@ module GraphTimeSeries =
     let _stepM () () = BiMonad.modifyFirstWithMonad (TimeSeries.Univariate.stepM) 
 
     let _setCurrentErrorM () x = 
-        BiMonad.modify (fun s1 s2 -> let currentElement, _ = Monad.run (TimeSeries.Univariate.currentElementM) s1
+        BiMonad.modify (fun s1 s2 -> let currentElement, _ = Monad.run (TimeSeries.Univariate.currentElementM ()) s1
                                      let (TimeSeries.Univariate.State(idx,data,innov)) = s1
                                      innov.[idx] <- (currentElement |> Option.defaultValue 0.0) - x |> Some
                                      s1,s2)
