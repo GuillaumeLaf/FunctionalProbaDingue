@@ -18,6 +18,7 @@
     <Compile Include="TimeSeries\TimeSeries.fs" />
     <Compile Include="TimeSeries\Statistics.fs" />
     <Compile Include="TimeSeries\Transformations.fs" />
+    <Compile Include="Models\SGD.fs" />
     <Compile Include="Models\ModelsTypes.fs" />
     <Compile Include="Models\Skeletons.fs" />
     <Compile Include="Models\Nodes.fs" />

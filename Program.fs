@@ -10,10 +10,9 @@ open FSharp.Charting
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
-    let ts = TimeSeries.Univariate.State(0,Array.init 1000 (fun i -> Some (float i)),Array.zeroCreate 1000)
-    printfn "%A" ts
-
-    printfn "%A" (Monad.run Transformations.normalizeM ts)
+    let modelSK = MonadicGraph.defaultSkeletonForSampling (Array.zeroCreate 300 |> ARp)
+    let defaultGraphState = MonadicGraph.State(Array.zeroCreate 300, Array.init 300 (fun x->float x),[|1.0|])
+    printfn "%A" (Monad.run (MonadicGraph.skeletonGradientM modelSK) defaultGraphState)
 
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)

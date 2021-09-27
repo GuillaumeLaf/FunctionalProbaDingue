@@ -29,17 +29,21 @@ module MonadicGraph =
         | Sampling(mparameters) -> defaultStateForSampling mparameters
         | Fitting(model) -> defaultStateForFitting model
 
-    let getParameterM idx = 
-        let innerFunc (State(p,v,i)) = p.[idx], (State(p,v,i))
+    let parametersM = 
+        let innerFunc (State(p,v,i)) = p, (State(p,v,i))
         Monad.M innerFunc
 
-    let getVariableM idx = 
-        let innerFunc (State(p,v,i)) = v.[idx], (State(p,v,i))
+    let variablesM = 
+        let innerFunc (State(p,v,i)) = v, (State(p,v,i))
         Monad.M innerFunc
 
-    let getInnovationM idx = 
-        let innerFunc (State(p,v,i)) = i.[idx], (State(p,v,i))
+    let innovationsM = 
+        let innerFunc (State(p,v,i)) = i, (State(p,v,i))
         Monad.M innerFunc
+
+    let getParameterM idx = Array.get <!> parametersM <*> (Monad.rets idx)
+    let getVariableM idx = Array.get <!> variablesM <*> (Monad.rets idx)
+    let getInnovationM idx = Array.get <!> innovationsM <*> (Monad.rets idx)
 
     let inactiveInnovationM idx = Monad.rets 0.0
 
@@ -79,6 +83,11 @@ module MonadicGraph =
               |> Monad.traverse (fun (i,x) -> setInnovationM i x)
               |> Monad.map (Array.ofList)
 
+    let mapM mArray = 
+        let innerFunc state = 
+            mArray |> Array.map (fun m -> Monad.run m state |> fst), state
+        Monad.M innerFunc
+
     let inline skeletonM parameterM variableM innovationM skeleton = 
         SkeletonTree.fold (fun op nk _ k -> match op with
                                                 | Apply(f) -> nk (fun nacc -> Monad.map f nacc |> k))
@@ -94,6 +103,17 @@ module MonadicGraph =
                                                 | Constant(value) -> Monad.rets value |> k)
                           skeleton 
 
+    let skeletonGradientForParameterM idx skeleton = 
+        let skM = skeletonM getParameterM getVariableM getInnovationM skeleton
+        let getParameterShiftedM idx x = if idx = x then Monad.add (getParameterM idx) (Monad.rets 0.00005) else getParameterM x
+        let skShiftParameterM idx = skeletonM (getParameterShiftedM idx) getVariableM getInnovationM skeleton
+        Monad.div (Monad.sub (skShiftParameterM idx) skM) (Monad.rets 0.00005)
+
+    let skeletonGradientM skeleton = 
+        Array.mapi <!> (Monad.rets (fun i _ -> skeletonGradientForParameterM i skeleton)) 
+                   <*> parametersM
+                   >>= (fun array -> mapM array)
+                   
     let rec defaultSkeletonForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))
         | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let ARs = defaultSkeletonForSampling (ARp(coeffs1))

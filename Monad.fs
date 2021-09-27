@@ -56,6 +56,7 @@ module Monad =
     let inline add m1 m2 = operation ( + ) m1 m2
     let inline mult m1 m2 = operation ( * ) m1 m2
     let inline sub m1 m2 = operation ( - ) m1 m2
+    let inline div m1 m2 = operation ( / ) m1 m2
 
 module BiMonad = 
     type M<'State1,'State2,'T,'U> = M of ('State1 -> 'State2 -> 'T * 'U * 'State1 * 'State2)
