@@ -12,6 +12,10 @@ module GraphTimeSeries =
 
     let defaultState name n = (TimeSeries.Univariate.defaultState n,MonadicGraph.defaultState name)
 
+    let stateM = 
+        let innerFunc stateTS stateG = stateTS, stateG, stateTS, stateG
+        BiMonad.M innerFunc
+
     let _activateModelM () skM = 
         let innerFunc (stateTS:TimeSeries.Univariate.State<'T>) (stateG:MonadicGraph.State<'T>) = 
             let result, nxtStateG = Monad.run skM stateG
@@ -50,6 +54,16 @@ module GraphTimeSeries =
                                      innov.[idx] <- (currentElement |> Option.defaultValue 0.0) - x |> Some
                                      s1,s2)
 
+    let _getCurrentErrorM () x = 
+        // get the error (dependent on current prediction) at the current index and returns it. 
+        let innerFunc stateTS stateG = 
+            let currentElement, _ = Monad.run (TimeSeries.Univariate.currentElementM ()) stateTS
+            let error = (currentElement |> Option.defaultValue 0.0) - x |> Some
+            (), error, stateTS, stateG
+        BiMonad.M innerFunc
+
+    let _setCurrentIndexM () idx = BiMonad.modifyFirstWithMonad (TimeSeries.Univariate.setCurrentIndexM idx)
+
     let rec conditionalExpectationM updateM skM steps () () = 
         if steps = 1 then
             _activateModelM () skM
@@ -62,6 +76,9 @@ module GraphTimeSeries =
     let fitOnceM updateM skM = 
         (_activateModelM >>=>> _setCurrentErrorM >>=>> _stepM >>=>> (fun _ _ -> updateM)) () skM
 
+    let SDGfitM updateM skM idx = 
+        _setCurrentIndexM () idx >>= (fun _ _ -> updateM >>= (fun _ _ -> (_activateModelM >>=>> _getCurrentErrorM) () skM ))
+                                                    
     let foldRun m (TimeSeries.Univariate.State(idx,data,innov)) initStateG =
         data |> Array.fold (fun (s1,s2) x -> let _,_,nxS1,nxS2 = BiMonad.run m s1 s2
                                              (nxS1,nxS2)) 

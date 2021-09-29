@@ -63,6 +63,10 @@ module Univariate =
             (), (State(idx,data,innovations))
         Monad.M innerFunc
 
+    let setCurrentIndexM idx = 
+        let innerFunc (State(_,data,innovations)) = (), (State(idx,data,innovations))
+        Monad.M innerFunc
+
     let currentElementM () = Array.get <!> dataM <*> idxM
     let currentInnovationM () = Array.get <!> innovationsM <*> idxM
 

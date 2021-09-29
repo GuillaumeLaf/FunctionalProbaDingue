@@ -112,7 +112,7 @@ module MonadicGraph =
     let skeletonGradientM skeleton = 
         Array.mapi <!> (Monad.rets (fun i _ -> skeletonGradientForParameterM i skeleton)) 
                    <*> parametersM
-                   >>= (fun array -> mapM array)
+                   >>= (fun arrayM -> mapM arrayM)
                    
     let rec defaultSkeletonForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))

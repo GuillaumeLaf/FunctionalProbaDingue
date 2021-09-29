@@ -1,5 +1,7 @@
 ﻿module Utilities
 
+    let rand = new System.Random()
+
     let dot a b = Array.fold2 (fun state x y -> state + x * y) 0.0 a b
 
     let cov (array1: float array) (array2:float array) =  // Only valid for zero mean processes.
@@ -22,4 +24,12 @@
 
     let extractFst arrayTuples = arrayTuples |> Array.map (fun (x1,_) -> x1)
     let extractSnd arrayTuples = arrayTuples |> Array.map (fun (_,x2) -> x2)
+
+    let swap x y (a: _ array) =
+        let tmp = a.[x]
+        a.[x] <- a.[y]
+        a.[y] <- tmp
+
+    let shuffle array = Array.iteri (fun i _ -> array |> swap i (rand.Next(i,array.Length))) array; array
+        
     
