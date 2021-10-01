@@ -11,8 +11,8 @@ let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
     let model = ARp([|0.7|]) |> Sampling
-    let (Univariate.State(idx,data,innov)) = GraphTimeSeries.sample 100000 model
-    printfn "%A" (Models.SGD.fit (AR(1)) 0.01 40 data)
+    let (Univariate.State(idx,data,innov)) = GraphTimeSeries.sample 1000 model
+    printfn "%A" (Models.SGD.fit (AR(1)) 0.01 500 data)
     
 
     stopWatch.Stop()

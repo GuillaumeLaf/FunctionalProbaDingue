@@ -29,6 +29,10 @@ module MonadicGraph =
         | Sampling(mparameters) -> defaultStateForSampling mparameters
         | Fitting(model) -> defaultStateForFitting model
 
+    let stateM = 
+        let innerFunc state = state,state
+        Monad.M innerFunc
+
     let parametersM = 
         let innerFunc (State(p,v,i)) = p, (State(p,v,i))
         Monad.M innerFunc
