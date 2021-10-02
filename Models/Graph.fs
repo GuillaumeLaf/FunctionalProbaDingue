@@ -3,7 +3,7 @@
 open MathNet.Numerics.Distributions
 open Monads
 
-module MonadicGraph = 
+module Graph = 
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
     let (>>=) x f = Monad.bind f x

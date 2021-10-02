@@ -257,14 +257,14 @@ module Optimization =
         let problem = problemFor name
 
         let initStateTS = TimeSeries.Univariate.defaultStateFrom array
-        let skM = MonadicGraph.modelM (Fitting(name))
+        let skM = Graph.modelM (Fitting(name))
         let updteVarM = GraphTimeSeries.updateVariablesForFittingM name
         let fittingM = GraphTimeSeries.fitOnceM updteVarM skM
 
-        let (MonadicGraph.State(_,v,i)) = MonadicGraph.defaultStateForFitting name
+        let (Graph.State(_,v,i)) = Graph.defaultStateForFitting name
 
         let errorFunction pa = 
-            let (TimeSeries.Univariate.State(_,_,error)) = GraphTimeSeries.foldRun fittingM initStateTS (MonadicGraph.State(pa,v,i)) |> fst
+            let (TimeSeries.Univariate.State(_,_,error)) = GraphTimeSeries.foldRun fittingM initStateTS (Graph.State(pa,v,i)) |> fst
             error |> Array.map (fun x -> Option.defaultValue 0.0 x)
 
         let partialToParameter partialType (p:Parameter.Params<'T>) partialArray = 
@@ -289,7 +289,7 @@ module Optimization =
                                         |> partialToParameter t initParams
 
         let (Parameter.Params(fittedParameters, _)) = solve problem parameters
-        MonadicGraph.State(fittedParameters,v,i)
+        Graph.State(fittedParameters,v,i)
         
         
         

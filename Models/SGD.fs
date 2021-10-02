@@ -7,6 +7,11 @@ module SGD =
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
     let (>>=) x f = Monad.bind f x
+    let (>>==) x f = BiMonad.bind f x
+    let (>>=>>) g f = BiMonad.compose g f
+
+    let SDGfitM updateM skM idx = 
+        GraphTimeSeries.setCurrentIndexM () idx >>== (fun _ _ -> updateM >>== (fun _ _ -> (GraphTimeSeries.activateModelM >>=>> GraphTimeSeries.getCurrentErrorM) () skM))
 
     let limitParams x =
         match x with
@@ -17,25 +22,25 @@ module SGD =
     let updateParametersM learningRate skeleton = 
         (Array.mapi (fun i x -> Monad.add (Monad.rets x) 
                                  (Monad.mult (Monad.rets learningRate) 
-                                   (MonadicGraph.skeletonGradientForParameterM i skeleton ))) 
-                <!> MonadicGraph.parametersM 
-                >>= (fun arrayM -> MonadicGraph.mapM arrayM))
-                >>= (fun array -> MonadicGraph.setParametersM (array |> Array.map (fun x -> limitParams x)))
+                                   (Graph.skeletonGradientForParameterM i skeleton ))) 
+                <!> Graph.parametersM 
+                >>= (fun arrayM -> Graph.mapM arrayM))
+                >>= (fun array -> Graph.setParametersM (array |> Array.map (fun x -> limitParams x)))
     
     let lossForEpoch model array =
-        GraphTimeSeries.getError model array <!> MonadicGraph.stateM
+        GraphTimeSeries.getError model array <!> Graph.stateM
             >>= (fun stateTS -> let (TimeSeries.Univariate.State(_,_,innov)) = stateTS
                                 Array.fold (fun s xOption -> Option.fold (fun accum x -> accum + x*x) s xOption) 0.0 innov |> Monad.rets)
             
     let fit model learningRate epochs array = 
         let initStateTS = TimeSeries.Univariate.defaultStateFrom array
-        let initStateG = MonadicGraph.defaultStateForFitting model
-        let defaultSk = MonadicGraph.defaultSkeletonForFitting model
-        let skM = MonadicGraph.modelM (Fitting(model))
+        let initStateG = Graph.defaultStateForFitting model
+        let defaultSk = Graph.defaultSkeletonForFitting model
+        let skM = Graph.modelM (Fitting(model))
         let updateVarM = GraphTimeSeries.updateVariablesForFittingM model
 
         let fittingM idx =
-            (GraphTimeSeries.SDGfitM updateVarM skM idx) 
+            (SDGfitM updateVarM skM idx) 
                 |> BiMonad.bind (fun _ _ -> BiMonad.modifySecondWithMonad (updateParametersM learningRate defaultSk))
                                   
         let folder states = Array.fold (fun s idx -> let _,_,nxtS1,nxtS2 = s ||> BiMonad.run (fittingM idx) 
