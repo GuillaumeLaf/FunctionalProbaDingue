@@ -24,7 +24,7 @@ module SGD =
                                  (Monad.mult (Monad.rets learningRate) 
                                    (Graph.skeletonGradientForParameterM i skeleton ))) 
                 <!> Graph.parametersM 
-                >>= (fun arrayM -> Graph.mapM arrayM))
+                >>= (fun arrayM -> Monad.mapM arrayM))
                 >>= (fun array -> Graph.setParametersM (array |> Array.map (fun x -> limitParams x)))
     
     let lossForEpoch model array =

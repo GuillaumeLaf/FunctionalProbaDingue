@@ -21,7 +21,7 @@ module Univariate =
     // The stepping monad must be last since it updates the state index.
     let stepping m = (fun m _ -> m) <!> m <*> stepM
 
-    let StateM = 
+    let stateM = 
         let innerFunc (State(idx,data,innovations)) = (State(idx,data,innovations)), (State(idx,data,innovations))
         Monad.M innerFunc
 
@@ -45,7 +45,7 @@ module Univariate =
         let innerFunc (State(idx,_,innovations)) = data, (State(idx,data,innovations))
         Monad.M innerFunc
 
-    let stateKeeping m = fst <!> (Monad.run (m >>= (fun result -> setStateM <!> StateM >>= (fun _ -> Monad.rets result))) <!> StateM)
+    let stateKeeping m = fst <!> (Monad.run (m >>= (fun result -> setStateM <!> stateM >>= (fun _ -> Monad.rets result))) <!> stateM)
                                        
     let dataUpdating m = m >>= (fun x -> setDataM x)
 
@@ -87,7 +87,7 @@ module Univariate =
                     |> Monad.map (Array.ofList)
 
     // This map function doesn't update the state. 
-    let mapM m = fst <!> (Array.mapFold (fun s _ -> Monad.run (stepping m) s) <!> StateM <*> dataM)
+    let mapM m = fst <!> (Array.mapFold (fun s _ -> Monad.run (stepping m) s) <!> stateM <*> dataM)
 
     // This map function extends the previous one by updating the state with the result.
     let mapReplaceM m = dataUpdating (mapM m)

@@ -22,7 +22,7 @@ module Graph =
         | ARp(coeffs) | MAp(coeffs) -> State(coeffs, Array.zeroCreate coeffs.Length, [|0.0|])
         | STARp(coeffs1,coeffs2,_,_,innerModelp) -> let (State(innerCoeffs,_,_)) = defaultStateForSampling innerModelp
                                                     State(Array.concat [|coeffs1;coeffs2;innerCoeffs|],Array.zeroCreate (coeffs1.Length+innerCoeffs.Length),[|0.0|])
-
+    
     let defaultStateForFitting = convertModelToParameters >> defaultStateForSampling
 
     let defaultState = function
@@ -54,43 +54,24 @@ module Graph =
     let setParameterM idx x = 
         let innerFunc (State(p,v,i)) = 
             p.[idx] <- x
-            x, (State(p,v,i))
+            (), (State(p,v,i))
         Monad.M innerFunc
 
     let setVariableM idx x = 
         let innerFunc (State(p,v,i)) = 
             v.[idx] <- x
-            x, (State(p,v,i))
+            (), (State(p,v,i))
         Monad.M innerFunc
 
     let setInnovationM idx x = 
         let innerFunc (State(p,v,i)) = 
             i.[idx] <- x
-            x, (State(p,v,i))
+            (), (State(p,v,i))
         Monad.M innerFunc
 
-    let setParametersM array = 
-        array |> Array.indexed
-              |> Array.toList
-              |> Monad.traverse (fun (i,x) -> setParameterM i x)
-              |> Monad.map (Array.ofList)
-
-    let setVariablesM array = 
-        array |> Array.indexed
-              |> Array.toList
-              |> Monad.traverse (fun (i,x) -> setVariableM i x)
-              |> Monad.map (Array.ofList)
-
-    let setInnovationsM array = 
-        array |> Array.indexed
-              |> Array.toList
-              |> Monad.traverse (fun (i,x) -> setInnovationM i x)
-              |> Monad.map (Array.ofList)
-
-    let mapM mArray = 
-        let innerFunc state = 
-            mArray |> Array.map (fun m -> Monad.run m state |> fst), state
-        Monad.M innerFunc
+    let setParametersM array = Array.mapi (fun i x -> setParameterM i x) array |> Monad.mapM >>= (fun _ -> Monad.rets ())
+    let setVariablesM array = Array.mapi (fun i x -> setVariableM i x) array |> Monad.mapM >>= (fun _ -> Monad.rets ())
+    let setInnovationsM array = Array.mapi (fun i x -> setInnovationM i x) array |> Monad.mapM >>= (fun _ -> Monad.rets ())
 
     let inline skeletonM parameterM variableM innovationM skeleton = 
         SkeletonTree.fold (fun op nk _ k -> match op with
@@ -116,7 +97,7 @@ module Graph =
     let skeletonGradientM skeleton = 
         Array.mapi <!> (Monad.rets (fun i _ -> skeletonGradientForParameterM i skeleton)) 
                    <*> parametersM
-                   >>= (fun arrayM -> mapM arrayM)
+                   >>= (fun arrayM -> Monad.mapM arrayM)
                    
     let rec defaultSkeletonForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))

@@ -2,6 +2,59 @@
 
 open Monads
 
+module GraphTS = 
+    let (>>=) x f = Monad.bind f x
+    let (<!>) = Monad.map
+    let (<*>) = Monad.apply
+    let (>=>) g f = Monad.compose g f
+
+    // Variable update must be made at a specific time ! (Be careful of look-ahead bias).
+    let rec defineUpdatesM modelName = 
+        let rec updateSequenceTSM = function
+            | ARp(coeffs) -> [| for i in 1..coeffs.Length do TimeSeries.Univariate.elementAtLagM i |]
+            | MAp(coeffs) -> [| for i in 1..coeffs.Length do TimeSeries.Univariate.innovationAtLagM i |] 
+            | STARp(coeffs1,coeffs2,_,_,innerModelp) -> Array.concat[|updateSequenceTSM (ARp(coeffs1)); updateSequenceTSM innerModelp|]       
+        
+        updateSequenceTSM modelName
+        |> Monad.mapM
+        |> Monad.map (Array.map (fun x -> x |> Option.defaultValue 0.0))
+
+    let stateGraphM () = fst <!> Monad.get
+    let stateTimeSeriesM () = snd <!> Monad.get
+
+    let setStateGraphM stateG = Monad.M (fun (_,stateTS) -> (),(stateG,stateTS))
+    let setStateTimeSeriesM stateTS = Monad.M (fun (stateG,_) -> (),(stateG,stateTS))
+
+    let runGraphM m = 
+        Monad.state {
+            let! (r,s) = Monad.run m <!> stateGraphM ()
+            do! setStateGraphM s
+            return r
+        }
+                               
+    let runTimeSeriesM m = 
+        Monad.state {
+            let! (r,s) = Monad.run m <!> stateTimeSeriesM ()
+            do! setStateTimeSeriesM s
+            return r
+        }
+    
+    let sampleOnceM updateM skM = 
+        Monad.state {
+            let! x = runGraphM skM
+            do! runTimeSeriesM (TimeSeries.Univariate.setCurrentElementM x)
+            let! innov = runGraphM Graph.innovationsM
+            do! runTimeSeriesM (TimeSeries.Univariate.setCurrentInnovationM innov.[0])
+            do! runTimeSeriesM TimeSeries.Univariate.stepM
+            let! newVar = runTimeSeriesM updateM
+            do! runGraphM (Graph.setVariablesM newVar)
+            return x
+        }
+                                        
+        
+        
+    
+
 module GraphTimeSeries = 
 
     let (>>=) x f = BiMonad.bind f x

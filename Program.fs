@@ -11,8 +11,13 @@ let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
     let model = ARp([|0.7|]) |> Sampling
-    let (Univariate.State(idx,data,innov)) = GraphTimeSeries.sample 1000 model
-    printfn "%A" (Models.SGD.fit (AR(1)) 0.01 500 data)
+    let initStateG = Graph.defaultState model
+    let initStateTS = TimeSeries.Univariate.defaultState 10
+    let skM = Graph.modelM model
+    let updateM = GraphTS.defineUpdatesM (ARp([|0.0|]))
+
+    printfn "%A" (Monad.run (GraphTS.sampleOnceM updateM skM) (initStateG,initStateTS))
+
     
 
     stopWatch.Stop()
