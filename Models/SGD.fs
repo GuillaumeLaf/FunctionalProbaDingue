@@ -23,7 +23,7 @@ module SGD =
                 >>= (fun array -> Graph.setParametersM (array |> Array.map (fun x -> limitParams x)))
     
     let lossForEpoch model array =
-        GraphTS.getError model array <!> Graph.stateM
+        GraphTS.getError model array <!> Monad.get
             >>= (fun stateTS -> let (TimeSeries.Univariate.State(_,_,innov)) = stateTS
                                 Array.fold (fun s xOption -> Option.fold (fun accum x -> accum + x*x) s xOption) 0.0 innov |> Monad.rets)
             

@@ -29,21 +29,9 @@ module Graph =
         | Sampling(mparameters) -> defaultStateForSampling mparameters
         | Fitting(model) -> defaultStateForFitting model
 
-    let stateM = 
-        let innerFunc state = state,state
-        Monad.M innerFunc
-
-    let parametersM = 
-        let innerFunc (State(p,v,i)) = p, (State(p,v,i))
-        Monad.M innerFunc
-
-    let variablesM = 
-        let innerFunc (State(p,v,i)) = v, (State(p,v,i))
-        Monad.M innerFunc
-
-    let innovationsM = 
-        let innerFunc (State(p,v,i)) = i, (State(p,v,i))
-        Monad.M innerFunc
+    let parametersM = Monad.M (fun (State(p,v,i)) -> p,(State(p,v,i)))
+    let variablesM = Monad.M (fun (State(p,v,i)) -> v,(State(p,v,i)))
+    let innovationsM = Monad.M (fun (State(p,v,i)) -> i,(State(p,v,i)))
 
     let getParameterM idx = Array.get <!> parametersM <*> (Monad.rets idx)
     let getVariableM idx = Array.get <!> variablesM <*> (Monad.rets idx)
@@ -88,11 +76,15 @@ module Graph =
                                                 | Constant(value) -> Monad.rets value |> k)
                           skeleton 
 
-    let skeletonGradientForParameterM idx skeleton = 
-        let skM = skeletonM getParameterM getVariableM getInnovationM skeleton
-        let getParameterShiftedM idx x = if idx = x then Monad.add (getParameterM idx) (Monad.rets 0.00005) else getParameterM x
-        let skShiftParameterM idx = skeletonM (getParameterShiftedM idx) getVariableM getInnovationM skeleton
-        Monad.div (Monad.sub (skShiftParameterM idx) skM) (Monad.rets 0.00005)
+    let skeletonGradientForParameterM wantedIdx skeleton = 
+        let getParameterShiftedM wantedIdx = function 
+            | x when x=wantedIdx -> Monad.add (getParameterM wantedIdx) (Monad.rets 0.00005) 
+            | x -> getParameterM x
+        Monad.state {
+            let! x = skeletonM getParameterM getVariableM getInnovationM skeleton
+            let! x_dt = skeletonM (getParameterShiftedM wantedIdx) getVariableM getInnovationM skeleton
+            return (x_dt - x)/0.00005
+        }
 
     let skeletonGradientM skeleton = 
         Array.mapi <!> (Monad.rets (fun i _ -> skeletonGradientForParameterM i skeleton)) 
@@ -110,8 +102,12 @@ module Graph =
 
     let defaultSkeletonForFitting = convertModelToParameters >> defaultSkeletonForSampling
 
-    let activateSkeletonForSamplingM sk = Monad.modify (fun (State(p,v,i)) -> State(p,v,[|Normal.Sample(0.0,1.0)|]))
-                                            >>= (fun _ -> skeletonM getParameterM getVariableM getInnovationM sk)
+    let activateSkeletonForSamplingM sk = 
+        Monad.state {
+            let! (State(p,v,_)) = Monad.get
+            do! Monad.put (State(p,v,[|Normal.Sample(0.0,1.0)|]))
+            return! skeletonM getParameterM getVariableM getInnovationM sk
+        }
 
     let activateSkeletonForFittingM sk = skeletonM getParameterM getVariableM inactiveInnovationM sk
 

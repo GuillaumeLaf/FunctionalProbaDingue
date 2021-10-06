@@ -6,46 +6,31 @@ module Univariate =
     type State<'T> = State of int * 'T option [] * innovations:'T option []  // Option type to handle missing data
 
     let defaultState n = State(0, Array.init n (fun _ -> Some 0.0), Array.init n (fun _ -> Some 0.0))
-    let defaultStateFrom array = 
-        State(0, array, Array.init array.Length (fun _ -> Some 0.0))
+    let defaultStateFrom array = State(0, array, Array.init array.Length (fun _ -> Some 0.0))
 
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
     let (>>=) x f = Monad.bind f x
     let (>=>) g f = Monad.compose g f
 
-    let stepM = 
-        let innerFunc (State(idx,data,innovations)) = (), (State(idx+1,data,innovations))
-        Monad.M innerFunc
+    let stepM = Monad.M ( fun (State(idx,data,innovations)) -> (), (State(idx+1,data,innovations)) )
 
     // The stepping monad must be last since it updates the state index.
     let stepping m = (fun m _ -> m) <!> m <*> stepM
 
-    let stateM = 
-        let innerFunc (State(idx,data,innovations)) = (State(idx,data,innovations)), (State(idx,data,innovations))
-        Monad.M innerFunc
+    let dataM = Monad.M ( fun (State(idx,data,innovations)) -> data, (State(idx,data,innovations)) )
+    let idxM = Monad.M ( fun (State(idx,data,innovations)) -> idx, (State(idx,data,innovations)) )
+    let innovationsM = Monad.M ( fun (State(idx,data,innovations)) -> innovations, (State(idx,data,innovations)) )
+    let setDataM data = Monad.M ( fun (State(idx,_,innovations)) -> data, (State(idx,data,innovations)) )
 
-    let dataM = 
-        let innerFunc (State(idx,data,innovations)) = data, (State(idx,data,innovations))
-        Monad.M innerFunc
-
-    let idxM = 
-        let innerFunc (State(idx,data,innovations)) = idx, (State(idx,data,innovations))
-        Monad.M innerFunc
-
-    let innovationsM = 
-        let innerFunc (State(idx,data,innovations)) = innovations, (State(idx,data,innovations))
-        Monad.M innerFunc
-
-    let setStateM state = 
-        let innerFunc oldState = state, state
-        Monad.M innerFunc
-
-    let setDataM data = 
-        let innerFunc (State(idx,_,innovations)) = data, (State(idx,data,innovations))
-        Monad.M innerFunc
-
-    let stateKeeping m = fst <!> (Monad.run (m >>= (fun result -> setStateM <!> stateM >>= (fun _ -> Monad.rets result))) <!> stateM)
+    // The monad "m" modifies the state but we wish to run this monad "m" without changing the state. 
+    let stateKeeping m = 
+        Monad.state {
+            let! state = Monad.get 
+            let! result = m
+            do! Monad.put state
+            return result
+        }
                                        
     let dataUpdating m = m >>= (fun x -> setDataM x)
 
@@ -63,9 +48,7 @@ module Univariate =
             (), (State(idx,data,innovations))
         Monad.M innerFunc
 
-    let setCurrentIndexM idx = 
-        let innerFunc (State(_,data,innovations)) = (), (State(idx,data,innovations))
-        Monad.M innerFunc
+    let setCurrentIndexM idx = Monad.M ( fun (State(_,data,innovations)) -> (), (State(idx,data,innovations)) )
 
     let currentElementM () = Array.get <!> dataM <*> idxM
     let currentInnovationM () = Array.get <!> innovationsM <*> idxM
@@ -87,7 +70,7 @@ module Univariate =
                     |> Monad.map (Array.ofList)
 
     // This map function doesn't update the state. 
-    let mapM m = fst <!> (Array.mapFold (fun s _ -> Monad.run (stepping m) s) <!> stateM <*> dataM)
+    let mapM m = fst <!> (Array.mapFold (fun s _ -> Monad.run (stepping m) s) <!> Monad.get <*> dataM)
 
     // This map function extends the previous one by updating the state with the result.
     let mapReplaceM m = dataUpdating (mapM m)
