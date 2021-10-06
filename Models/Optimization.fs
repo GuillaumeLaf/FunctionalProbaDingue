@@ -258,14 +258,12 @@ module Optimization =
 
         let initStateTS = TimeSeries.Univariate.defaultStateFrom array
         let skM = Graph.modelM (Fitting(name))
-        let updteVarM = GraphTimeSeries.updateVariablesForFittingM name
-        let fittingM = GraphTimeSeries.fitOnceM updteVarM skM
+        let updteVarM = GraphTS.updateForFittingM name
+        let fittingM = GraphTS.fitOnceM updteVarM skM
 
         let (Graph.State(_,v,i)) = Graph.defaultStateForFitting name
 
-        let errorFunction pa = 
-            let (TimeSeries.Univariate.State(_,_,error)) = GraphTimeSeries.foldRun fittingM initStateTS (Graph.State(pa,v,i)) |> fst
-            error |> Array.map (fun x -> Option.defaultValue 0.0 x)
+        let errorFunction pa = GraphTS.getError name array (Graph.State(pa,v,i))
 
         let partialToParameter partialType (p:Parameter.Params<'T>) partialArray = 
             let partialInfo = Parameter.partialInfoFromParams p partialType

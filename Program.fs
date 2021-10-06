@@ -11,12 +11,14 @@ let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
     let model = ARp([|0.7|]) |> Sampling
-    let initStateG = Graph.defaultState model
-    let initStateTS = TimeSeries.Univariate.defaultState 10
-    let skM = Graph.modelM model
-    let updateM = GraphTS.defineUpdatesM (ARp([|0.0|]))
+    let spleStates = GraphTS.sample 10000 model
 
-    printfn "%A" (Monad.run (GraphTS.sampleOnceM updateM skM) (initStateG,initStateTS))
+(*    let fittingModel = AR(1)
+    let (_,TimeSeries.Univariate.State(_,_,error)) = GraphTS.getError fittingModel sple (Graph.State([|0.0|],[|0.0|],[|0.0|]))
+    let error = Array.map (fun x -> x |> Option.defaultValue 0.0) error
+    let error = Array.map (fun x -> x*x) error
+    printfn "%A" (UtilitiesSIMD.ArraySIMD.sum error)*)
+
 
     
 
