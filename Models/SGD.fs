@@ -13,15 +13,21 @@ module SGD =
         | a when x < -1.0 -> -1.0
         | a when x > 1.0 -> 1.0
         | _ -> x
+    
+    let updateRuleM learningRate skeleton parameterIdx parameterValue = 
+        Monad.state {
+            let! gradient = Graph.skeletonGradientForParameterM parameterIdx skeleton
+            return parameterValue + learningRate * gradient
+        }
 
     let updateParametersM learningRate skeleton = 
-        (Array.mapi (fun i x -> Monad.add (Monad.rets x) 
-                                 (Monad.mult (Monad.rets learningRate) 
-                                   (Graph.skeletonGradientForParameterM i skeleton ))) 
-                <!> Graph.parametersM 
-                >>= (fun arrayM -> Monad.mapM arrayM))
-                >>= (fun array -> Graph.setParametersM (array |> Array.map (fun x -> limitParams x)))
-    
+        Monad.state {
+            let! parameterValues = Graph.parametersM
+            let! newParameters = Array.mapi (fun i value -> updateRuleM learningRate skeleton i value) parameterValues |> Monad.mapM
+            let newParameters = newParameters |> Array.map (fun x -> limitParams x)
+            do! Graph.setParametersM newParameters
+        }
+
     let lossForEpoch model array =
         GraphTS.getError model array <!> Monad.get
             >>= (fun stateTS -> let (TimeSeries.Univariate.State(_,_,innov)) = stateTS
