@@ -11,13 +11,10 @@ let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
     let model = ARp([|0.7|]) |> Sampling
-    let spleStates = GraphTS.sample 10000 model
+    let sple = GraphTS.sample 10000 model
+    let sple = Array.map (fun x -> Some x) sple
 
-(*    let fittingModel = AR(1)
-    let (_,TimeSeries.Univariate.State(_,_,error)) = GraphTS.getError fittingModel sple (Graph.State([|0.0|],[|0.0|],[|0.0|]))
-    let error = Array.map (fun x -> x |> Option.defaultValue 0.0) error
-    let error = Array.map (fun x -> x*x) error
-    printfn "%A" (UtilitiesSIMD.ArraySIMD.sum error)*)
+    printfn "%A" (SGD.fit (AR(2)) 0.001 50 sple)
 
 
     

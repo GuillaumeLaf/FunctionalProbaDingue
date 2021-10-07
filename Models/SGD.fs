@@ -14,24 +14,27 @@ module SGD =
         | a when x > 1.0 -> 1.0
         | _ -> x
     
-    let updateRuleM learningRate skeleton parameterIdx parameterValue = 
+    let updateRuleM learningRate skeleton parameterIdx parameterValue currentError = 
         Monad.state {
-            let! gradient = Graph.skeletonGradientForParameterM parameterIdx skeleton
-            return parameterValue + learningRate * gradient
+            let! gradient = GraphTS.runGraphM (Graph.skeletonGradientForParameterM parameterIdx skeleton)
+            return parameterValue + learningRate * gradient * currentError
         }
 
     let updateParametersM learningRate skeleton = 
         Monad.state {
-            let! parameterValues = Graph.parametersM
-            let! newParameters = Array.mapi (fun i value -> updateRuleM learningRate skeleton i value) parameterValues |> Monad.mapM
+            let! currentError = GraphTS.runTimeSeriesM (TimeSeries.Univariate.currentInnovationM ())
+            let currentError = currentError |> Option.defaultValue 0.0
+            let! parameterValues = GraphTS.runGraphM Graph.parametersM
+            let! newParameters = Array.mapi (fun i value -> updateRuleM learningRate skeleton i value currentError) parameterValues |> Monad.mapM
             let newParameters = newParameters |> Array.map (fun x -> limitParams x)
-            do! Graph.setParametersM newParameters
+            do! GraphTS.runGraphM (Graph.setParametersM newParameters)
         }
 
-    let lossForEpoch model array =
-        GraphTS.getError model array <!> Monad.get
-            >>= (fun stateTS -> let (TimeSeries.Univariate.State(_,_,innov)) = stateTS
-                                Array.fold (fun s xOption -> Option.fold (fun accum x -> accum + x*x) s xOption) 0.0 innov |> Monad.rets)
+    let lossForEpochM model array = 
+        Monad.state {
+            let! errors = GraphTS.runGraphM (GraphTS.getError model array <!> Monad.get)
+            return (Array.mapFoldBack (fun x s -> (), x*x+s) errors 0.0 |> snd)
+        }
             
     let fit model learningRate epochs array = 
         let initStateTS = TimeSeries.Univariate.defaultStateFrom array
@@ -40,16 +43,21 @@ module SGD =
         let skM = Graph.modelM (Fitting(model))
         let updateVarM = GraphTS.updateForFittingM model
 
-        let fittingM idx =
-            (GraphTS.SDGfitM updateVarM skM idx) 
-                |> BiMonad.bind (fun _ _ -> BiMonad.modifySecondWithMonad (updateParametersM learningRate defaultSk))
+        let fittingM idx = 
+            Monad.state {
+                do! GraphTS.SDGfitM updateVarM skM idx
+                do! updateParametersM learningRate defaultSk
+            }
                                   
-        let folder states = Array.fold (fun s idx -> let _,_,nxtS1,nxtS2 = s ||> BiMonad.run (fittingM idx) 
-                                                     (nxtS1,nxtS2)) states                              
+        let folder states = Array.fold (fun s idx -> let _,nxtStates = s |> Monad.run (fittingM idx) 
+                                                     nxtStates) states                              
         
+        let printCurrent states= 
+            let r,(s,_) = Monad.run (lossForEpochM model array) states
+            r,s
+
         let rec loop idxArray epochs states = 
-            let (_,s2) = states
             match epochs with
-            | 1 -> printfn "%A" (Monad.run (lossForEpoch model array) s2); folder states idxArray
-            | _ -> printfn "%A" (Monad.run (lossForEpoch model array) s2); loop (Utilities.shuffle idxArray) (epochs-1) (folder states idxArray)
-        loop (Array.init array.Length id) epochs (initStateTS,initStateG) 
+            | 1 -> printfn "%A" (printCurrent states); folder states idxArray
+            | _ -> printfn "%A" (printCurrent states); loop (Utilities.shuffle idxArray) (epochs-1) (folder states idxArray)
+        loop (Array.init array.Length id) epochs (initStateG,initStateTS) |> fst
