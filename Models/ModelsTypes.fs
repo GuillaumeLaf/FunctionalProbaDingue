@@ -7,12 +7,13 @@ module ModelsTypes =
         | AR of order:int
         | MA of order:int
         | STAR of order:int * location:float * scale:float * model:Model
-        //| SETAR of order:int * delay:int // The two AR models have the same order
+        | ErrorModel of Model
 
     type ModelParameters<'T> = 
         | ARp of 'T[]
         | MAp of 'T[]
         | STARp of 'T[] * 'T[] * 'T * 'T * ModelParameters<'T>
+        | ErrorModelp of ModelParameters<'T>
 
     type ModelType<'T> = 
         | Sampling of ModelParameters<'T> 

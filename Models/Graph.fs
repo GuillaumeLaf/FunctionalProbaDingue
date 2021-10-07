@@ -12,16 +12,20 @@ module Graph =
 
     let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Addition, N1, N2)
     let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Multiplication, N1, N2)
+    let inline ( .-. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Substraction, N1, N2)
 
     let rec convertModelToParameters = function
         | AR(order) -> ARp(Array.zeroCreate order)
         | MA(order) -> MAp(Array.zeroCreate order)
         | STAR(order,_,_,innerModel) -> STARp(Array.zeroCreate order, Array.zeroCreate order, 0.0, 1.0, convertModelToParameters innerModel)
+        | ErrorModel(innerModel) -> ErrorModelp(convertModelToParameters innerModel)
 
     let rec defaultStateForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> State(coeffs, Array.zeroCreate coeffs.Length, [|0.0|])
         | STARp(coeffs1,coeffs2,_,_,innerModelp) -> let (State(innerCoeffs,_,_)) = defaultStateForSampling innerModelp
                                                     State(Array.concat [|coeffs1;coeffs2;innerCoeffs|],Array.zeroCreate (coeffs1.Length+innerCoeffs.Length),[|0.0|])
+        | ErrorModelp(innerModelp) -> let (State(innerCoeffs,innerVar,innerInnov)) = defaultStateForSampling innerModelp
+                                      (State(innerCoeffs,Array.concat [|[|0.0|];innerVar|],innerInnov))
     
     let defaultStateForFitting = convertModelToParameters >> defaultStateForSampling
 
@@ -99,6 +103,7 @@ module Graph =
                                                           let mixingNode = Node1(Apply(logisticFunc),defaultSkeletonForSampling innerModelp |> SkeletonTree.deactivateInnovations)
                                                           //let mixingNode = Node1(Apply(logisticFunc),Nodes.linearCombinaisons coeffs1.Length)
                                                           (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode
+        | ErrorModelp(innerModelp) -> (defaultSkeletonForSampling innerModelp |> SkeletonTree.shift 0 1 0) .-. (Leaf(Variable(0)))
 
     let defaultSkeletonForFitting = convertModelToParameters >> defaultSkeletonForSampling
 

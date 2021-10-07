@@ -13,7 +13,8 @@ module GraphTS =
         let rec updateSequenceTSM = function
             | ARp(coeffs) -> [| for i in 1..coeffs.Length do TimeSeries.Univariate.elementAtLagM i |]
             | MAp(coeffs) -> [| for i in 1..coeffs.Length do TimeSeries.Univariate.innovationAtLagM i |] 
-            | STARp(coeffs1,coeffs2,_,_,innerModelp) -> Array.concat[|updateSequenceTSM (ARp(coeffs1)); updateSequenceTSM innerModelp|]       
+            | STARp(coeffs1,coeffs2,_,_,innerModelp) -> Array.concat[|updateSequenceTSM (ARp(coeffs1)); updateSequenceTSM innerModelp|] 
+            | ErrorModelp(innerModelp) -> Array.concat [|[|TimeSeries.Univariate.currentElementM()|];updateSequenceTSM innerModelp|]
         updateSequenceTSM modelName
         |> Monad.mapM
         |> Monad.map (Array.map (fun x -> x |> Option.defaultValue 0.0))

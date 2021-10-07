@@ -20,6 +20,7 @@ module SGD =
             return parameterValue + learningRate * gradient * currentError
         }
 
+    // Updating of the parameters must be made after running the model.
     let updateParametersM learningRate skeleton = 
         Monad.state {
             let! currentError = GraphTS.runTimeSeriesM (TimeSeries.Univariate.currentInnovationM ())
@@ -33,7 +34,7 @@ module SGD =
     let lossForEpochM model array = 
         Monad.state {
             let! errors = GraphTS.runGraphM (GraphTS.getError model array <!> Monad.get)
-            return (Array.mapFoldBack (fun x s -> (), x*x+s) errors 0.0 |> snd)
+            return (Array.foldBack (fun x s -> x*x+s) errors 0.0)
         }
             
     let fit model learningRate epochs array = 

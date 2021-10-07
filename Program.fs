@@ -10,11 +10,11 @@ open FSharp.Charting
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
-    let model = ARp([|0.7|]) |> Sampling
-    let sple = GraphTS.sample 10000 model
+    let model = STARp([|0.6;-0.2|],[|-0.9;0.4|],0.0,1.0,ARp([|0.7|])) |> Sampling
+    let sple = GraphTS.sample 1000 model
     let sple = Array.map (fun x -> Some x) sple
 
-    printfn "%A" (SGD.fit (AR(2)) 0.001 50 sple)
+    printfn "%A" (SGD.fit (STAR(2,0.0,1.0,AR(1))) 0.001 500 sple)
 
 
     
