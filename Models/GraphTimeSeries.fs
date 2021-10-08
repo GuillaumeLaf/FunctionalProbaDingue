@@ -14,7 +14,7 @@ module GraphTS =
             | ARp(coeffs) -> [| for i in 1..coeffs.Length do TimeSeries.Univariate.elementAtLagM i |]
             | MAp(coeffs) -> [| for i in 1..coeffs.Length do TimeSeries.Univariate.innovationAtLagM i |] 
             | STARp(coeffs1,coeffs2,_,_,innerModelp) -> Array.concat[|updateSequenceTSM (ARp(coeffs1)); updateSequenceTSM innerModelp|] 
-            | ErrorModelp(innerModelp) -> Array.concat [|[|TimeSeries.Univariate.currentElementM()|];updateSequenceTSM innerModelp|]
+            | ErrorModelp(innerModelp) -> Array.concat [|[|TimeSeries.Univariate.currentElementM()|]; updateSequenceTSM innerModelp|]
         updateSequenceTSM modelName
         |> Monad.mapM
         |> Monad.map (Array.map (fun x -> x |> Option.defaultValue 0.0))
@@ -53,30 +53,23 @@ module GraphTS =
             return x
         }
 
-    let currentErrorM skM = 
+    let fitOnceM updateM errorSkM = 
         Monad.state {
-            let! x = runGraphM skM
-            let! currentElement = runTimeSeriesM (TimeSeries.Univariate.currentElementM ())
-            return (currentElement |> Option.defaultValue 0.0) - x
-        } 
-
-    let fitOnceM updateM skM = 
-        Monad.state {
-            let! currentError = currentErrorM skM
-            do! runTimeSeriesM (TimeSeries.Univariate.setCurrentInnovationM currentError)
+            let! error = runGraphM errorSkM
+            do! runTimeSeriesM (TimeSeries.Univariate.setCurrentInnovationM error)
             do! runTimeSeriesM TimeSeries.Univariate.stepM
             let! newVar = runTimeSeriesM updateM
             do! runGraphM (Graph.setVariablesM newVar)
         }
 
-    let SDGfitM updateM skM idx = 
+    let SDGfitM updateM errorSkM idx = 
         Monad.state {
-            do! runTimeSeriesM (TimeSeries.Univariate.setCurrentIndexM idx)
-            let! newVar = runTimeSeriesM updateM
-            do! runGraphM (Graph.setVariablesM newVar)
-            let! x = runGraphM skM
-            let! currentError = currentErrorM skM
-            do! runTimeSeriesM (TimeSeries.Univariate.setCurrentInnovationM currentError)
+            for i in idx do
+                do! runTimeSeriesM (TimeSeries.Univariate.setCurrentIndexM i)
+                let! newVar = runTimeSeriesM updateM
+                do! runGraphM (Graph.setVariablesM newVar)
+                let! error = runGraphM errorSkM
+                do! runTimeSeriesM (TimeSeries.Univariate.setCurrentInnovationM error)
         }
 
     let sample n = function
@@ -88,13 +81,5 @@ module GraphTS =
                                let sampleArrayM = Array.zeroCreate n |> Array.map (fun _ -> sampleM)
                                Monad.run (Monad.mapM sampleArrayM) (initStateG,initStateTS) |> fst
         | Fitting(m) -> invalidArg "model" "Cannot sample with a Fitting model type. Convert it to a Sampling type."
-                   
-    let getError model array stateG = 
-        let initStateTS = TimeSeries.Univariate.defaultStateFrom array
-        let skM = Graph.modelM (Fitting(model))
-        let updateM = updateForFittingM model
-        let fittingM = fitOnceM updateM skM
-        let fittingArrayM = Array.zeroCreate (array.Length) |> Array.map (fun _ -> fittingM)
-        let (_,TimeSeries.Univariate.State(_,_,errors)) = Monad.run (Monad.mapM fittingArrayM) (stateG,initStateTS) |> snd
-        errors |> Array.map (fun x -> Option.defaultValue 0.0 x)
+                  
        
