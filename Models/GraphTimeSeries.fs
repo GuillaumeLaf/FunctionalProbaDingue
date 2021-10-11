@@ -16,7 +16,7 @@ module GraphTS =
             | STARp(coeffs1,coeffs2,_,_,innerModelp) -> Array.concat[|updateSequenceTSM (ARp(coeffs1)); updateSequenceTSM innerModelp|] 
             | ErrorModelp(innerModelp) -> Array.concat [|[|TimeSeries.Univariate.currentElementM()|]; updateSequenceTSM innerModelp|]
         updateSequenceTSM modelName
-        |> Monad.mapM
+        |> Monad.mapFoldM
         |> Monad.map (Array.map (fun x -> x |> Option.defaultValue 0.0))
 
     let updateForFittingM = Graph.convertModelToParameters >> defineUpdatesM
@@ -79,7 +79,7 @@ module GraphTS =
                                let updateM = defineUpdatesM mparams
                                let sampleM = sampleOnceM updateM skM
                                let sampleArrayM = Array.zeroCreate n |> Array.map (fun _ -> sampleM)
-                               Monad.run (Monad.mapM sampleArrayM) (initStateG,initStateTS) |> fst
+                               Monad.run (Monad.mapFoldM sampleArrayM) (initStateG,initStateTS) |> fst
         | Fitting(m) -> invalidArg "model" "Cannot sample with a Fitting model type. Convert it to a Sampling type."
                   
        

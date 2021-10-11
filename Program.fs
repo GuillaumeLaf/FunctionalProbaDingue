@@ -15,8 +15,8 @@ let main argv =
     let sple = GraphTS.sample 1000 model
     let sple = Array.map (fun x -> Some x) sple
 
-    //printfn "%A" (SGD.fit (AR(1)) 0.001 500 sple)
-    printfn "%A" (SGD.fit (STAR(2,0.0,1.0,AR(1))) 0.003 100 sple)
+    //printfn "%A" (SGD.fit (AR(1)) 0.0001 100 sple)
+    printfn "%A" (SGD.fit (STAR(2,0.0,1.0,AR(1))) 0.005 100 sple)
 
 
     

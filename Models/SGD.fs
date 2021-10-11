@@ -14,19 +14,34 @@ module SGD =
         | a when x > 1.0 -> 1.0
         | _ -> x
     
-    let updateRuleM learningRate skeleton parameterIdx parameterValue currentError = 
+(*    let updateRuleM learningRate skeleton parameterIdx parameterValue currentError = 
         Monad.state {
-            let! gradient = GraphTS.runGraphM (Graph.skeletonGradientForParameterM parameterIdx skeleton)
             return parameterValue - learningRate * gradient * currentError
+        }
+*)
+
+    let gradientUpdateM skeleton idx = 
+        Monad.state {
+            do! GraphTS.runTimeSeriesM (TimeSeries.Univariate.setCurrentIndexM idx)
+            let! currentError = GraphTS.runTimeSeriesM (TimeSeries.Univariate.currentInnovationM ())
+            let currentError = currentError |> Option.defaultValue 0.0
+            let! currentGradient = GraphTS.runGraphM (Graph.skeletonGradientM skeleton)
+            return Array.map (fun g -> g * currentError) currentGradient
+        }
+
+    let multipleGradientUpdateM nParameters skeleton indices = 
+        Monad.state {
+            let gradient = Array.zeroCreate nParameters
+            let! currentGradient = Array.map (fun idx -> gradientUpdateM skeleton idx) indices |> Monad.mapM
+            return Array.foldBack (fun x s -> UtilitiesSIMD.ArraySIMD.add x s) currentGradient gradient
         }
 
     // Updating of the parameters must be made after running the model.
     let updateParametersM learningRate skeleton indices = 
         Monad.state {
-            let! currentError = GraphTS.runTimeSeriesM (TimeSeries.Univariate.currentInnovationM ())
-            let currentError = currentError |> Option.defaultValue 0.0
             let! parameterValues = GraphTS.runGraphM Graph.parametersM
-            let! newParameters = Array.mapi (fun i value -> updateRuleM learningRate skeleton i value currentError) parameterValues |> Monad.mapM
+            let! gradient = multipleGradientUpdateM (parameterValues.Length) skeleton indices
+            let newParameters = Array.map2 (fun p g -> p - learningRate * g) parameterValues gradient
             let newParameters = newParameters |> Array.map (fun x -> limitParams x)
             do! GraphTS.runGraphM (Graph.setParametersM newParameters)
         }
@@ -55,6 +70,6 @@ module SGD =
 
         let rec loop idxArray epochs states = 
             match epochs with
-            | 1 -> printfn "%A" (printCurrent states); folder states (idxArray |> Array.chunkBySize 10)
-            | _ -> printfn "%A" (printCurrent states); loop (Utilities.shuffle idxArray) (epochs-1) (folder states (idxArray |> Array.chunkBySize 10))
+            | 1 -> printfn "%A" (printCurrent states); folder states (idxArray |> Array.chunkBySize 12)
+            | _ -> printfn "%A" (printCurrent states); loop (Utilities.shuffle idxArray) (epochs-1) (folder states (idxArray |> Array.chunkBySize 12))
         loop (Array.init array.Length id) epochs (initStateG,initStateTS) |> fst

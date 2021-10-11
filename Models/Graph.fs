@@ -61,9 +61,9 @@ module Graph =
             (), (State(p,v,i))
         Monad.M innerFunc
 
-    let setParametersM array = Array.mapi (fun i x -> setParameterM i x) array |> Monad.mapM >>= (fun _ -> Monad.rets ())
-    let setVariablesM array = Array.mapi (fun i x -> setVariableM i x) array |> Monad.mapM >>= (fun _ -> Monad.rets ())
-    let setInnovationsM array = Array.mapi (fun i x -> setInnovationM i x) array |> Monad.mapM >>= (fun _ -> Monad.rets ())
+    let setParametersM array = Array.mapi (fun i x -> setParameterM i x) array |> Monad.mapFoldM >>= (fun _ -> Monad.rets ())
+    let setVariablesM array = Array.mapi (fun i x -> setVariableM i x) array |> Monad.mapFoldM >>= (fun _ -> Monad.rets ())
+    let setInnovationsM array = Array.mapi (fun i x -> setInnovationM i x) array |> Monad.mapFoldM >>= (fun _ -> Monad.rets ())
 
     let inline skeletonM parameterM variableM innovationM skeleton = 
         SkeletonTree.fold (fun op nk _ k -> match op with
@@ -93,7 +93,7 @@ module Graph =
     let skeletonGradientM skeleton = 
         Array.mapi <!> (Monad.rets (fun i _ -> skeletonGradientForParameterM i skeleton)) 
                    <*> parametersM
-                   >>= (fun arrayM -> Monad.mapM arrayM)
+                   >>= (fun arrayM -> Monad.mapFoldM arrayM)
                    
     let rec defaultSkeletonForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))

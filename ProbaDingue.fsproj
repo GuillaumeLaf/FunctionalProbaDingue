@@ -6,6 +6,11 @@
     <WarnOn>3390;$(WarnOn)</WarnOn> 
 
     <AssemblyName>ProbaDingue</AssemblyName>
+
+	<runtime>
+		<gcServer enabled="true" />
+		<gcConcurrent enabled="true"/>
+	</runtime>
   </PropertyGroup>
 
   <ItemGroup>

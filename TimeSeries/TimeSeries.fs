@@ -65,6 +65,8 @@ module Univariate =
     let elementAtLeadM lead = elementAtLagM (-lead)
     let innovationAtLeadM lead = innovationAtLagM (-lead)
 
+    let innovationAtIdxM idx = Array.get <!> innovationsM <*> (Monad.rets idx)
+
     let previousElementsM maxLag = 
         [1..maxLag] |> Monad.traverse elementAtLagM
                     |> Monad.map (Array.ofList)
