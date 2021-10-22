@@ -5,22 +5,37 @@ open TimeSeries
 open Models
 open Monads
 open FSharp.Charting
+open Binance
+
+open Binance.Net
+
+open System.IO
+open System
 
 [<EntryPoint>]
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
+
+    let endTime = new DateTime(2021,10,21) |> Nullable
+    let d = Collector.downloadOne (Collector.Crypto("BNBUSDT", Collector.M15)) endTime
+                |> Async.RunSynchronously
     
-    let model = STARp([|0.6;-0.2|],[|-0.9;0.4|],0.0,1.0,ARp([|0.7|])) |> Sampling
-    //let model = ARp([|0.7|]) |> Sampling
-    let sple = GraphTS.sample 1000 model
-    let sple = Array.map (fun x -> Some x) sple
+(*    let client = new BinanceClient()
 
-    //printfn "%A" (SGD.fit (AR(1)) (SGD.RMSProp(0.9,[|0.0|],0.0001)) 500 sple)
-    printfn "%A" (SGD.fit (STAR(2,0.0,1.0,AR(1))) (SGD.RMSProp(0.9,Array.zeroCreate 5,0.01)) 500 sple)
+    let startTime = new DateTime(2021,10,18)
+    let endTime = new DateTime(2021,10,20)*)
 
-
+(*    let result = client.Spot.System.GetExchangeInfoAsync()
+                    |> Async.AwaitTask
+                    |> Async.RunSynchronously
+    printfn "%A" (result.Data.Symbols |> Seq.map (fun x -> x.Name)
+                                      |> Seq.length)*)
+(*    let result = client.Spot.Market.GetKlinesAsync("BNBBTC",Enums.KlineInterval.FifteenMinutes,startTime,endTime)
+                    |> Async.AwaitTask
+                    |> Async.RunSynchronously
+    printfn "%A" (result.Data |> Seq.map (fun (x:Binance.Net.Interfaces.IBinanceKline) -> x.CloseTime)
+                              |> Seq.length)*)
     
-
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)
 
