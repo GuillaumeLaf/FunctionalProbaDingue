@@ -35,11 +35,20 @@ module Collector =
         | true -> File.ReadLines(getPath crypto).Last()
         | false -> ""
 
-    let getLastTime crypto = new DateTime(2021,10,20) |> Some // Should first know how the data will be organized in the file.
+    let getLastTime crypto = 
+        try 
+            let previousData = File.ReadAllLines(getPath crypto).Last().Split [|';'|]
+            let previousOpenTime = previousData.Last()
+            let splittedTime = previousOpenTime.Split [|' '|]
+            let date = splittedTime.[0].Split [|'/'|]
+            let time = splittedTime.[1].Split [|':'|]
+            new DateTime(int date.[2],int date.[0],int date.[1],int time.[0],int time.[1],int time.[2])
+        with
+        | :? System.IO.FileNotFoundException -> new DateTime(2021,10,20)
 
     let downloadOne crypto endTime =  // First need to get the startTime (which should be an option ?)
         let (Crypto(cr,interval)) = crypto
-        let startTime = getLastTime crypto |> Option.defaultValue (new DateTime(2021,10,20))
+        let startTime = getLastTime crypto 
         async{
             let! rawData = client.Spot.Market.GetKlinesAsync(cr,intervalToBinanceInterval interval,startTime,endTime) 
                             |> Async.AwaitTask
@@ -50,6 +59,14 @@ module Collector =
                                                              string x.BaseVolume + ";" + string x.TradeCount + ";" + string x.OpenTime)
             File.WriteAllLines(getPathDL crypto, seq{yield firstLine; yield! klinesData})
         }
+
+    let updateSymbols() = 
+        let symbols = 
+            async{
+                let! result = client.Spot.System.GetExchangeInfoAsync() |> Async.AwaitTask
+                return result.Data.Symbols |> Seq.map (fun x -> x.Name)
+            } |> Async.RunSynchronously
+        File.WriteAllLines(pathDL+"\Symbols.csv",symbols)
 
     let download cryptos endTime = 0
         
