@@ -45,7 +45,7 @@ module Helper =
             let time = splittedTime.[1].Split [|':'|]
             new DateTime(int date.[2],int date.[0],int date.[1],int time.[0],int time.[1],int time.[2])
         with
-        | :? System.IO.FileNotFoundException -> new DateTime(2021,10,20)
+        | :? System.IO.FileNotFoundException -> new DateTime(2021,10,18)
 
 
 module Downloader =
@@ -61,6 +61,7 @@ module Downloader =
         let (Helper.Crypto(cr,interval)) = crypto
         let startTime = Helper.getLastTime Helper.Aggregate crypto  // Get the last time we updated the database files. 
         async{
+            printfn "%s" cr
             let! rawData = Helper.client.Spot.Market.GetKlinesAsync(cr,Helper.intervalToBinanceInterval interval,startTime,endTime) 
                             |> Async.AwaitTask
             let klinesData = rawData.Data
@@ -77,16 +78,34 @@ module Downloader =
                 let! result = Helper.client.Spot.System.GetExchangeInfoAsync() |> Async.AwaitTask
                 return result.Data.Symbols |> Seq.map (fun x -> x.Name)
             } |> Async.RunSynchronously
-        File.WriteAllLines(Helper.pathDL+"\Symbols.csv",symbols)
+        File.WriteAllLines(Helper.pathDL+"\Symbols.csv",symbols |> Seq.sort)
 
-    let download cryptos endTime = 0
+    let downloadAll endTime = 
+        let symbolsPath = Path.Combine(Helper.pathDL, "Symbols.csv")
+        let symbols = File.ReadAllLines(symbolsPath)
+        symbols |> Seq.map (fun x -> downloadOne (Helper.Crypto(x,Helper.M15)) endTime)
+                |> (fun x -> Async.Parallel (x,5))
+                //|> Async.Sequential
+                |> Async.RunSynchronously
+                |> ignore
+
+    let download cryptoNames endTime = 
+(*        let symbolsPath = Path.Combine(Helper.pathDL, "Symbols.csv")
+        let symbols = File.ReadAllLines(symbolsPath)*)
+        cryptoNames |> Array.map (fun x -> downloadOne (Helper.Crypto(x,Helper.M15)) endTime)
+                    |> Async.Parallel
+                    |> Async.RunSynchronously
+                    |> ignore
+        
 
 module Aggregator =    // The essence of this module is to aggregate the downloaded files with the data base files. 
     let getLastTime = Helper.getLastTime Helper.Aggregate
 
     let doesIntervalExists interval = Path.Combine(Helper.getPath Helper.Aggregate,(Helper.intervalToString interval)) |> File.Exists
     let doesCryptoExists crypto = Helper.getCryptoPath crypto Helper.Aggregate |> File.Exists
-        
+         
+    
+
     // Find a way to compare the last time in the database file with the first time in the download file (-> avoid duplicates). 
     // Then append the correct data at the end of the database file. 
     

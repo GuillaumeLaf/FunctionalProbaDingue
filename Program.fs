@@ -16,9 +16,9 @@ open System
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
-    let endTime = new DateTime(2021,10,21) |> Nullable
-    let d = Downloader.downloadOne (Downloader.Crypto("RCNETH", Downloader.M15)) endTime
-                |> Async.RunSynchronously
+    let endTime = new DateTime(2021,10,22) |> Nullable
+    Downloader.downloadAll endTime
+    //Downloader.download [|"AAVEBTC";"AAVEBUSD";"AAVEDOWNUSDT";"AAVEETH";"AAVEUPUSDT";"AAVEUSDT";"ACMBTC";"ACMBUSD";"ACMUSDT";"ADAAUD";"ADABIDR";"ADABKRW"|] endTime
 
 (*    let client = new BinanceClient()
 
