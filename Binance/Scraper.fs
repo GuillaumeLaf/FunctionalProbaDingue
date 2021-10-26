@@ -4,11 +4,17 @@ open System
 open System.Linq
 open System.IO
 open Binance.Net
+open Monads
 
 module Helper = 
+    let (<*>) = Monad.apply
+    let (<!>) = Monad.map
+    let (>>=) x f = Monad.bind f x
+
     let path = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\Binance"
     let pathDL = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\NewData"
     let header = "CloseTime;Open;High;Low;Close;QuoteVolume;BaseVolume;TradeCount;OpenTime"
+    let defaultTime = new DateTime(2021,10,18)
     let client = new BinanceClient()
 
     type PathType = 
@@ -18,18 +24,9 @@ module Helper =
     type Interval = 
         | M15
 
-    type Crypto = Crypto of string * Interval
+    type Crypto = Crypto of string
 
-    type Data = 
-        | CloseTime
-        | Open
-        | High
-        | Low
-        | Close
-        | QuoteVolume
-        | BaseVolume
-        | TradeCount
-        | OpenTime
+    type State<'T> = State of Crypto * Interval
 
     let intervalToString = function
         | M15 -> "M15"
@@ -41,28 +38,44 @@ module Helper =
         | Download -> pathDL
         | Aggregate -> path
 
-    let cryptoName (Crypto(name,_)) = name
+    let cryptoNameM = Monad.M (fun (State(Crypto(name),interval)) -> name,State(Crypto(name),interval))
+    let cryptoIntervalM = Monad.M (fun (State(Crypto(name),interval)) -> interval,State(Crypto(name),interval))
 
-    let getCryptoPath (Crypto(cr,interval)) = getPath >> (fun path -> Path.Combine(path, intervalToString interval, cr + ".csv"))
-    let cryptoExists t crypto = getCryptoPath crypto t |> File.Exists
+    let getCryptoPath t name interval = Path.Combine(getPath t, intervalToString interval, name + ".csv")
+    let cryptoPathM t = getCryptoPath t <!> cryptoNameM <*> cryptoIntervalM
+    let cryptoExistsM t = File.Exists <!> cryptoPathM t
 
-    let getSymbols() = File.ReadAllLines(Path.Combine(pathDL, "Symbols.csv"))
+    let getIntervalpath t interval = Path.Combine(getPath t, intervalToString interval)
+    let intervalPathM t = getIntervalpath t <!> cryptoIntervalM
+    let intervalExistsM t = Directory.Exists <!> intervalPathM t
+
+    let symbolsListM = File.ReadAllLines(Path.Combine(pathDL, "Symbols.csv")) |> Monad.rets
+
     let isHeader (row:string) = row.[0..4] = "Close"
 
-    let getLastTime t crypto = 
-        if (cryptoExists t crypto) then
-            let previousData = File.ReadAllLines(getCryptoPath crypto t).Last()
-            if isHeader previousData then 
-                new DateTime(2021,10,18)
+    let cryptoDataM t = File.ReadAllLines <!> cryptoPathM t
+
+    let fileDefaultValue t defaultValue fileM = 
+        Monad.state{
+            let! doesExists = cryptoExistsM t
+            if doesExists then 
+                return! fileM
+            else return defaultValue
+        }
+
+    let lastTimeM t =
+        Monad.state{
+            let! lastDataRow = Seq.last <!> cryptoDataM t
+            if isHeader lastDataRow then 
+                return defaultTime
             else
-                let previousData = previousData.Split [|';'|]
-                let previousOpenTime = previousData.Last()
-                let splittedTime = previousOpenTime.Split [|' '|]
+                let lastDataRow = lastDataRow.Split [|';'|]
+                let lastOpenTime = lastDataRow.Last()
+                let splittedTime = lastOpenTime.Split [|' '|]
                 let date = splittedTime.[0].Split [|'/'|]
                 let time = splittedTime.[1].Split [|':'|]
-                new DateTime(int date.[2],int date.[0],int date.[1],int time.[0],int time.[1],int time.[2])
-        else
-            new DateTime(2021,10,18)
+                return new DateTime(int date.[2],int date.[0],int date.[1],int time.[0],int time.[1],int time.[2])
+        } |> fileDefaultValue t defaultTime
 
     let extractOpenTime (s:string) = (s.Split [|';'|]).Last()
     
@@ -74,11 +87,13 @@ module Helper =
 
 
 module Downloader =
+    let (<*>) = Monad.apply
+    let (<!>) = Monad.map
+    let (>>=) x f = Monad.bind f x
 
-    let getLastTime = Helper.getLastTime Helper.Download
-
-    let doesIntervalExists interval = Path.Combine(Helper.getPath Helper.Download,(Helper.intervalToString interval)) |> File.Exists
-    let doesCryptoExists crypto = Helper.getCryptoPath crypto Helper.Download |> File.Exists
+    let lastTimeM = Helper.lastTimeM Helper.Download
+    let intevalExistsM = Helper.intervalExistsM Helper.Download
+    let cryptoExistsM = Helper.cryptoExistsM Helper.Download
 
     let updateSymbols() = 
         let symbols = 
@@ -96,19 +111,21 @@ module Downloader =
             if  currentW >= 1000 then 
                 do! Async.Sleep(60000)
         }
-       
-    let downloadOne crypto startTime endTime =  // First need to get the startTime (which should be an option ?)
-        let (Helper.Crypto(cr,interval)) = crypto
+
+    let downloadOne startTime endTime crypto interval =  // First need to get the startTime (which should be an option ?)
         async{
-            printfn "%s" ("Downloading " + cr)
-            let! rawData = Helper.client.Spot.Market.GetKlinesAsync(cr,Helper.intervalToBinanceInterval interval,startTime,endTime) 
+            printfn "%s" ("Downloading " + crypto)
+            let! rawData = Helper.client.Spot.Market.GetKlinesAsync(crypto,Helper.intervalToBinanceInterval interval,startTime,endTime) 
                             |> Async.AwaitTask
             do! checkAPILimits rawData
             let klinesData = rawData.Data |> Seq.map (fun x -> string x.CloseTime + ";" + string x.Open + ";" + string x.High + ";" +
                                                                string x.Low + ";" + string x.Close + ";" + string x.QuoteVolume + ";" + 
                                                                string x.BaseVolume + ";" + string x.TradeCount + ";" + string x.OpenTime)
-            File.WriteAllLines(Helper.getCryptoPath crypto Helper.Download, seq{yield Helper.header; yield! klinesData})
+            let path = Helper.getCryptoPath Helper.Download crypto interval
+            File.WriteAllLines(path, seq{yield Helper.header; yield! klinesData})
         }
+
+    let downloadOneM startTime endTime = downloadOne startTime endTime <!> Helper.cryptoNameM <*> Helper.cryptoIntervalM
 
     let downloadAll startTime endTime = 
         Helper.getSymbols() |> Seq.map (fun x -> downloadOne (Helper.Crypto(x,Helper.M15)) startTime endTime)
