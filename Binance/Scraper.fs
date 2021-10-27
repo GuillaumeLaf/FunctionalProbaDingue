@@ -28,6 +28,8 @@ module Helper =
 
     type State<'T> = State of Crypto * Interval
 
+    let defaultState interval = State(Crypto("DefaultCrypto"), interval)
+
     let intervalToString = function
         | M15 -> "M15"
 
@@ -40,6 +42,7 @@ module Helper =
 
     let cryptoNameM = Monad.M (fun (State(Crypto(name),interval)) -> name,State(Crypto(name),interval))
     let cryptoIntervalM = Monad.M (fun (State(Crypto(name),interval)) -> interval,State(Crypto(name),interval))
+    let updateSymbolM newSymbol = Monad.M (fun (State(Crypto(_),interval)) -> (),State(Crypto(newSymbol),interval))
 
     let getCryptoPath t name interval = Path.Combine(getPath t, intervalToString interval, name + ".csv")
     let cryptoPathM t = getCryptoPath t <!> cryptoNameM <*> cryptoIntervalM
@@ -49,11 +52,9 @@ module Helper =
     let intervalPathM t = getIntervalpath t <!> cryptoIntervalM
     let intervalExistsM t = Directory.Exists <!> intervalPathM t
 
-    let symbolsListM = File.ReadAllLines(Path.Combine(pathDL, "Symbols.csv")) |> Monad.rets
+    let symbolsList = File.ReadAllLines(Path.Combine(pathDL, "Symbols.csv"))
 
     let isHeader (row:string) = row.[0..4] = "Close"
-
-    let cryptoDataM t = File.ReadAllLines <!> cryptoPathM t
 
     let fileDefaultValue t defaultValue fileM = 
         Monad.state{
@@ -62,6 +63,8 @@ module Helper =
                 return! fileM
             else return defaultValue
         }
+
+    let cryptoDataM t = File.ReadAllLines <!> cryptoPathM t
 
     let lastTimeM t =
         Monad.state{
@@ -85,15 +88,14 @@ module Helper =
         let time = splittedTime.[1].Split [|':'|]
         new DateTime(int date.[2],int date.[0],int date.[1],int time.[0],int time.[1],int time.[2])
 
-
 module Downloader =
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
     let (>>=) x f = Monad.bind f x
 
-    let lastTimeM = Helper.lastTimeM Helper.Download
-    let intevalExistsM = Helper.intervalExistsM Helper.Download
-    let cryptoExistsM = Helper.cryptoExistsM Helper.Download
+    let lastTimeM () = Helper.lastTimeM Helper.Download
+    let intevalExistsM () = Helper.intervalExistsM Helper.Download
+    let cryptoExistsM () = Helper.cryptoExistsM Helper.Download
 
     let updateSymbols() = 
         let symbols = 
@@ -127,23 +129,27 @@ module Downloader =
 
     let downloadOneM startTime endTime = downloadOne startTime endTime <!> Helper.cryptoNameM <*> Helper.cryptoIntervalM
 
-    let downloadAll startTime endTime = 
-        Helper.getSymbols() |> Seq.map (fun x -> downloadOne (Helper.Crypto(x,Helper.M15)) startTime endTime)
-                            |> (fun x -> Async.Parallel (x,5))
-                            |> Async.RunSynchronously
-                            |> ignore
+    let downloadAll interval startTime endTime = 
+        let result = Helper.symbolsList |> Array.map (fun s -> Monad.state{do! Helper.updateSymbolM s
+                                                                           return! downloadOneM startTime endTime})
+                                        |> Monad.mapM   
+                                        >>= (fun xs -> (xs,5) |> Async.Parallel |> Async.RunSynchronously |> Monad.rets)
+        Monad.run result (Helper.defaultState interval) |> ignore
 
-    let download cryptoNames startTime endTime = 
+(*    let download cryptoNames startTime endTime = 
         cryptoNames |> Array.map (fun x -> downloadOne (Helper.Crypto(x,Helper.M15)) startTime endTime)
                     |> Async.Parallel
                     |> Async.RunSynchronously
-                    |> ignore
+                    |> ignore*)
         
-module Aggregator =    // The essence of this module is to aggregate the downloaded files with the data base files. 
-    let getLastTime = Helper.getLastTime Helper.Aggregate
+module Aggregator =   
+    let (<*>) = Monad.apply
+    let (<!>) = Monad.map
+    let (>>=) x f = Monad.bind f x
 
-    let doesIntervalExists interval = Path.Combine(Helper.getPath Helper.Aggregate,(Helper.intervalToString interval)) |> File.Exists
-    let doesCryptoExists = Helper.cryptoExists Helper.Aggregate
+    let lastTimeM () = Helper.lastTimeM Helper.Aggregate
+    let intevalExistsM () = Helper.intervalExistsM Helper.Aggregate
+    let cryptoExistsM () = Helper.cryptoExistsM Helper.Aggregate
 
     let compareOpenTimes (dbTime:DateTime) dlTime = if (dlTime - dbTime).TotalDays > 0.0 then true else false
         
@@ -152,29 +158,38 @@ module Aggregator =    // The essence of this module is to aggregate the downloa
                   |> Helper.parseDate
                   |> compareOpenTimes dbTime
 
-    let checkHeader crypto sq = 
-        match (doesCryptoExists crypto) with
-            | true -> sq
-            | false -> seq {yield Helper.header; yield! sq}
-
-    let aggregateOne crypto = 
-        async{
-            printfn "%s" ("aggregating " + (Helper.cryptoName crypto))
-            let lastDataBaseTime = getLastTime crypto
-            File.ReadAllLines(Helper.getCryptoPath crypto Helper.Download)
-                |> Seq.skip 1
-                |> Seq.filter(fun x -> x |> isRowValidForAggregation lastDataBaseTime)
-                |> checkHeader crypto
-                |> (fun newLines -> File.AppendAllLines(Helper.getCryptoPath crypto Helper.Aggregate, newLines))
+    let checkHeaderM sq = 
+        Monad.state{
+        let! doesExists = cryptoExistsM ()
+        match doesExists with
+            | true -> return sq
+            | false -> return seq {yield Helper.header; yield! sq}
         }
 
-    let aggregateAll () = 
+    let aggregateOne data lastDbTime crypto interval = 
+        async{
+            printfn "%s" ("aggregating " + crypto)
+            data
+                |> Seq.skip 1
+                |> Seq.filter(fun x -> x |> isRowValidForAggregation lastDbTime)
+                |> (fun xs -> Monad.run (checkHeaderM xs) (Helper.State(Helper.Crypto(crypto),interval)) |> fst)
+                |> (fun newLines -> File.AppendAllLines(Helper.getCryptoPath Helper.Aggregate crypto interval, newLines))
+        }
+
+    let aggregateOneM () = aggregateOne <!> Helper.cryptoDataM Helper.Download <*> Helper.lastTimeM Helper.Aggregate
+                                        <*> Helper.cryptoNameM <*> Helper.cryptoIntervalM
+
+    let aggregateAll interval = 
+        let result = Helper.symbolsList |> Array.map (fun s -> Monad.state{do! Helper.updateSymbolM s
+                                                                           return! aggregateOneM()})
+                                        |> Monad.mapM   
+                                        >>= (fun xs -> (xs,5) |> Async.Parallel |> Async.RunSynchronously |> Monad.rets)
+        Monad.run result (Helper.defaultState interval) |> ignore
+
+(*    let aggregateAll () = 
         Helper.getSymbols() |> Seq.map (fun x -> aggregateOne (Helper.Crypto(x,Helper.M15)))
                             |> (fun x -> Async.Parallel (x,5))
                             |> Async.RunSynchronously
-                            |> ignore
-
-    // Find a way to compare the last time in the database file with the first time in the download file (-> avoid duplicates). 
-    // Then append the correct data at the end of the database file. 
+                            |> ignore*)
     
         

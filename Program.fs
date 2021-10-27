@@ -21,7 +21,8 @@ let main argv =
     //Downloader.download [|"AAVEBTC";"AAVEBUSD";"AAVEDOWNUSDT";"AAVEETH";"AAVEUPUSDT";"AAVEUSDT";"ACMBTC";"ACMBUSD";"ACMUSDT";"ADAAUD";"ADABIDR";"ADABKRW"|] startTime endTime
     //Downloader.downloadAll startTime endTime
 
-    Aggregator.aggregateAll()
+    //Downloader.downloadAll (Helper.M15) startTime endTime
+    Aggregator.aggregateAll (Helper.M15)
 
 (*    let client = new BinanceClient()
 
