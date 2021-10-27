@@ -16,13 +16,15 @@ open System
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
-    let endTime = new DateTime(2021,10,24) |> Nullable
-    let startTime = new DateTime(2021,10,17) |> Nullable
+    let endTime = new DateTime(2021,10,26)
+    let startTime = new DateTime(2021,10,16)
     //Downloader.download [|"AAVEBTC";"AAVEBUSD";"AAVEDOWNUSDT";"AAVEETH";"AAVEUPUSDT";"AAVEUSDT";"ACMBTC";"ACMBUSD";"ACMUSDT";"ADAAUD";"ADABIDR";"ADABKRW"|] startTime endTime
     //Downloader.downloadAll startTime endTime
 
     //Downloader.downloadAll (Helper.M15) startTime endTime
-    Aggregator.aggregateAll (Helper.M15)
+    //Aggregator.aggregateAll (Helper.M15)
+
+    Downloader.download Helper.M15 startTime endTime
 
 (*    let client = new BinanceClient()
 
