@@ -16,8 +16,8 @@ open System
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
-    let endTime = new DateTime(2021,10,26)
-    let startTime = new DateTime(2021,10,16)
+    let endTime = new DateTime(2021,10,22)
+    let startTime = new DateTime(2021,1,1)
     //Downloader.download [|"AAVEBTC";"AAVEBUSD";"AAVEDOWNUSDT";"AAVEETH";"AAVEUPUSDT";"AAVEUSDT";"ACMBTC";"ACMBUSD";"ACMUSDT";"ADAAUD";"ADABIDR";"ADABKRW"|] startTime endTime
     //Downloader.downloadAll startTime endTime
 

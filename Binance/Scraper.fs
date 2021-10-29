@@ -3,6 +3,7 @@
 open System
 open System.Linq
 open System.IO
+open System.Threading
 open Binance.Net
 open Monads
 
@@ -10,7 +11,7 @@ module Helper =
     let path = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\Binance"
     let pathDL = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\NewData"
     let header = "CloseTime;Open;High;Low;Close;QuoteVolume;BaseVolume;TradeCount;OpenTime"
-    let defaultTime = new DateTime(2021,10,18)
+    let defaultTime = new DateTime(2000,10,1)
     let client = new BinanceClient()
 
     type PathType = 
@@ -46,8 +47,26 @@ module Helper =
         | true -> Some filePath
         | false -> None
 
-    let cryptoData crypto = cryptoPath crypto >> checkExistence >> Option.map File.ReadAllLines
-    let lastData crypto = cryptoData crypto >> Option.map Seq.last
+    let rec checkIfInUse filePath = 
+        async{
+            try 
+                use stream = File.Open(filePath, FileMode.Open)
+                stream.Close()
+                return filePath
+            with
+            | :? System.IO.IOException -> do! Async.Sleep(500)
+                                          return! (checkIfInUse filePath)
+        }
+
+    let cryptoData crypto t = 
+        async{
+            let path = cryptoPath crypto t |> checkExistence
+            let path = path |> Option.map checkIfInUse |> Option.map Async.RunSynchronously
+            return Option.map File.ReadAllLines path
+        }
+
+    //let cryptoData crypto = cryptoPath crypto >> checkExistence >> Option.map File.ReadAllLines
+    let lastData crypto = cryptoData crypto >> Option.map Seq.last >> Option.bind (fun x -> if isHeader x then None else Some x) // if the file only contains the header. it is considered empty.
     let _lastOpenTime crypto = lastData crypto >> Option.map (fun s -> s.Split ';') >> Option.map Seq.last
 
     let stringToDateTime (s:string) = 
@@ -79,29 +98,26 @@ module Aggregator =
                           |> (fun b -> if b then sq else seq{yield Helper.header; yield! sq})
     
     let aggregateOne dbTime crypto = 
-        cryptoDataDL crypto |> Option.map (Seq.skip 1)
-                            |> Option.map (Seq.filter (fun x -> isRowValidForAggregation dbTime x))
-                            |> Option.map (addHeaderIfNeeded crypto) 
-                            |> Option.map (fun newLines -> File.AppendAllLines(cryptoPath crypto, newLines))
-
-    let aggregateOneM () = aggregateOne <!> Helper.cryptoDataM Helper.Download <*> Helper.lastTimeM Helper.Aggregate
-                                        <*> Helper.cryptoNameM <*> Helper.cryptoIntervalM
+        async {
+            return (cryptoDataDL crypto |> Option.map (Seq.skip 1)
+                                        |> Option.bind (fun sq -> if Seq.isEmpty sq then None else Some sq) // Empty DL files wont go into the DB. 
+                                        |> Option.map (Seq.filter (fun x -> isRowValidForAggregation dbTime x))
+                                        |> Option.map (addHeaderIfNeeded crypto) 
+                                        |> Option.map (fun newLines -> File.AppendAllLines(cryptoPath crypto, newLines)))
+        }
 
     let aggregateAll interval = 
-        let result = Helper.symbolsList |> Array.map (fun s -> Monad.state{do! Helper.updateSymbolM s
-                                                                           return! aggregateOneM()})
-                                        |> Monad.mapM   
-                                        >>= (fun xs -> (xs,5) |> Async.Parallel |> Async.RunSynchronously |> Monad.rets)
-        Monad.run result (Helper.defaultState interval) |> ignore
+        Helper.symbolsList |> Seq.map (fun symbol -> let lastDbTime = lastTime (Helper.Crypto(symbol,interval)) |> Option.defaultValue Helper.defaultTime
+                                                     aggregateOne lastDbTime (Helper.Crypto(symbol,interval)))
+                           |> (fun sq -> Async.Parallel (sq,5))
+                           |> Async.RunSynchronously
+                           |> ignore
 
 module Downloader =
-    let (<*>) = Monad.apply
-    let (<!>) = Monad.map
-    let (>>=) x f = Monad.bind f x
 
-    let lastTimeM () = Helper.lastTimeM Helper.Download
-    let intevalExistsM () = Helper.intervalExistsM Helper.Download
-    let cryptoExistsM () = Helper.cryptoExistsM Helper.Download
+    let lastTimeDL crypto = Helper.lastDateTime crypto Helper.Download
+    let cryptoDataDL crypto = Helper.cryptoData crypto Helper.Download
+    let cryptoPathDL crypto = Helper.cryptoPath crypto Helper.Download
 
     let updateSymbols() = 
         let symbols = 
@@ -120,33 +136,30 @@ module Downloader =
                 do! Async.Sleep(60000)
         }
 
-    let downloadOne (startTime:DateTime) (endTime:DateTime) crypto interval =  // First need to get the startTime (which should be an option ?)
+    let downloadOne (startTime:DateTime) (endTime:DateTime) crypto =  // First need to get the startTime (which should be an option ?)
         async{
-            printfn "%s" ("Downloading " + crypto)
-            let! rawData = Helper.client.Spot.Market.GetKlinesAsync(crypto,Helper.intervalToBinanceInterval interval,startTime,endTime) 
+            let (Helper.Crypto(cr,interval)) = crypto
+            printfn "%s" ("Downloading " + cr)
+            let! rawData = Helper.client.Spot.Market.GetKlinesAsync(cr,Helper.intervalToBinanceInterval interval,startTime,endTime) 
                             |> Async.AwaitTask
             do! checkAPILimits rawData
             let klinesData = rawData.Data |> Seq.map (fun x -> string x.CloseTime + ";" + string x.Open + ";" + string x.High + ";" +
                                                                string x.Low + ";" + string x.Close + ";" + string x.QuoteVolume + ";" + 
                                                                string x.BaseVolume + ";" + string x.TradeCount + ";" + string x.OpenTime)
-            let path = Helper.getCryptoPath Helper.Download crypto interval
-            File.WriteAllLines(path, seq{yield Helper.header; yield! klinesData})
+            File.WriteAllLines(cryptoPathDL crypto, seq{yield Helper.header; yield! klinesData})
         }
 
-    let downloadOneM startTime endTime = downloadOne startTime endTime <!> Helper.cryptoNameM <*> Helper.cryptoIntervalM
-
     let downloadAll interval (startTime:DateTime) (endTime:DateTime) = 
-        let result = Helper.symbolsList |> Array.map (fun s -> Monad.state{do! Helper.updateSymbolM s
-                                                                           return! downloadOneM startTime endTime})
-                                        |> Monad.mapM   
-                                        >>= (fun xs -> (xs,5) |> Async.Parallel |> Async.RunSynchronously |> Monad.rets)
-        Monad.run result (Helper.defaultState interval) |> ignore
+        Helper.symbolsList |> Seq.map (fun symbol -> downloadOne startTime endTime (Helper.Crypto(symbol,interval)))
+                           |> (fun sq -> Async.Parallel (sq,5))
+                           |> Async.RunSynchronously
+                           |> ignore
 
     let download interval (startTime:DateTime) (endTime:DateTime) = 
         let totalTime = endTime - startTime
         let nbWeeks = totalTime.Days / 7
-        let r = totalTime.Days - nbWeeks
-        let weekIntervals = [| for i in 0..nbWeeks-1 do (startTime.Add(TimeSpan(7*i,0,0,0)), startTime.Add(TimeSpan(7*(i+1),0,0,0))) |]
+        let r = totalTime.Days - (nbWeeks*7)
+        let weekIntervals = [| for i in 0..nbWeeks-1 do (startTime.Add(TimeSpan(7*i,0,0,0)), startTime.Add(TimeSpan(7*(i+1)-1,0,0,0))) |]
         let weekIntervals = Array.concat [|weekIntervals ; [|(endTime.Subtract(TimeSpan(r,0,0,0)),endTime)|]|]
         weekIntervals |> Array.map (fun (s,e) -> downloadAll interval s e
                                                  Aggregator.aggregateAll interval)
