@@ -64,10 +64,19 @@ module Helper =
             let path = path |> Option.map checkIfInUse |> Option.map Async.RunSynchronously
             return Option.map File.ReadAllLines path
         }
+    
+    let lastData crypto t = 
+        async{
+            let! data = cryptoData crypto t
+            let last = data |> Option.map Seq.last
+            return last |> Option.bind (fun x -> if isHeader x then None else Some x) // if the file only contains the header. it is considered empty.
+        }
 
-    //let cryptoData crypto = cryptoPath crypto >> checkExistence >> Option.map File.ReadAllLines
-    let lastData crypto = cryptoData crypto >> Option.map Seq.last >> Option.bind (fun x -> if isHeader x then None else Some x) // if the file only contains the header. it is considered empty.
-    let _lastOpenTime crypto = lastData crypto >> Option.map (fun s -> s.Split ';') >> Option.map Seq.last
+    let _lastOpenTime crypto t = 
+        async {
+            let! lastData = lastData crypto t
+            return (lastData |> Option.map (fun s -> s.Split ';') |> Option.map Seq.last)
+        }   
 
     let stringToDateTime (s:string) = 
         let splitted = s.Split ' '
@@ -75,7 +84,11 @@ module Helper =
         let time = splitted.[1].Split ':'
         new DateTime(int date.[2], int date.[0], int date.[1], int time.[0], int time.[1], int time.[2])
 
-    let lastDateTime crypto = _lastOpenTime crypto >> Option.map stringToDateTime
+    let lastDateTime crypto t = 
+        async{
+            let! lastOpen = _lastOpenTime crypto t
+            return lastOpen |> Option.map stringToDateTime
+        }
 
     let extractOpenTime (s:string) = s.Split ';' |> Seq.last 
    
@@ -96,19 +109,21 @@ module Aggregator =
     let addHeaderIfNeeded crypto sq = 
         cryptoPath crypto |> (Helper.checkExistence >> Option.isSome)
                           |> (fun b -> if b then sq else seq{yield Helper.header; yield! sq})
-    
+
     let aggregateOne dbTime crypto = 
-        async {
-            return (cryptoDataDL crypto |> Option.map (Seq.skip 1)
-                                        |> Option.bind (fun sq -> if Seq.isEmpty sq then None else Some sq) // Empty DL files wont go into the DB. 
-                                        |> Option.map (Seq.filter (fun x -> isRowValidForAggregation dbTime x))
-                                        |> Option.map (addHeaderIfNeeded crypto) 
-                                        |> Option.map (fun newLines -> File.AppendAllLines(cryptoPath crypto, newLines)))
+        async{
+            let! dataDL = cryptoDataDL crypto
+            return (dataDL |> Option.map (Seq.skip 1)
+                           |> Option.bind (fun sq -> if Seq.isEmpty sq then None else Some sq) // Empty DL files wont go into the DB. 
+                           |> Option.map (Seq.filter (fun x -> isRowValidForAggregation dbTime x))
+                           |> Option.map (addHeaderIfNeeded crypto) 
+                           |> Option.map (fun newLines -> File.AppendAllLines(cryptoPath crypto, newLines)))
         }
 
     let aggregateAll interval = 
-        Helper.symbolsList |> Seq.map (fun symbol -> let lastDbTime = lastTime (Helper.Crypto(symbol,interval)) |> Option.defaultValue Helper.defaultTime
-                                                     aggregateOne lastDbTime (Helper.Crypto(symbol,interval)))
+        Helper.symbolsList |> Seq.map (fun symbol -> async{let! lastDbTime = lastTime (Helper.Crypto(symbol,interval))
+                                                           let lastDbTime = lastDbTime |> Option.defaultValue Helper.defaultTime
+                                                           return! aggregateOne lastDbTime (Helper.Crypto(symbol,interval))})           
                            |> (fun sq -> Async.Parallel (sq,5))
                            |> Async.RunSynchronously
                            |> ignore
