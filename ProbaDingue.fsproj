@@ -20,7 +20,8 @@
     <Compile Include="PSO_algorithm.fs" />
     <Compile Include="Utilities.fs" />
     <Compile Include="Distributions.fs" />
-	<Compile Include="Binance\Scraper.fs" />
+	<Compile Include="Binance\Binance.fs" />
+	<Compile Include="DataBase\DB.fs" />
     <Compile Include="TimeSeries\TimeSeries.fs" />
     <Compile Include="TimeSeries\Statistics.fs" />
     <Compile Include="TimeSeries\Transformations.fs" />
@@ -47,6 +48,8 @@
     <PackageReference Include="FSharpPlus" Version="1.2.1" />
     <PackageReference Include="MathNet.Numerics" Version="4.15.0" />
     <PackageReference Include="MathNet.Numerics.FSharp" Version="4.15.0" />
+    <PackageReference Include="SQLProvider" Version="1.2.10" />
+    <PackageReference Include="System.Data.OleDb" Version="5.0.0" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
     <PackageReference Include="System.Runtime.Numerics" Version="4.3.0" />
   </ItemGroup>

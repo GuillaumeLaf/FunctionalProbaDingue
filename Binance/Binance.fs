@@ -39,6 +39,9 @@ module Helper =
 
     let intervalPath interval = getPath >> (fun path -> Path.Combine(path, intervalToString interval))
 
+    let symbolsInAggregate interval = Directory.GetFiles(intervalPath interval Aggregate, "*.csv") 
+                                        |> Array.map (Path.GetFileName >> (fun s -> s.[0..s.Length-5]))
+
     let symbolsList = File.ReadAllLines(Path.Combine(pathDL, "Symbols.csv"))
     let isHeader (row:string) = row.[0..4] = "Close"
 
@@ -78,6 +81,12 @@ module Helper =
             return (lastData |> Option.map (fun s -> s.Split ';') |> Option.map Seq.last)
         }   
 
+    let _firstOpenTime crypto t = 
+        async{
+            let! data = cryptoData crypto t
+            return (data |> Option.map (Seq.item 1) |> Option.map (fun s -> s.Split ';') |> Option.map Seq.last)
+        }
+
     let stringToDateTime (s:string) = 
         let splitted = s.Split ' '
         let date = splitted.[0].Split '/'
@@ -90,6 +99,12 @@ module Helper =
             return lastOpen |> Option.map stringToDateTime
         }
 
+    let firstDateTime crypto t = 
+        async{
+            let! firstOpen =_firstOpenTime crypto t
+            return firstOpen |> Option.map stringToDateTime
+        }
+
     let extractOpenTime (s:string) = s.Split ';' |> Seq.last 
    
 
@@ -98,32 +113,45 @@ module Aggregator =
     let (>>=) x f = Option.bind f x
 
     let lastTime crypto = Helper.lastDateTime crypto Helper.Aggregate
+    let firstTime crypto = Helper.firstDateTime crypto Helper.Aggregate
     let cryptoData crypto = Helper.cryptoData crypto Helper.Aggregate
     let cryptoDataDL crypto = Helper.cryptoData crypto Helper.Download
     let cryptoPath crypto = Helper.cryptoPath crypto Helper.Aggregate
 
-    let compareOpenTimes (dbTime:DateTime) dlTime = if (dlTime - dbTime).TotalDays > 0.0 then true else false
+    let compareOpenTimes (firstDbTime:DateTime) (lastDbTime:DateTime) dlTime = if (dlTime - lastDbTime).TotalDays > 0.0 then true else false // || (dlTime - firstDbTime).TotalDays < 0.0
 
-    let isRowValidForAggregation dbTime = Helper.extractOpenTime >> Helper.stringToDateTime >> compareOpenTimes dbTime
+    let isRowValidForAggregation firstDbTime lastDbTime = Helper.extractOpenTime >> Helper.stringToDateTime >> compareOpenTimes firstDbTime lastDbTime
 
     let addHeaderIfNeeded crypto sq = 
         cryptoPath crypto |> (Helper.checkExistence >> Option.isSome)
                           |> (fun b -> if b then sq else seq{yield Helper.header; yield! sq})
 
-    let aggregateOne dbTime crypto = 
+(*    let concatenateData crypto dataDb dataDL firstDbTime lastDbTime = 
+        seq{
+            for x in dataDL do
+        }
+
+    let writeToDbFile crypto dataDL =
+        dataDL |> Option.map (Seq.skip 1)
+               |> *)
+
+    let aggregateOne crypto = 
         async{
+            let (Helper.Crypto(symbol,interval)) = crypto
             let! dataDL = cryptoDataDL crypto
+            let! lastDbTime = lastTime (Helper.Crypto(symbol,interval))
+            let! firstDbTime = firstTime (Helper.Crypto(symbol,interval))
+            let lastDbTime = lastDbTime |> Option.defaultValue Helper.defaultTime
+            let firstDbTime = firstDbTime |> Option.defaultValue Helper.defaultTime
             return (dataDL |> Option.map (Seq.skip 1)
                            |> Option.bind (fun sq -> if Seq.isEmpty sq then None else Some sq) // Empty DL files wont go into the DB. 
-                           |> Option.map (Seq.filter (fun x -> isRowValidForAggregation dbTime x))
+                           |> Option.map (Seq.filter (fun x -> isRowValidForAggregation firstDbTime lastDbTime x))
                            |> Option.map (addHeaderIfNeeded crypto) 
                            |> Option.map (fun newLines -> File.AppendAllLines(cryptoPath crypto, newLines)))
         }
 
     let aggregateAll interval = 
-        Helper.symbolsList |> Seq.map (fun symbol -> async{let! lastDbTime = lastTime (Helper.Crypto(symbol,interval))
-                                                           let lastDbTime = lastDbTime |> Option.defaultValue Helper.defaultTime
-                                                           return! aggregateOne lastDbTime (Helper.Crypto(symbol,interval))})           
+        Helper.symbolsList |> Seq.map (fun symbol -> aggregateOne (Helper.Crypto(symbol,interval)))              
                            |> (fun sq -> Async.Parallel (sq,5))
                            |> Async.RunSynchronously
                            |> ignore

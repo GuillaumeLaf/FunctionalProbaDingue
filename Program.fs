@@ -7,41 +7,30 @@ open Monads
 open FSharp.Charting
 open Binance
 
-open Binance.Net
-
-open System.IO
-open System
+open DataBase
 
 [<EntryPoint>]
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
-    
-    let startTime = new DateTime(2021,6,12)
-    let endTime = new DateTime(2021,6,30)
+    // DB.importFromAggregate (Helper.Crypto("BTCUSDT", Helper.M15))
+    Helper.symbolsInAggregate Helper.M15 
+        |> Array.iter (fun x -> DB.importFromAggregate (Helper.Crypto(x, Helper.M15)))
+(*    [|Helper.Crypto("BTCNGN", Helper.M15);Helper.Crypto("BTCRUB", Helper.M15);
+        Helper.Crypto("BTCUAH", Helper.M15)|] |> Array.map(fun x -> DB.importFromAggregate x)
+        |> ignore*)
+
+(*    let startTime = new DateTime(2021,6,30)
+    let endTime = new DateTime(2021,10,31)*)
     //Downloader.download [|"AAVEBTC";"AAVEBUSD";"AAVEDOWNUSDT";"AAVEETH";"AAVEUPUSDT";"AAVEUSDT";"ACMBTC";"ACMBUSD";"ACMUSDT";"ADAAUD";"ADABIDR";"ADABKRW"|] startTime endTime
     //Downloader.downloadAll startTime endTime
 
     //Downloader.downloadAll (Helper.M15) startTime endTime
     //Aggregator.aggregateAll (Helper.M15)
 
-    Downloader.download Helper.M15 startTime endTime
+    //Downloader.download Helper.M15 startTime endTime
 
-(*    let client = new BinanceClient()
 
-    let startTime = new DateTime(2021,10,18)
-    let endTime = new DateTime(2021,10,20)*)
-
-(*    let result = client.Spot.System.GetExchangeInfoAsync()
-                    |> Async.AwaitTask
-                    |> Async.RunSynchronously
-    printfn "%A" (result.Data.Symbols |> Seq.map (fun x -> x.Name)
-                                      |> Seq.length)*)
-(*    let result = client.Spot.Market.GetKlinesAsync("BNBBTC",Enums.KlineInterval.FifteenMinutes,startTime,endTime)
-                    |> Async.AwaitTask
-                    |> Async.RunSynchronously
-    printfn "%A" (result.Data |> Seq.map (fun (x:Binance.Net.Interfaces.IBinanceKline) -> x.CloseTime)
-                              |> Seq.length)*)
     
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)
