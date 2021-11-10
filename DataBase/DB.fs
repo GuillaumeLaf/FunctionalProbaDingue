@@ -7,8 +7,6 @@ open System.IO
 
 open Binance
 
-
-
 // MS Access has strong limitations (max. 16M rows per table and max. 2G file) -> go with SQL Server (lighter limitations)
 
 module DB = 
@@ -16,23 +14,55 @@ module DB =
     let pathDL = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\NewData"
 
     type sqlTest = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=TestBinanceDB;User Id=sa;Password=123">
-    type sqlReal = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=TestBinanceDB;User Id=sa;Password=123">
+    type sqlReal = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=BinanceDB;User Id=sa;Password=123">
 
-(*    type Table = 
-        | TableTimeSeries*)
+    type Provider = 
+        | TestProvider of sqlTest.dataContext
+        | RealProvider of sqlReal.dataContext
 
-    type ContextType = 
+    type DBType = 
         | Test
         | Real 
 
+    type Table = 
+        | TableTimeSeries
+        | TableTickers
+
+    type TableContextTest = 
+        | TimeSeriesContextTest of sqlTest.dataContext.dboSchema.``dbo.tTimeSeries``
+        | TickersContextTest of sqlTest.dataContext.dboSchema.``dbo.tTickers``
+
+    type TableContextReal = 
+        | TimeSeriesContextReal of sqlReal.dataContext.dboSchema.``dbo.tTimeSeries``
+        | TickersContextReal of sqlReal.dataContext.dboSchema.``dbo.tTickers``
+
+    type TableContext = 
+        | TestContext of TableContextTest
+        | RealContext of TableContextReal
+
     let dbContext = function
-        | Test -> sqlTest.GetDataContext()
-        | Real -> sqlReal.GetDataContext()
+        | Test -> sqlTest.GetDataContext() |> TestProvider
+        | Real -> sqlReal.GetDataContext() |> RealProvider
 
-    let ts = dbContext(Test).Dbo.TTimeSeries
+    let getTestContext = (function TestProvider(x) -> x | RealProvider(_) -> invalidArg "Context" "Try accessing RealContext with TestContextFunction. Try using 'getRealContext'.'") 
+    let getRealContext = (function RealProvider(x) -> x | TestProvider(_) -> invalidArg "Context" "Try accessing TestContext with RealContextFunction. Try using 'getTestContext'.'") 
 
-(*    let getTableName = function
-        | TableTimeSeries -> "tTimeSeries"*)
+    let applyContextTo fTest fReal = function
+        | Test as x -> (dbContext >> getTestContext >> fTest) x
+        | Real as x -> (dbContext >> getRealContext >> fReal) x
+
+    let getTableContext = function
+        | TableTimeSeries -> applyContextTo (fun c -> (TimeSeriesContextTest >> TestContext) c.Dbo.TTimeSeries)
+                                            (fun c-> (TimeSeriesContextReal >> RealContext) c.Dbo.TTimeSeries)
+        | TableTickers -> applyContextTo (fun c -> (TickersContextTest >> TestContext) c.Dbo.TTickers)
+                                         (fun c -> (TickersContextReal >> RealContext) c.Dbo.TTickers)
+
+    let ctx = sqlReal.GetDataContext()
+    let ts = ctx.Dbo.TTimeSeries
+
+    let getTableName = function
+        | TableTimeSeries -> "tTimeSeries"
+        | TableTickers -> "tTickers"
 
     let formatTime (timeString:string) = 
         let splittedString = timeString.Split ' '
@@ -68,8 +98,8 @@ module DB =
             row.BaseVolume <- splitted.[6] |> float
             row.TradeCount <- splitted.[7] |> int
             row.OpenTime <- splitted.[8] |> formatTime
-            dbContext(dbType).SubmitUpdates()
-
+            ctx.SubmitUpdates()
+        
 
 
     // https://stackoverflow.com/questions/31070731/f-sharp-saving-record-type-into-access-db

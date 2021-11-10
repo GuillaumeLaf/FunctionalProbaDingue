@@ -14,8 +14,8 @@ let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
     // DB.importFromAggregate (Helper.Crypto("BTCUSDT", Helper.M15))
-    Helper.symbolsInAggregate Helper.M15 
-        |> Array.iter (fun x -> DB.importFromAggregate (Helper.Crypto(x, Helper.M15)))
+    (*Helper.symbolsInAggregate Helper.M15 
+        |> Array.iter (fun x -> DB.importFromAggregate (Helper.Crypto(x, Helper.M15)) DB.Real)*)
 (*    [|Helper.Crypto("BTCNGN", Helper.M15);Helper.Crypto("BTCRUB", Helper.M15);
         Helper.Crypto("BTCUAH", Helper.M15)|] |> Array.map(fun x -> DB.importFromAggregate x)
         |> ignore*)
