@@ -8,97 +8,109 @@ open System.IO
 open Binance
 
 // MS Access has strong limitations (max. 16M rows per table and max. 2G file) -> go with SQL Server (lighter limitations)
-
-module DB = 
+module DataBase = 
     let path = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\Binance"
     let pathDL = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\NewData"
 
     type sqlTest = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=TestBinanceDB;User Id=sa;Password=123">
     type sqlReal = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=BinanceDB;User Id=sa;Password=123">
 
-    type Provider = 
-        | TestProvider of sqlTest.dataContext
-        | RealProvider of sqlReal.dataContext
+    module DB =
+        type Provider = 
+            | TestProvider of sqlTest.dataContext
+            | RealProvider of sqlReal.dataContext
 
-    type DBType = 
-        | Test
-        | Real 
+        type DBType = 
+            | Test
+            | Real 
 
-    type Table = 
-        | TableTimeSeries
-        | TableTickers
+        let getProvider = function
+            | Test -> sqlTest.GetDataContext() |> TestProvider
+            | Real -> sqlReal.GetDataContext() |> RealProvider
 
-    type TableContextTest = 
-        | TimeSeriesContextTest of sqlTest.dataContext.dboSchema.``dbo.tTimeSeries``
-        | TickersContextTest of sqlTest.dataContext.dboSchema.``dbo.tTickers``
+        let getTestContext = (function TestProvider(x) -> x | RealProvider(_) -> invalidArg "Context" "Try accessing RealContext with TestContextFunction. Try using 'getRealContext'.'") 
+        let getRealContext = (function RealProvider(x) -> x | TestProvider(_) -> invalidArg "Context" "Try accessing TestContext with RealContextFunction. Try using 'getTestContext'.'") 
 
-    type TableContextReal = 
-        | TimeSeriesContextReal of sqlReal.dataContext.dboSchema.``dbo.tTimeSeries``
-        | TickersContextReal of sqlReal.dataContext.dboSchema.``dbo.tTickers``
+        let applyDbContextTo fTest fReal = function
+            | Test as x -> (getProvider >> getTestContext >> fTest) x
+            | Real as x -> (getProvider >> getRealContext >> fReal) x
 
-    type TableContext = 
-        | TestContext of TableContextTest
-        | RealContext of TableContextReal
+    module Table =
+        type Table = 
+            | TableTimeSeries
+            | TableTickers
 
-    let dbContext = function
-        | Test -> sqlTest.GetDataContext() |> TestProvider
-        | Real -> sqlReal.GetDataContext() |> RealProvider
+        type TableContextTest = 
+            | TimeSeriesContextTest of sqlTest.dataContext.dboSchema.``dbo.tTimeSeries``
+            | TickersContextTest of sqlTest.dataContext.dboSchema.``dbo.tTickers``
 
-    let getTestContext = (function TestProvider(x) -> x | RealProvider(_) -> invalidArg "Context" "Try accessing RealContext with TestContextFunction. Try using 'getRealContext'.'") 
-    let getRealContext = (function RealProvider(x) -> x | TestProvider(_) -> invalidArg "Context" "Try accessing TestContext with RealContextFunction. Try using 'getTestContext'.'") 
+        type TableContextReal = 
+            | TimeSeriesContextReal of sqlReal.dataContext.dboSchema.``dbo.tTimeSeries``
+            | TickersContextReal of sqlReal.dataContext.dboSchema.``dbo.tTickers``
 
-    let applyContextTo fTest fReal = function
-        | Test as x -> (dbContext >> getTestContext >> fTest) x
-        | Real as x -> (dbContext >> getRealContext >> fReal) x
+        type TableContext = 
+            | TestContext of TableContextTest
+            | RealContext of TableContextReal
 
-    let getTableContext = function
-        | TableTimeSeries -> applyContextTo (fun c -> (TimeSeriesContextTest >> TestContext) c.Dbo.TTimeSeries)
-                                            (fun c-> (TimeSeriesContextReal >> RealContext) c.Dbo.TTimeSeries)
-        | TableTickers -> applyContextTo (fun c -> (TickersContextTest >> TestContext) c.Dbo.TTickers)
-                                         (fun c -> (TickersContextReal >> RealContext) c.Dbo.TTickers)
+        let getTableTestContext = (function TestContext(c) -> c | RealContext(_) -> invalidArg "Context" "Try accessing RealContext with TestContextFunction. Try using 'getRealContext'.'")
+        let getTableRealContext = (function RealContext(c) -> c | TestContext(_) -> invalidArg "Context" "Try accessing TestContext with RealContextFunction. Try using 'getTestContext'.'")
 
-    let ctx = sqlReal.GetDataContext()
-    let ts = ctx.Dbo.TTimeSeries
+        let getTableTimeSeriesTestContext = (function TimeSeriesContextTest(c) -> c | TickersContextTest(_) -> invalidArg "Context" "Try accessing TimeSeriesContextTest with RealContextFunction. Try using 'getTableTimeSeriesRealContext'.'")
+        let getTableTimeSeriesRealContext = (function TimeSeriesContextReal(c) -> c | TickersContextReal(_) -> invalidArg "Context" "Try accessing TimeSeriesContextReal with TestContextFunction. Try using 'getTableTimeSeriesTestContext'.'")
+        let getTableTickersTestContext = (function TickersContextTest(c) -> c | TimeSeriesContextTest(_) -> invalidArg "Context" "Try accessing TickersContextTest with RealContextFunction. Try using 'getTableTickersRealContext'.'")
+        let getTableTickersRealContext = (function TickersContextReal(c) -> c | TimeSeriesContextReal(_) -> invalidArg "Context" "Try accessing TickersContextReal with TestContextFunction. Try using 'getTableTickersTestContext'.'")
 
-    let getTableName = function
-        | TableTimeSeries -> "tTimeSeries"
-        | TableTickers -> "tTickers"
+        let getTableContext = function
+            | TableTimeSeries -> DB.applyDbContextTo (fun c -> (TimeSeriesContextTest >> TestContext) c.Dbo.TTimeSeries)
+                                                     (fun c-> (TimeSeriesContextReal >> RealContext) c.Dbo.TTimeSeries)
+            | TableTickers -> DB.applyDbContextTo (fun c -> (TickersContextTest >> TestContext) c.Dbo.TTickers)
+                                                  (fun c -> (TickersContextReal >> RealContext) c.Dbo.TTickers)
 
-    let formatTime (timeString:string) = 
-        let splittedString = timeString.Split ' '
-        let dateComps = splittedString.[0].Split '/'
-        let timeComps = splittedString.[1].Split ':'
-        new DateTime(int dateComps.[2],int dateComps.[0],int dateComps.[1],int timeComps.[0],int timeComps.[1],int timeComps.[2])
+        let applyToTimeSeriesTable fTest fReal = function
+            | DB.Test as t -> (getTableContext TableTimeSeries >> getTableTestContext >> getTableTimeSeriesTestContext >> fTest) t 
+            | DB.Real as t -> (getTableContext TableTimeSeries >> getTableRealContext >> getTableTimeSeriesRealContext >> fReal) t
 
-    let importFromAggregate crypto dbType = 
-        let (Helper.Crypto(name,_)) = crypto
-        printfn "%s" ("Importing " + name)
-        use stream = new StreamReader(Helper.cryptoPath crypto Helper.Aggregate)
-        stream.ReadLine() |> ignore // skip the header row
-        let mutable line = ""
-        let mutable count = 0
+        let applyToTickersTable fTest fReal = function
+            | DB.Test as t -> (getTableContext TableTickers >> getTableTestContext >> getTableTickersTestContext >> fTest) t 
+            | DB.Real as t -> (getTableContext TableTickers >> getTableRealContext >> getTableTickersRealContext >> fReal) t
 
-        let cond = function
-            | Test -> line <- stream.ReadLine() 
-                      count<-count+1
-                      line <> null && count < 100
-            | Real -> line <- stream.ReadLine()
-                      line <> null
+        let createRow table dbType = 0 
 
-        while (cond dbType) do
-            let splitted = line.Split ';'
-            let row = ts.Create()
-            row.Ticker <- name
-            row.CloseTime <- splitted.[0] |> formatTime
-            row.OpenPrice <- splitted.[1] |> float
-            row.HighPrice <- splitted.[2] |> float
-            row.LowPrice <- splitted.[3] |> float
-            row.ClosePrice <- splitted.[4] |> float
-            row.QuoteVolume <- splitted.[5] |> float
-            row.BaseVolume <- splitted.[6] |> float
-            row.TradeCount <- splitted.[7] |> int
-            row.OpenTime <- splitted.[8] |> formatTime
-            ctx.SubmitUpdates()
+        let formatTime (timeString:string) = 
+            let splittedString = timeString.Split ' '
+            let dateComps = splittedString.[0].Split '/'
+            let timeComps = splittedString.[1].Split ':'
+            new DateTime(int dateComps.[2],int dateComps.[0],int dateComps.[1],int timeComps.[0],int timeComps.[1],int timeComps.[2])
+
+        let importFromAggregate crypto dbType = 
+            let (Helper.Crypto(name,_)) = crypto
+            printfn "%s" ("Importing " + name)
+            use stream = new StreamReader(Helper.cryptoPath crypto Helper.Aggregate)
+            stream.ReadLine() |> ignore // skip the header row
+            let mutable line = ""
+            let mutable count = 0
+
+            let cond = function
+                | Test -> line <- stream.ReadLine() 
+                          count<-count+1
+                          line <> null && count < 100
+                | Real -> line <- stream.ReadLine()
+                          line <> null
+
+            while (cond dbType) do
+                let splitted = line.Split ';'
+                let row = ts.Create()
+                row.Ticker <- name
+                row.CloseTime <- splitted.[0] |> formatTime
+                row.OpenPrice <- splitted.[1] |> float
+                row.HighPrice <- splitted.[2] |> float
+                row.LowPrice <- splitted.[3] |> float
+                row.ClosePrice <- splitted.[4] |> float
+                row.QuoteVolume <- splitted.[5] |> float
+                row.BaseVolume <- splitted.[6] |> float
+                row.TradeCount <- splitted.[7] |> int
+                row.OpenTime <- splitted.[8] |> formatTime
+                ctx.SubmitUpdates()
         
 
 
