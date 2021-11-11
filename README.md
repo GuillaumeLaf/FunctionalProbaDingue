@@ -38,3 +38,7 @@ The major techniques I use are listed below. I already had an idea about most of
   - [ ] Normally Distributed
   - [ ] (Non)Stationarity
 - [ ] Rewrite using float32 (faster computations).
++ Diagnostics
+  - [ ] QQ-plot (original and error)
+  - [ ] histogram (original and error)
+  - [ ] Statistics Table
