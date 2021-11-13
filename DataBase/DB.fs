@@ -15,7 +15,76 @@ module DataBase =
     type sqlTest = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=TestBinanceDB;User Id=sa;Password=123">
     type sqlReal = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=BinanceDB;User Id=sa;Password=123">
 
-    module DB =
+    let ctxTest = sqlTest.GetDataContext()
+    let ctxReal = sqlReal.GetDataContext()
+
+    module DB = 
+        type DBType<'T, 'U> = 
+            | Test of 'T option
+            | Real of 'U option
+
+        let applyToContext = function
+            | Test(Some(f)) -> f ctxTest |> Some
+            | Test(None) -> None
+            | Real(Some(f)) -> f ctxReal |> Some
+            | Real(None) -> None
+
+    module Table = 
+        
+        let tTimeSeriesTestCtx = DB.ctxTest.Dbo.TTimeSeries
+        let tTimeSeriesRealCtx = DB.ctxReal.Dbo.TTimeSeries
+        let tTickersTestCtx = DB.ctxTest.Dbo.TTickers
+        let tTickersRealCtx = DB.ctxReal.Dbo.TTickers
+
+        type Table<'T, 'U> = 
+            | TableTimeSeries of DB.DBType<'T,'U>
+            | TableTickers of DB.DBType<'T,'U>
+
+        type TableData = 
+            | TimeSeriesData of string * DateTime * float * float * float * float * float * float * int * DateTime
+            | TickersData of string
+
+        let applyToContext = function 
+            | TableTimeSeries(DB.Test(Some(f))) -> f tTimeSeriesTestCtx |> Some
+            | TableTimeSeries(DB.Real(Some(f))) -> f tTimeSeriesRealCtx |> Some
+            | TableTimeSeries(DB.Test(None)) -> None
+            | TableTimeSeries(DB.Real(None)) -> None
+            | TableTickers(DB.Test(Some(f))) -> f tTickersTestCtx |> Some 
+            | TableTickers(DB.Real(Some(f))) -> f tTickersRealCtx |> Some
+            | TableTickers(DB.Test(None)) -> None
+            | TableTickers(DB.Real(None)) -> None
+
+        let createNewRow = function
+            | TableTimeSeries(DB.Test(None)) -> (Some >> DB.Test >> TableTimeSeries >> applyToContext) (fun c -> c.Create())
+            | TableTimeSeries(DB.Real(None)) -> (Some >> DB.Real >> TableTimeSeries >> applyToContext) (fun c -> c.Create())
+            | TableTickers(DB.Test(None)) -> (Some >> DB.Test >> TableTickers >> applyToContext) (fun c -> c.Create())
+            | TableTickers(DB.Real(None)) -> (Some >> DB.Real >> TableTickers >> applyToContext) (fun c -> c.Create())
+
+        let createRow (dbType:DB.DBType<'T,'U>) data = 
+            match data with
+            | TimeSeriesData(name,closeT,openP,highP,lowP,closeP,quote,baseV,trade,openT) -> let newRow = applyToContext (fun c -> c.Create()) (fun c -> c.Create()) dbType
+                                                                                             newRow.Ticker <- name
+                                                                                             newRow.CloseTime <- closeT
+                                                                                             newRow.OpenPrice <- openP
+                                                                                             newRow.HighPrice <- highP
+                                                                                             newRow.LowPrice <- lowP
+                                                                                             newRow.ClosePrice <- closeP
+                                                                                             newRow.QuoteVolume <- quote
+                                                                                             newRow.BaseVolume <- baseV
+                                                                                             newRow.TradeCount <- trade
+                                                                                             newRow.OpenTime <- openT
+                                                                                             
+
+
+
+
+
+
+            
+
+
+
+    (*module DB2 =
         type Provider = 
             | TestProvider of sqlTest.dataContext
             | RealProvider of sqlReal.dataContext
@@ -35,7 +104,7 @@ module DataBase =
             | Test as x -> (getProvider >> getTestContext >> fTest) x
             | Real as x -> (getProvider >> getRealContext >> fReal) x
 
-    module Table =
+    module Table2 =
         type Table = 
             | TableTimeSeries
             | TableTickers
@@ -101,7 +170,7 @@ module DataBase =
             let dateComps = splittedString.[0].Split '/'
             let timeComps = splittedString.[1].Split ':'
             new DateTime(int dateComps.[2],int dateComps.[0],int dateComps.[1],int timeComps.[0],int timeComps.[1],int timeComps.[2])
-
+*)
 (*        let importFromAggregate crypto dbType = 
             let (Helper.Crypto(name,_)) = crypto
             printfn "%s" ("Importing " + name)
