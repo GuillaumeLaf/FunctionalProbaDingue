@@ -44,25 +44,29 @@ module DataBase =
             | TimeSeriesData of string * DateTime * float * float * float * float * float * float * int * DateTime
             | TickersData of string
 
+        let isTableNone = function
+            | TableTimeSeries(DB.Test(None)) -> true
+            | TableTimeSeries(DB.Real(None)) -> true
+            | TableTickers(DB.Test(None)) -> true
+            | TableTickers(DB.Real(None)) -> true
+            | _ -> false
+
         let applyToContext = function 
             | TableTimeSeries(DB.Test(Some(f))) -> f tTimeSeriesTestCtx |> Some
             | TableTimeSeries(DB.Real(Some(f))) -> f tTimeSeriesRealCtx |> Some
-            | TableTimeSeries(DB.Test(None)) -> None
-            | TableTimeSeries(DB.Real(None)) -> None
             | TableTickers(DB.Test(Some(f))) -> f tTickersTestCtx |> Some 
             | TableTickers(DB.Real(Some(f))) -> f tTickersRealCtx |> Some
-            | TableTickers(DB.Test(None)) -> None
-            | TableTickers(DB.Real(None)) -> None
+            | x when (isTableNone x) = true -> None
 
         let createNewRow = function
             | TableTimeSeries(DB.Test(None)) -> (Some >> DB.Test >> TableTimeSeries >> applyToContext) (fun c -> c.Create())
             | TableTimeSeries(DB.Real(None)) -> (Some >> DB.Real >> TableTimeSeries >> applyToContext) (fun c -> c.Create())
             | TableTickers(DB.Test(None)) -> (Some >> DB.Test >> TableTickers >> applyToContext) (fun c -> c.Create())
             | TableTickers(DB.Real(None)) -> (Some >> DB.Real >> TableTickers >> applyToContext) (fun c -> c.Create())
+            | x when (isTableNone x) = false -> None
 
-        let createRow (dbType:DB.DBType<'T,'U>) data = 
-            match data with
-            | TimeSeriesData(name,closeT,openP,highP,lowP,closeP,quote,baseV,trade,openT) -> let newRow = applyToContext (fun c -> c.Create()) (fun c -> c.Create()) dbType
+        let createRow (dbType:DB.DBType<'T,'U>) = function
+            | TimeSeriesData(name,closeT,openP,highP,lowP,closeP,quote,baseV,trade,openT) -> let newRow = (TableTimeSeries >> createNewRow >> applyToContext) dbType 
                                                                                              newRow.Ticker <- name
                                                                                              newRow.CloseTime <- closeT
                                                                                              newRow.OpenPrice <- openP
