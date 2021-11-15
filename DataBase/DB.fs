@@ -12,73 +12,60 @@ module DataBase =
     let path = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\Binance"
     let pathDL = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\NewData"
 
-    type sqlTest = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=TestBinanceDB;User Id=sa;Password=123">
     type sqlReal = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=BinanceDB;User Id=sa;Password=123">
 
-    let ctxTest = sqlTest.GetDataContext()
     let ctxReal = sqlReal.GetDataContext()
-
-    module DB = 
-        type DBType<'T, 'U> = 
-            | Test of 'T option
-            | Real of 'U option
-
-        let applyToContext = function
-            | Test(Some(f)) -> f ctxTest |> Some
-            | Test(None) -> None
-            | Real(Some(f)) -> f ctxReal |> Some
-            | Real(None) -> None
 
     module Table = 
         
-        let tTimeSeriesTestCtx = DB.ctxTest.Dbo.TTimeSeries
-        let tTimeSeriesRealCtx = DB.ctxReal.Dbo.TTimeSeries
-        let tTickersTestCtx = DB.ctxTest.Dbo.TTickers
-        let tTickersRealCtx = DB.ctxReal.Dbo.TTickers
+        let tTimeSeriesCtx = ctxReal.Dbo.TTimeSeries
+        let tTickersCtx = ctxReal.Dbo.TTickers
 
-        type Table<'T, 'U> = 
-            | TableTimeSeries of DB.DBType<'T,'U>
-            | TableTickers of DB.DBType<'T,'U>
+        type Table = 
+            | TableTimeSeries
+            | TableTickers
 
         type TableData = 
             | TimeSeriesData of string * DateTime * float * float * float * float * float * float * int * DateTime
             | TickersData of string
 
-        let isTableNone = function
-            | TableTimeSeries(DB.Test(None)) -> true
-            | TableTimeSeries(DB.Real(None)) -> true
-            | TableTickers(DB.Test(None)) -> true
-            | TableTickers(DB.Real(None)) -> true
-            | _ -> false
+        let createRow = function
+            | TimeSeriesData(name,closeT,openP,highP,lowP,closeP,quote,baseV,trade,openT) -> let r = tTimeSeriesCtx.Create()
+                                                                                             r.Ticker <- name
+                                                                                             r.CloseTime <- closeT
+                                                                                             r.OpenPrice <- openP
+                                                                                             r.HighPrice <- highP
+                                                                                             r.LowPrice <- lowP
+                                                                                             r.ClosePrice <- closeP
+                                                                                             r.QuoteVolume <- quote
+                                                                                             r.BaseVolume <- baseV
+                                                                                             r.TradeCount <- trade
+                                                                                             r.OpenTime <- openT
+                                                                                             ctxReal.SubmitUpdates() 
+            | TickersData(name) -> let r = tTickersCtx.Create()
+                                   r.Ticker <- name
+                                   ctxReal.SubmitUpdates()
 
-        let applyToContext = function 
-            | TableTimeSeries(DB.Test(Some(f))) -> f tTimeSeriesTestCtx |> Some
-            | TableTimeSeries(DB.Real(Some(f))) -> f tTimeSeriesRealCtx |> Some
-            | TableTickers(DB.Test(Some(f))) -> f tTickersTestCtx |> Some 
-            | TableTickers(DB.Real(Some(f))) -> f tTickersRealCtx |> Some
-            | x when (isTableNone x) = true -> None
 
-        let createNewRow = function
-            | TableTimeSeries(DB.Test(None)) -> (Some >> DB.Test >> TableTimeSeries >> applyToContext) (fun c -> c.Create())
-            | TableTimeSeries(DB.Real(None)) -> (Some >> DB.Real >> TableTimeSeries >> applyToContext) (fun c -> c.Create())
-            | TableTickers(DB.Test(None)) -> (Some >> DB.Test >> TableTickers >> applyToContext) (fun c -> c.Create())
-            | TableTickers(DB.Real(None)) -> (Some >> DB.Real >> TableTickers >> applyToContext) (fun c -> c.Create())
-            | x when (isTableNone x) = false -> None
-
-        let createRow (dbType:DB.DBType<'T,'U>) = function
-            | TimeSeriesData(name,closeT,openP,highP,lowP,closeP,quote,baseV,trade,openT) -> let newRow = (TableTimeSeries >> createNewRow >> applyToContext) dbType 
-                                                                                             newRow.Ticker <- name
-                                                                                             newRow.CloseTime <- closeT
-                                                                                             newRow.OpenPrice <- openP
-                                                                                             newRow.HighPrice <- highP
-                                                                                             newRow.LowPrice <- lowP
-                                                                                             newRow.ClosePrice <- closeP
-                                                                                             newRow.QuoteVolume <- quote
-                                                                                             newRow.BaseVolume <- baseV
-                                                                                             newRow.TradeCount <- trade
-                                                                                             newRow.OpenTime <- openT
                                                                                              
+        let importFromAggregate crypto = 
+            let (Helper.Crypto(name,_)) = crypto
+            use stream = new StreamReader(Helper.cryptoPath crypto Helper.Aggregate)
+            stream.ReadLine() |> ignore // skip the header row
+            let mutable line = ""
 
+            while (line <- stream.ReadLine(); line <> null) do
+                let splitted = line.Split ';'
+                let data = TimeSeriesData(name,splitted.[0] |> DataPreps.formatTime,
+                                          splitted.[1] |> float,
+                                          splitted.[2] |> float,
+                                          splitted.[3] |> float,
+                                          splitted.[4] |> float,
+                                          splitted.[5] |> float,
+                                          splitted.[6] |> float,
+                                          splitted.[7] |> int,
+                                          splitted.[8] |> DataPreps.formatTime)
+                createRow data
 
 
 
@@ -88,25 +75,7 @@ module DataBase =
 
 
 
-    (*module DB2 =
-        type Provider = 
-            | TestProvider of sqlTest.dataContext
-            | RealProvider of sqlReal.dataContext
-
-        type DBType = 
-            | Test
-            | Real 
-
-        let getProvider = function
-            | Test -> sqlTest.GetDataContext() |> TestProvider
-            | Real -> sqlReal.GetDataContext() |> RealProvider
-
-        let getTestContext = (function TestProvider(x) -> x | RealProvider(_) -> invalidArg "Context" "Try accessing RealContext with TestContextFunction. Try using 'getRealContext'.'") 
-        let getRealContext = (function RealProvider(x) -> x | TestProvider(_) -> invalidArg "Context" "Try accessing TestContext with RealContextFunction. Try using 'getTestContext'.'") 
-
-        let applyDbContextTo fTest fReal = function
-            | Test as x -> (getProvider >> getTestContext >> fTest) x
-            | Real as x -> (getProvider >> getRealContext >> fReal) x
+    (*
 
     module Table2 =
         type Table = 
