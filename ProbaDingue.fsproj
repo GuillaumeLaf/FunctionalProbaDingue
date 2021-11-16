@@ -21,6 +21,8 @@
     <Compile Include="Utilities.fs" />
     <Compile Include="Distributions.fs" />
 	<Compile Include="Binance\Binance.fs" />
+	<Compile Include="DataBase\DataPreps.fs" />
+	<Compile Include="DataBase\DBTest.fs" />
 	<Compile Include="DataBase\DB.fs" />
     <Compile Include="TimeSeries\TimeSeries.fs" />
     <Compile Include="TimeSeries\Statistics.fs" />

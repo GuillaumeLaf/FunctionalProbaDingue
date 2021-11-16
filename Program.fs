@@ -12,7 +12,11 @@ open DataBase
 [<EntryPoint>]
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
-    
+
+    let startTime = new DateTime(2021,10,1,0,0,0)
+    let endTime = new DateTime(2021,10,2,0,0,0)
+    printfn "%A" (DataBase.Table.getTimeSeriesRows "BTCUSDT" startTime endTime)
+
     // DB.importFromAggregate (Helper.Crypto("BTCUSDT", Helper.M15))
     (*Helper.symbolsInAggregate Helper.M15 
         |> Array.iter (fun x -> DB.importFromAggregate (Helper.Crypto(x, Helper.M15)) DB.Real)*)
