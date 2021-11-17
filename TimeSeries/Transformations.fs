@@ -22,7 +22,7 @@ module Transformations =
         Option.map2 (fun current mean -> current - mean)
             <!> Univariate.currentElementM ()
             <*> Statistics.meanM
-            |> Univariate.mapM
+            |> Univariate.mapM // map over every element in 'data'.
     
     let standardizeM = 
         Option.map2 (fun current std -> current / std)
@@ -30,5 +30,9 @@ module Transformations =
             <*> Statistics.stdM
             |> Univariate.mapM
 
+    // 'demeanM' must modify the state with the result of its computations,
+    // if we then want to standardize the variance.
+    // We finally comeback to the initial state by making it 'stateKeeping'.
     let normalizeM = (Univariate.dataUpdating demeanM >=< standardizeM) |> Univariate.stateKeeping
                              
+    

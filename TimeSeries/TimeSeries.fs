@@ -3,7 +3,13 @@
 open Monads
 
 module Univariate = 
-    type State<'T> = State of int * 'T option [] * innovations:'T option []  // Option type to handle missing data
+
+(*    type TransformationTypes<'T> = 
+        | Mean of 'T
+        | Std of 'T*)
+
+    // Option type to handle missing data
+    type State<'T> = State of int * 'T option [] * innovations:'T option []
 
     let defaultState n = State(0, Array.init n (fun _ -> Some 0.0), Array.init n (fun _ -> Some 0.0))
     let defaultStateFrom array = State(0, array, Array.init array.Length (fun _ -> Some 0.0))
@@ -23,7 +29,8 @@ module Univariate =
     let innovationsM = Monad.M ( fun (State(idx,data,innovations)) -> innovations, (State(idx,data,innovations)) )
     let setDataM data = Monad.M ( fun (State(idx,_,innovations)) -> data, (State(idx,data,innovations)) )
 
-    // The monad "m" modifies the state but we wish to run this monad "m" without changing the state. 
+    // The monad "m"'s computations modifies the state but we wish to run 
+    // this monad "m" without changing the initial state. 
     let stateKeeping m = 
         Monad.state {
             let! state = Monad.get 
@@ -31,7 +38,8 @@ module Univariate =
             do! Monad.put state
             return result
         }
-                                       
+    
+    // The monad will be given the ability to modify 'data' in the state by the result of its computation.
     let dataUpdating m = m >>= (fun x -> setDataM x)
 
     let lengthM () = float <!> (Array.length <!> dataM)
@@ -72,6 +80,7 @@ module Univariate =
                     |> Monad.map (Array.ofList)
 
     // This map function doesn't update the state. 
+    // Map a monad computation over every element in 'data'
     let mapM m = fst <!> (Array.mapFold (fun s _ -> Monad.run (stepping m) s) <!> Monad.get <*> dataM)
 
     // This map function extends the previous one by updating the state with the result.
