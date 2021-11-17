@@ -4,31 +4,34 @@ open Monads
 
 module Univariate = 
 
-(*    type TransformationTypes<'T> = 
-        | Mean of 'T
-        | Std of 'T*)
+    type TransformationTypes<'T> = 
+        | Mean of 'T option
+        | Std of 'T option
 
     // Option type to handle missing data
-    type State<'T> = State of int * 'T option [] * innovations:'T option []
+    type State<'T> = State of int * 'T option [] * innovations:'T option [] * TransformationTypes<'T> list
 
-    let defaultState n = State(0, Array.init n (fun _ -> Some 0.0), Array.init n (fun _ -> Some 0.0))
-    let defaultStateFrom array = State(0, array, Array.init array.Length (fun _ -> Some 0.0))
+    let defaultState n = State(0, Array.init n (fun _ -> Some 0.0), Array.init n (fun _ -> Some 0.0),[])
+    let defaultStateFrom array = State(0, array, Array.init array.Length (fun _ -> Some 0.0),[])
 
     let (<*>) = Monad.apply
     let (<!>) = Monad.map
     let (>>=) x f = Monad.bind f x
     let (>=>) g f = Monad.compose g f
 
-    let stepM = Monad.M ( fun (State(idx,data,innovations)) -> (), (State(idx+1,data,innovations)) )
+    let stepM = Monad.M ( fun (State(idx,data,innovations,trans)) -> (), (State(idx+1,data,innovations,trans)) )
 
     // The stepping monad must be last since it updates the state index.
     let stepping m = (fun m _ -> m) <!> m <*> stepM
 
-    let dataM = Monad.M ( fun (State(idx,data,innovations)) -> data, (State(idx,data,innovations)) )
-    let idxM = Monad.M ( fun (State(idx,data,innovations)) -> idx, (State(idx,data,innovations)) )
-    let innovationsM = Monad.M ( fun (State(idx,data,innovations)) -> innovations, (State(idx,data,innovations)) )
-    let setDataM data = Monad.M ( fun (State(idx,_,innovations)) -> data, (State(idx,data,innovations)) )
-
+    let dataM = Monad.M ( fun (State(idx,data,innovations,trans)) -> data, (State(idx,data,innovations,trans)) )
+    let idxM = Monad.M ( fun (State(idx,data,innovations,trans)) -> idx, (State(idx,data,innovations,trans)) )
+    let innovationsM = Monad.M ( fun (State(idx,data,innovations,trans)) -> innovations, (State(idx,data,innovations,trans)) )
+    let transformationsM = Monad.M ( fun (State(idx,data,innovations,trans)) -> trans, (State(idx,data,innovations,trans)) )
+    let setDataM data = Monad.M ( fun (State(idx,_,innovations,trans)) -> data, (State(idx,data,innovations,trans)) )
+    let addTransformationM newTrans = Monad.M ( fun (State(idx,data,innovations,trans)) -> (), (State(idx,data,innovations,newTrans::trans)) )
+    let removeTransformationM t = Monad.M ( fun (State(idx,data,innovations,trans)) -> (), (State(idx,data,innovations,List.except [t] trans)) )
+    
     // The monad "m"'s computations modifies the state but we wish to run 
     // this monad "m" without changing the initial state. 
     let stateKeeping m = 
@@ -45,18 +48,18 @@ module Univariate =
     let lengthM () = float <!> (Array.length <!> dataM)
 
     let setCurrentElementM x = 
-        let innerFunc (State(idx,data,innovations)) = 
+        let innerFunc (State(idx,data,innovations,trans)) = 
             data.[idx] <- Some x
-            (), (State(idx,data,innovations))
+            (), (State(idx,data,innovations,trans))
         Monad.M innerFunc
 
     let setCurrentInnovationM x = 
-        let innerFunc (State(idx,data,innovations)) = 
+        let innerFunc (State(idx,data,innovations,trans)) = 
             innovations.[idx] <- Some x
-            (), (State(idx,data,innovations))
+            (), (State(idx,data,innovations,trans))
         Monad.M innerFunc
 
-    let setCurrentIndexM idx = Monad.M ( fun (State(_,data,innovations)) -> (), (State(idx,data,innovations)) )
+    let setCurrentIndexM idx = Monad.M ( fun (State(_,data,innovations,trans)) -> (), (State(idx,data,innovations,trans)) )
 
     let currentElementM () = Array.get <!> dataM <*> idxM
     let currentInnovationM () = Array.get <!> innovationsM <*> idxM

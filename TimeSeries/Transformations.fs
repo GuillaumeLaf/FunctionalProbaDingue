@@ -17,22 +17,62 @@ module Transformations =
 
     let differencedSeriesM = Univariate.mapM (differencedM id)
     let logDifferencedSeriesM = Univariate.mapM (differencedM log)
-        
+
     let demeanM = 
-        Option.map2 (fun current mean -> current - mean)
-            <!> Univariate.currentElementM ()
-            <*> Statistics.meanM
-            |> Univariate.mapM // map over every element in 'data'.
-    
+        Monad.state{
+            let! mean = Statistics.meanM
+            do! Univariate.addTransformationM (Univariate.Mean(mean))
+            return! Monad.state{
+                        let! current = Univariate.currentElementM()
+                        return Option.map2 (fun current mean -> current - mean) current mean
+                    } |> Univariate.mapReplaceM // map over every element in 'data' and replace inital 'data'.
+        }
+
+    let inline inverseDemeanM mean = 
+        Monad.state{
+            do! Univariate.removeTransformationM (Univariate.Mean(mean))
+            return! Monad.state {
+                    let! current = Univariate.currentElementM()
+                    return Option.map2 (fun current mean -> current + mean) current mean
+                    } |> Univariate.mapReplaceM
+        }
+        
+
     let standardizeM = 
-        Option.map2 (fun current std -> current / std)
-            <!> Univariate.currentElementM ()
-            <*> Statistics.stdM
-            |> Univariate.mapM
+        Monad.state{
+            let! std = Statistics.stdM
+            do! Univariate.addTransformationM (Univariate.Std(std))
+            return! Monad.state{
+                        let! current = Univariate.currentElementM()
+                        return Option.map2 (fun current std -> current / std) current std
+                    } |> Univariate.mapReplaceM 
+        }
+
+    let inline inverseStandardizeM std =
+        Monad.state{
+            do! Univariate.removeTransformationM (Univariate.Std(std))
+            return! Monad.state {
+                        let! current = Univariate.currentElementM()
+                        return Option.map2 (fun current std -> current * std) current std
+                    } |> Univariate.mapReplaceM
+        }
+        
 
     // 'demeanM' must modify the state with the result of its computations,
     // if we then want to standardize the variance.
     // We finally comeback to the initial state by making it 'stateKeeping'.
-    let normalizeM = (Univariate.dataUpdating demeanM >=< standardizeM) |> Univariate.stateKeeping
+    let normalizeM = (demeanM >=< standardizeM)
+
+    let inline _inverseFrom transformation = 
+        match transformation with
+        | Univariate.Mean(mean) -> inverseDemeanM mean
+        | Univariate.Std(std) -> inverseStandardizeM std
+
+    let inline inverseTransformationsM() = 
+        Monad.state {
+            let! transListM = List.map (fun t -> _inverseFrom t) <!> Univariate.transformationsM
+            return! List.fold (>=<) (List.head transListM) (List.tail transListM)
+        }
+
                              
     

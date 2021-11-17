@@ -13,26 +13,12 @@ open DataBase
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
-    let startTime = new DateTime(2021,10,1,0,0,0)
-    let endTime = new DateTime(2021,10,2,0,0,0)
-    printfn "%A" (DataBase.Table.getTimeSeriesRows "BTCUSDT" startTime endTime)
-
-    // DB.importFromAggregate (Helper.Crypto("BTCUSDT", Helper.M15))
-    (*Helper.symbolsInAggregate Helper.M15 
-        |> Array.iter (fun x -> DB.importFromAggregate (Helper.Crypto(x, Helper.M15)) DB.Real)*)
-(*    [|Helper.Crypto("BTCNGN", Helper.M15);Helper.Crypto("BTCRUB", Helper.M15);
-        Helper.Crypto("BTCUAH", Helper.M15)|] |> Array.map(fun x -> DB.importFromAggregate x)
-        |> ignore*)
-
-(*    let startTime = new DateTime(2021,6,30)
-    let endTime = new DateTime(2021,10,31)*)
-    //Downloader.download [|"AAVEBTC";"AAVEBUSD";"AAVEDOWNUSDT";"AAVEETH";"AAVEUPUSDT";"AAVEUSDT";"ACMBTC";"ACMBUSD";"ACMUSDT";"ADAAUD";"ADABIDR";"ADABKRW"|] startTime endTime
-    //Downloader.downloadAll startTime endTime
-
-    //Downloader.downloadAll (Helper.M15) startTime endTime
-    //Aggregator.aggregateAll (Helper.M15)
-
-    //Downloader.download Helper.M15 startTime endTime
+    let initTS = Array.init 30 (fun idx -> (float >> Some) idx)
+    let initInnov = Array.init 30 (fun idx -> Some 0.0)
+    let initState = Univariate.State(0, initTS, initInnov, [])
+    let x, s = Monad.run (Transformations.normalizeM) initState
+    printfn "%A" s
+    printfn "%A" (Monad.run (Transformations.inverseTransformationsM ()) s)
 
 
     

@@ -80,7 +80,7 @@ module SGD =
                                                          (nxtOpt,nxtStates)) (opt,states)                              
         
         let printCurrent states = 
-            let (Graph.State(p,_,_),TimeSeries.Univariate.State(_,_,errors)) = states
+            let (Graph.State(p,_,_),TimeSeries.Univariate.State(_,_,errors,_)) = states
             let errors = errors |> Array.map (fun x -> x |> Option.defaultValue 0.0)
             errors |> Array.mapFold (fun s x -> (),x*x+s) 0.0 |> snd, p
 
