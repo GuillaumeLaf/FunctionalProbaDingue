@@ -1,4 +1,6 @@
 ﻿module Utilities
+    open MathNet.Numerics
+    open MathNet.Numerics.IntegralTransforms
 
     let rand = new System.Random()
 
@@ -32,4 +34,22 @@
 
     let shuffle array = Array.iteri (fun i _ -> array |> swap i (rand.Next(i,array.Length))) array; array
         
-    
+    let rec matchSizeOf (array1:'T[]) (array2:'T[]) = 
+        if array1.Length >= array2.Length then
+            array1, Array.concat [|array2; Array.zeroCreate (array1.Length - array2.Length)|]
+        else 
+            let newArray2, newArray1 = matchSizeOf array2 array1
+            newArray1, newArray2
+
+    let convolution (signal:float[]) (filter:float[]) = 
+        let signalF, filterF = matchSizeOf (Array.copy signal) (Array.copy filter)
+        Fourier.Forward(signalF,Array.zeroCreate signal.Length)
+        Fourier.Forward(filterF,Array.zeroCreate signal.Length)
+        let convolution = UtilitiesSIMD.ArraySIMD.mult signalF filterF
+        Fourier.Inverse(convolution, Array.zeroCreate signal.Length)
+        convolution
+
+    let roll rightShift (array:'T[]) = 
+        let shift = if rightShift >= 0 then array.Length - rightShift else rightShift
+        let arr1, arr2 = array |> Array.splitAt shift
+        Array.concat [|arr2;arr1|]

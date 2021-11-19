@@ -9,16 +9,23 @@ open Binance
 
 open DataBase
 
+open MathNet.Numerics
+open MathNet.Numerics.IntegralTransforms
+
 [<EntryPoint>]
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
-    let initTS = Array.init 30 (fun idx -> (float >> Some) idx)
+(*    let initTS = Array.init 30 (fun idx -> (float >> Some) idx)
     let initInnov = Array.init 30 (fun idx -> Some 0.0)
     let initState = Univariate.State(0, initTS, initInnov, [])
     let x, s = Monad.run (Transformations.normalizeM) initState
     printfn "%A" s
-    printfn "%A" (Monad.run (Transformations.inverseTransformationsM ()) s)
+    printfn "%A" (Monad.run (Transformations.inverseTransformationsM ()) s)*)
+    let arr = Array.init 30 (fun idx -> float idx)
+    Fourier.Forward(arr, Array.zeroCreate 30, FourierOptions.Default)
+    printfn "%A" (arr)
+
 
 
     
