@@ -9,6 +9,8 @@ open Binance
 
 open DataBase
 
+open Transformations
+
 open MathNet.Numerics
 open MathNet.Numerics.IntegralTransforms
 
@@ -22,12 +24,16 @@ let main argv =
     let x, s = Monad.run (Transformations.normalizeM) initState
     printfn "%A" s
     printfn "%A" (Monad.run (Transformations.inverseTransformationsM ()) s)*)
-    let arr = Array.init 30 (fun idx -> float idx)
+(*    let arr = Array.init 30 (fun idx -> float idx)
     Fourier.Forward(arr, Array.zeroCreate 30, FourierOptions.Default)
-    printfn "%A" (arr)
+    printfn "%A" (arr)*)
 
+    let arr = [|2;3;-4;5;9;-7;3;5;6;-7;3;4;-2;9;6;-1|] |> Array.map (fun x -> float x)
+    printfn "%A" (WaveletSmoothing.SWT arr WaveletSmoothing.DB2)
 
-
+(*    let arrF = Array.copy arr |> Array.map (fun x -> complex x 0.0)
+    Fourier.Forward(arrF, FourierOptions.NoScaling)
+    printfn "%A" (arrF |> Array.map (fun x -> Complex.realPart x))*)
     
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)

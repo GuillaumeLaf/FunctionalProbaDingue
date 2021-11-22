@@ -34,22 +34,23 @@
 
     let shuffle array = Array.iteri (fun i _ -> array |> swap i (rand.Next(i,array.Length))) array; array
         
-    let rec matchSizeOf (array1:'T[]) (array2:'T[]) = 
+    let rec matchSizeOf (array1:float[]) (array2:float[]) = 
         if array1.Length >= array2.Length then
-            array1, Array.concat [|array2; Array.zeroCreate (array1.Length - array2.Length)|]
+            array1 |> Array.map (fun x -> complex x 0.0),
+            Array.concat [|array2 |> Array.map (fun x -> complex x 0.0); Array.zeroCreate (array1.Length - array2.Length)|]
         else 
             let newArray2, newArray1 = matchSizeOf array2 array1
             newArray1, newArray2
 
     let convolution (signal:float[]) (filter:float[]) = 
         let signalF, filterF = matchSizeOf (Array.copy signal) (Array.copy filter)
-        Fourier.Forward(signalF,Array.zeroCreate signal.Length)
-        Fourier.Forward(filterF,Array.zeroCreate signal.Length)
-        let convolution = UtilitiesSIMD.ArraySIMD.mult signalF filterF
-        Fourier.Inverse(convolution, Array.zeroCreate signal.Length)
-        convolution
+        Fourier.Forward(signalF, FourierOptions.NoScaling)
+        Fourier.Forward(filterF, FourierOptions.NoScaling)
+        let convolution = Array.map2 (fun s f -> Complex.mul s f) signalF filterF
+        Fourier.Inverse(convolution, FourierOptions.AsymmetricScaling)
+        convolution |> Array.map (fun x -> Complex.realPart x)
 
     let roll rightShift (array:'T[]) = 
-        let shift = if rightShift >= 0 then array.Length - rightShift else rightShift
+        let shift = if rightShift >= 0 then array.Length - rightShift else -rightShift
         let arr1, arr2 = array |> Array.splitAt shift
         Array.concat [|arr2;arr1|]
