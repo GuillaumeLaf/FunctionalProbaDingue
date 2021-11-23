@@ -34,18 +34,32 @@
 
     let shuffle array = Array.iteri (fun i _ -> array |> swap i (rand.Next(i,array.Length))) array; array
         
-    let rec matchSizeOf (array1:float[]) (array2:float[]) = 
+    let matchSizeOf (array1:'T[]) (array2:'U[]) = 
         if array1.Length >= array2.Length then
-            array1 |> Array.map (fun x -> complex x 0.0),
-            Array.concat [|array2 |> Array.map (fun x -> complex x 0.0); Array.zeroCreate (array1.Length - array2.Length)|]
+            array1,
+            Array.concat [|array2; Array.zeroCreate (array1.Length - array2.Length)|]
         else 
-            let newArray2, newArray1 = matchSizeOf array2 array1
-            newArray1, newArray2
+            Array.concat [|array1; Array.zeroCreate (array2.Length - array1.Length)|],
+            array2
+
+    let fft (array:complex[]) = 
+        let out = Array.copy array
+        Fourier.Forward(out, FourierOptions.AsymmetricScaling)
+        out
+
+    let ifft (array:complex[]) = 
+        let out = Array.copy array
+        Fourier.Inverse(out, FourierOptions.AsymmetricScaling)
+        out
+
+    let toComplex = Array.map (fun x -> complex x 0.0)
 
     let convolution (signal:float[]) (filter:float[]) = 
         let signalF, filterF = matchSizeOf (Array.copy signal) (Array.copy filter)
-        Fourier.Forward(signalF, FourierOptions.NoScaling)
-        Fourier.Forward(filterF, FourierOptions.NoScaling)
+        let signalF = signalF |> toComplex
+        let filterF = filterF |> toComplex
+        Fourier.Forward(signalF, FourierOptions.AsymmetricScaling)
+        Fourier.Forward(filterF, FourierOptions.AsymmetricScaling)
         let convolution = Array.map2 (fun s f -> Complex.mul s f) signalF filterF
         Fourier.Inverse(convolution, FourierOptions.AsymmetricScaling)
         convolution |> Array.map (fun x -> Complex.realPart x)
