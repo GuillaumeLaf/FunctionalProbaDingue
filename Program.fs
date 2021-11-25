@@ -29,8 +29,10 @@ let main argv =
     printfn "%A" (arr)*)
 
     let arr = [|2;3;-4;5;9;-7;3;5;6;-7;3;4;-2;9;6;-1|] |> Array.map (fun x -> float x)
-    let decomp = WaveletSmoothing.SWT arr WaveletSmoothing.Haar
-    printfn "%A" (WaveletSmoothing.iSWT decomp WaveletSmoothing.Haar)
+    let decomp = WaveletSmoothing.SWT WaveletSmoothing.Haar arr 
+    //printfn "%A" (WaveletSmoothing.iSWT decomp WaveletSmoothing.Haar)
+    let smoother = WaveletSmoothing.Soft(1.0)
+    printfn "%A" (WaveletSmoothing.smooth WaveletSmoothing.Haar smoother arr)
 
 (*    let arrF = Array.copy arr |> Array.map (fun x -> complex x 0.0)
     Fourier.Forward(arrF, FourierOptions.InverseExponent)

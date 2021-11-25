@@ -32,7 +32,7 @@ module WaveletSmoothing =
     let upsampleNtimes n = Array.replicate n upsample |> Array.fold (fun f s -> s >> f) id
 
     // Implementation could be made faster by successive convolution with products of FFT. 
-    let SWT signal wavelet = 
+    let SWT wavelet signal = 
         let maxLevel = 2
         let lowPass = scalingFilter wavelet
         let highPass = waveletFilter wavelet
@@ -49,31 +49,47 @@ module WaveletSmoothing =
         SWTatLevel lowPass highPass signal maxLevel
         decomp
 
-    let iSWT (decomp:float[][]) wavelet = 
+    let iSWT wavelet (decomp:float[][]) = 
         let maxLevel = decomp.Length - 1 // '-1' since the last is the final approx. coeffs. 
         let reconLowPass = scalingReconstructionFilter wavelet |> upsampleNtimes (maxLevel-1)
         let reconHighPass = waveletReconstructionFilter wavelet |> upsampleNtimes (maxLevel-1)
         let details = decomp.[0..maxLevel-1]
 
-(*        let folder detail (approx,reconLow,reconHigh) = 
+        let folder detail (approx,reconLow,reconHigh) = 
             let reconLowPass = Utilities.matchSizeOf approx reconLow |> snd 
             let reconHighPass = Utilities.matchSizeOf approx reconHigh |> snd
             let convoLow = Utilities.convolution approx reconLowPass
             let convoHigh = Utilities.convolution detail reconHighPass
             let nextApprox = Array.map2 (fun x1 x2 -> (x1+x2)/2.0) convoLow convoHigh
-            (nextApprox, downSample reconLow, downSample reconHigh)*)
-
-        let folder detail (approx,reconLow,reconHigh) = 
-            let reconLowPass = Utilities.matchSizeOf approx reconLow |> snd |> Utilities.toComplex |> Utilities.fft
-            let reconHighPass = Utilities.matchSizeOf approx reconHigh |> snd |> Utilities.toComplex |> Utilities.fft
-            let convoLow = Array.map2 (fun x1 x2 -> x1*x2) approx reconLowPass
-            let convoHigh = Array.map2 (fun x1 x2 -> x1*x2) (detail |> Utilities.toComplex |> Utilities.fft) reconHighPass
-            let nextApprox = Array.map2 (fun x1 x2 -> (x1+x2)/(complex 2.0 0.0)) convoLow convoHigh
             (nextApprox, downSample reconLow, downSample reconHigh)
 
-        let out, _, _ = Array.foldBack folder details (decomp.[maxLevel] |> Utilities.toComplex |> Utilities.fft,reconLowPass,reconHighPass)
-        out |> Utilities.ifft |> Array.map (fun x -> Complex.realPart x)
+        let out, _, _ = Array.foldBack folder details (decomp.[maxLevel],reconLowPass,reconHighPass)
+        out 
     
+    type Smoother = 
+        | HighFrequencyCut of level:int // Nullify coefficients below level
+        | Hard of threshold:float
+        | Soft of threshold:float
+
+    let nullifyHighFrequency level (decomp:float[][]) = 
+        let zeros = Array.zeroCreate decomp.[0].Length
+        Array.concat [|Array.replicate level zeros;decomp.[level..decomp.Length-1]|] 
+
+    let applyHardThreshold threshold = 
+        let thresholdLevel = Array.Parallel.map (fun x -> if abs x <= threshold then 0.0 else x)
+        Array.map (fun x -> thresholdLevel x)
+
+    let applySoftThreshold threshold = 
+        let thresholdLevel = Array.Parallel.map (function | x when abs x <= threshold -> 0.0
+                                                          | x when x > threshold -> x - threshold
+                                                          | x when x < -threshold -> x + threshold
+                                                          | x -> x)
+        Array.map (fun x -> thresholdLevel x)
+
+    let smooth wavelet = function
+        | HighFrequencyCut(l) -> (SWT wavelet >> nullifyHighFrequency l >> iSWT wavelet)
+        | Hard(thresh) -> (SWT wavelet >> applyHardThreshold thresh >> iSWT wavelet)
+        | Soft(thresh) -> (SWT wavelet >> applySoftThreshold thresh >> iSWT wavelet)
 
         
         
