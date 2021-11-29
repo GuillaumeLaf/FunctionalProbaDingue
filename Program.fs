@@ -18,21 +18,28 @@ open MathNet.Numerics.IntegralTransforms
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
-(*    let initTS = Array.init 30 (fun idx -> (float >> Some) idx)
-    let initInnov = Array.init 30 (fun idx -> Some 0.0)
-    let initState = Univariate.State(0, initTS, initInnov, [])
-    let x, s = Monad.run (Transformations.normalizeM) initState
-    printfn "%A" s
-    printfn "%A" (Monad.run (Transformations.inverseTransformationsM ()) s)*)
-(*    let arr = Array.init 30 (fun idx -> float idx)
-    Fourier.Forward(arr, Array.zeroCreate 30, FourierOptions.Default)
-    printfn "%A" (arr)*)
+    let m = AR(1)
+    let param = ARp([|0.7|]) |> Sampling
+    let smoother = WaveletSmoothing.HighFrequencyCut(1)
 
-    let arr = [|2;3;-4;5;9;-7;3;5;6;-7;3;4;-2;9;6;-1|] |> Array.map (fun x -> float x)
+    let s = Models.GraphTS.sample 1000 param 
+    let c1 = Chart.Line s
+    let s = s |> Array.scan (fun s x -> s + x) 0.0
+    //printfn "%A" (WaveletSmoothing.SWT WaveletSmoothing.Haar s)
+    let s = WaveletSmoothing.smooth WaveletSmoothing.Haar smoother s
+    let s = s |> Array.windowed 2 |> Array.map (fun arr -> arr.[1] - arr.[0])
+    Chart.Combine([c1; Chart.Line s]) |> Chart.Show
+    
+    let s = s |> Array.map (fun x -> Some x)
+    let opti = Models.SGD.RMSProp(0.9,[|0.0|],0.005)
+    let fittedModel = Models.SGD.fit m opti 200 s
+    printfn "%A" fittedModel
+
+(*    let arr = [|2;3;-4;5;9;-7;3;5;6;-7;3;4;-2;9;6;-1|] |> Array.map (fun x -> float x)
     let decomp = WaveletSmoothing.SWT WaveletSmoothing.Haar arr 
     //printfn "%A" (WaveletSmoothing.iSWT decomp WaveletSmoothing.Haar)
     let smoother = WaveletSmoothing.Soft(1.0)
-    printfn "%A" (WaveletSmoothing.smooth WaveletSmoothing.Haar smoother arr)
+    printfn "%A" (WaveletSmoothing.smooth WaveletSmoothing.Haar smoother arr)*)
 
 (*    let arrF = Array.copy arr |> Array.map (fun x -> complex x 0.0)
     Fourier.Forward(arrF, FourierOptions.InverseExponent)

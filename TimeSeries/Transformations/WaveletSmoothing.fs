@@ -33,7 +33,7 @@ module WaveletSmoothing =
 
     // Implementation could be made faster by successive convolution with products of FFT. 
     let SWT wavelet signal = 
-        let maxLevel = 2
+        let maxLevel = 5
         let lowPass = scalingFilter wavelet
         let highPass = waveletFilter wavelet
 
@@ -76,6 +76,7 @@ module WaveletSmoothing =
         Array.concat [|Array.replicate level zeros;decomp.[level..decomp.Length-1]|] 
 
     let applyHardThreshold threshold = 
+        let thresholdLevel = Array.Parallel.map (fun x -> if abs x <= threshold then 0.0 else x)
         let thresholdLevel = Array.Parallel.map (fun x -> if abs x <= threshold then 0.0 else x)
         Array.map (fun x -> thresholdLevel x)
 

@@ -12,7 +12,12 @@ module SGD =
         | Classic of learnRate:float
         | Momentum of momRate:float * momValue:float [] * learnRate:float
         | RMSProp of momRate:float * momValue:float [] * learnRate:float
-        | ADAM of momRate1:float * momRate2:float * momValue1:float[] * momValue2:float[] * learnRate:float
+        //| ADAM of momRate1:float * momRate2:float * momValue1:float[] * momValue2:float[] * learnRate:float
+
+    type OptimizerParameters = 
+        | ClassicP
+        | MomentumP of momentumValue:float[]
+        | RMSProp of momentumValue:float[]
         
     let limitParams x =
         match x with
@@ -44,10 +49,10 @@ module SGD =
         | RMSProp(momRate,momValue,learnRate) -> let newMomentum = Array.map2 (fun mm g -> momRate*mm + (1.0-momRate)*g*g) momValue gradient
                                                  RMSProp(momRate,newMomentum,learnRate), Array.map3 (fun p mm g -> p - g*(learnRate/(sqrt(mm)+1.0)) |> limitParams)
                                                                                                     parameterValues momValue gradient
-        | ADAM(momRate1,momRate2,momValue1,momValue2,learnRate) -> let newMom1 = Array.map2 (fun m1 g -> momRate1*m1 + (1.0-momRate1)*g) momValue1 gradient
+        (*| ADAM(momRate1,momRate2,momValue1,momValue2,learnRate) -> let newMom1 = Array.map2 (fun m1 g -> momRate1*m1 + (1.0-momRate1)*g) momValue1 gradient
                                                                    let newMom2 = Array.map2 (fun m2 g -> momRate2*m2 + (1.0-momRate2)*g*g) momValue2 gradient
                                                                    ADAM(momRate1,momRate2,momValue1,momValue2,learnRate),
-                                                                        Array.map3 (fun nm1 nm2 p -> p - learnRate*(nm1/(1.0-momRate1))/(sqrt(nm2/(1.0-momRate2))+0.001) |> limitParams) newMom1 newMom2 parameterValues
+                                                                        Array.map3 (fun nm1 nm2 p -> p - learnRate*(nm1/(1.0-momRate1))/(sqrt(nm2/(1.0-momRate2))+0.001) *)|> limitParams) newMom1 newMom2 parameterValues
 
     // Updating of the parameters must be made after running the model.
     let updateParametersM optimizer skeleton indices = 
