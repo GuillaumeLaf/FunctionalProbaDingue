@@ -9,6 +9,7 @@ module GraphTS =
     let (>=>) g f = Monad.compose g f
 
     // Variable update must be made at a specific time ! (Be careful of look-ahead bias).
+    // Output the updated variables.
     let rec defineUpdatesM modelName = 
         let rec updateSequenceTSM = function
             | ARp(coeffs) -> [| for i in 1..coeffs.Length do TimeSeries.Univariate.elementAtLagM i |]
@@ -53,6 +54,7 @@ module GraphTS =
             return x
         }
 
+    // The skeleton monad here comes from an ErrorModel
     let fitOnceM updateM errorSkM = 
         Monad.state {
             let! error = runGraphM errorSkM
@@ -62,6 +64,7 @@ module GraphTS =
             do! runGraphM (Graph.setVariablesM newVar)
         }
 
+    // The skeleton monad here comes from an ErrorModel
     let SDGfitM updateM errorSkM idx = 
         Monad.state {
             for i in idx do

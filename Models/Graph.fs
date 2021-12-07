@@ -2,6 +2,7 @@
 
 open MathNet.Numerics.Distributions
 open Monads
+open System
 
 module Graph = 
     let (<*>) = Monad.apply
@@ -81,14 +82,22 @@ module Graph =
                           skeleton 
 
     let skeletonGradientForParameterM wantedIdx skeleton = 
+        let shift = 1e-10
         let getParameterShiftedM wantedIdx = function 
-            | x when x=wantedIdx -> Monad.add (getParameterM wantedIdx) (Monad.rets 0.00005) 
+            | x when x=wantedIdx -> Monad.add (getParameterM wantedIdx) (Monad.rets shift) 
             | x -> getParameterM x
         Monad.state {
             let! x = skeletonM getParameterM getVariableM getInnovationM skeleton
             let! x_dt = skeletonM (getParameterShiftedM wantedIdx) getVariableM getInnovationM skeleton
-            return (x_dt - x)/0.00005
+            return (x_dt - x)/shift
         }
+
+(*    // Create new skeleton for each parameter gradient and then convert it to a monad.
+    let rec inline skeletonParameterGradientM modelP =
+        let convertToMonad = skeletonM getParameterM getVariableM getInnovationM
+        match modelP with
+        | ARp(coeffs) | MAp(coeffs) -> [| for i in 0..coeffs.Length-1 do Leaf(Variable(i)) |] 
+        | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let innerGradientM = skeletonParameterGradientM innerModelp*)
 
     let skeletonGradientM skeleton = 
         Array.mapi <!> (Monad.rets (fun i _ -> skeletonGradientForParameterM i skeleton)) 
@@ -100,8 +109,8 @@ module Graph =
         | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let ARs = defaultSkeletonForSampling (ARp(coeffs1))
                                                           let expTerm x = ((-x+loc)/scale) |> exp
                                                           let logisticFunc x = 1.0 / (1.0 + expTerm x) 
-                                                          let mixingNode = Node1(Apply(logisticFunc),defaultSkeletonForSampling innerModelp |> SkeletonTree.deactivateInnovations)
-                                                          //let mixingNode = Node1(Apply(logisticFunc),Nodes.linearCombinaisons coeffs1.Length)
+                                                          let innerSk = defaultSkeletonForSampling innerModelp |> SkeletonTree.deactivateInnovations
+                                                          let mixingNode = Node1(Apply(logisticFunc),innerSk)
                                                           (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode
         | ErrorModelp(innerModelp) -> (defaultSkeletonForSampling innerModelp |> SkeletonTree.shift 0 1 0) .-. (Leaf(Variable(0)))
 

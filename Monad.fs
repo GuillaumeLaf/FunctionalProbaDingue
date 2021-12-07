@@ -50,13 +50,8 @@ module Monad =
 
     let sequence list = traverse id list
 
-    let mapFoldM arrayM = 
-        let innerFunc state = Array.mapFold (fun s x -> run x s) state arrayM 
-        M innerFunc
-
-    let mapM arrayM = 
-        let innerFunc state = Array.Parallel.map (fun x -> run x state |> fst) arrayM, state 
-        M innerFunc
+    let mapFoldM arrayM = M ( fun state -> Array.mapFold (fun s x -> run x s) state arrayM )
+    let mapM arrayM = M ( fun state -> Array.Parallel.map (fun x -> run x state |> fst) arrayM, state )
 
     let inline operation op m1 m2 = 
         m1 >>= (fun x1 ->

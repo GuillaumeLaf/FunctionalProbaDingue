@@ -44,9 +44,9 @@ module SkeletonTree =
              skeleton
 
     let deactivateInnovations skeleton = 
-        fold (fun op nk n k -> nk (fun nacc -> k n))
-             (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> k n)))
+        fold (fun op nk n k -> nk (fun nacc -> Node1(op,nacc) |> k))
+             (fun op kl kr n k -> kl (fun lacc -> kr (fun racc -> Node2(op,lacc,racc) |> k)))
              (fun input n k -> match input with
                                 | Innovation(_) -> Leaf(Constant(0.0)) |> k
-                                | _ -> k n)
+                                | _ -> Leaf(input) |> k)
              skeleton
