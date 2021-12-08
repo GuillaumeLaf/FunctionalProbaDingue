@@ -4,6 +4,14 @@ module SkeletonTree =
     let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Addition, N1, N2)
     let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Multiplication, N1, N2)
 
+    let equalInputs input1 input2 = 
+        match (input1,input2) with
+        | Parameter(idx1),Parameter(idx2) -> idx1 = idx2 
+        | Variable(idx1),Variable(idx2) -> idx1 = idx2 
+        | Innovation(idx1),Innovation(idx2) -> idx1 = idx2 
+        | Constant(value1),Constant(value2) -> value1 = value2
+        | _ -> false
+
     let inline fold node1F node2F leafV sk = 
         let rec loop n k = 
             match n with
@@ -50,3 +58,18 @@ module SkeletonTree =
                                 | Innovation(_) -> Leaf(Constant(0.0)) |> k
                                 | _ -> Leaf(input) |> k)
              skeleton
+
+    let gradientSkeletonForParameter idxParam skeleton = 
+        fold (fun op nk _ k -> match op with
+                                | Apply(f) -> nk (fun nacc -> (Node1(Apply(f), fst nacc),Node1(Apply(f), snd nacc)) |> k))
+             (fun op kl kr _ k -> match op with
+                                    | Addition -> kl (fun lacc -> kr (fun racc -> (Node2(Addition,fst lacc,fst racc),Node2(Addition,snd lacc,snd racc)) |> k)) 
+                                    | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Node2(Multiplication,fst lacc,fst racc),Node2(Multiplication,snd lacc,snd racc)) |> k))
+                                    | Substraction -> kl (fun lacc -> kr (fun racc ->  (Node2(Substraction,fst lacc,fst racc),Node2(Substraction,snd lacc,snd racc)) |> k)))
+             (fun input _ k -> match input with
+                                | Parameter(idx) -> (Leaf(Constant(1.0)),Leaf(Parameter(idx))) |> k
+                                | Variable(idx) -> (Leaf(Constant(0.0)),Leaf(Variable(idx))) |> k
+                                | Innovation(idx) -> (Leaf(Constant(0.0)),Leaf(Innovation(idx))) |> k  
+                                | Constant(value) -> (Leaf(Constant(0.0)),Leaf(Constant(value))) |> k)
+             skeleton 
+
