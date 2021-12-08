@@ -59,17 +59,24 @@ module SkeletonTree =
                                 | _ -> Leaf(input) |> k)
              skeleton
 
+    let gradientInputForParameter idxParam = function
+        | Parameter(idx) -> if idx = idxParam then Leaf(Constant(1.0)) else Leaf(Constant(0.0))
+        | _ -> Leaf(Constant(0.0))
+
+    // The first element of the tuple is the gradient skeleton
     let gradientSkeletonForParameter idxParam skeleton = 
         fold (fun op nk _ k -> match op with
                                 | Apply(f) -> nk (fun nacc -> (Node1(Apply(f), fst nacc),Node1(Apply(f), snd nacc)) |> k))
              (fun op kl kr _ k -> match op with
                                     | Addition -> kl (fun lacc -> kr (fun racc -> (Node2(Addition,fst lacc,fst racc),Node2(Addition,snd lacc,snd racc)) |> k)) 
-                                    | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Node2(Multiplication,fst lacc,fst racc),Node2(Multiplication,snd lacc,snd racc)) |> k))
+                                    | Multiplication -> kl (fun lacc -> kr (fun racc -> let lg, l = lacc  
+                                                                                        let rg, r = racc
+                                                                                        ((Node2(Addition,Node2(Multiplication,lg,r),Node2(Multiplication,rg,l))),Node2(Multiplication,snd lacc,snd racc)) |> k))
                                     | Substraction -> kl (fun lacc -> kr (fun racc ->  (Node2(Substraction,fst lacc,fst racc),Node2(Substraction,snd lacc,snd racc)) |> k)))
              (fun input _ k -> match input with
-                                | Parameter(idx) -> (Leaf(Constant(1.0)),Leaf(Parameter(idx))) |> k
-                                | Variable(idx) -> (Leaf(Constant(0.0)),Leaf(Variable(idx))) |> k
-                                | Innovation(idx) -> (Leaf(Constant(0.0)),Leaf(Innovation(idx))) |> k  
-                                | Constant(value) -> (Leaf(Constant(0.0)),Leaf(Constant(value))) |> k)
+                                | Parameter(idx) as x -> (gradientInputForParameter idxParam x,Leaf(Parameter(idx))) |> k
+                                | Variable(idx) as x -> (Leaf(Constant(0.0)),Leaf(Variable(idx))) |> k
+                                | Innovation(idx) as x -> (Leaf(Constant(0.0)),Leaf(Innovation(idx))) |> k  
+                                | Constant(value) as x -> (Leaf(Constant(0.0)),Leaf(Constant(value))) |> k)
              skeleton 
 
