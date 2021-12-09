@@ -66,9 +66,13 @@ module Graph =
     let setVariablesM array = Array.mapi (fun i x -> setVariableM i x) array |> Monad.mapFoldM >>= (fun _ -> Monad.rets ())
     let setInnovationsM array = Array.mapi (fun i x -> setInnovationM i x) array |> Monad.mapFoldM >>= (fun _ -> Monad.rets ())
 
+    // Function nodes could be made into skeleton trees (easier to take higher derivatives)
+    let functionNode = function
+        | Logistic(gamma,c) -> (fun x -> -gamma*(x-c) |> exp |> (+) 1.0 |> (/) 1.0)
+        | GradientLogistic(gamma,c) -> (fun x -> gamma*(x-c) |> exp |> (+) 1.0 |> (/) (gamma*(x-c) |> exp))
+
     let inline skeletonM parameterM variableM innovationM skeleton = 
-        SkeletonTree.fold (fun op nk _ k -> match op with
-                                                | Apply(f) -> nk (fun nacc -> Monad.map f nacc |> k))
+        SkeletonTree.fold (fun op nk _ k -> nk (fun nacc -> Monad.map (functionNode op) nacc |> k))
                           (fun op kl kr _ k -> match op with
                                                 | Addition -> kl (fun lacc -> kr (fun racc -> (Monad.add lacc racc) |> k)) 
                                                 | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Monad.mult lacc racc) |> k))
@@ -107,10 +111,8 @@ module Graph =
     let rec defaultSkeletonForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))
         | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let ARs = defaultSkeletonForSampling (ARp(coeffs1))
-                                                          let expTerm x = ((-x+loc)/scale) |> exp
-                                                          let logisticFunc x = 1.0 / (1.0 + expTerm x) 
                                                           let innerSk = defaultSkeletonForSampling innerModelp |> SkeletonTree.deactivateInnovations
-                                                          let mixingNode = Node1(Apply(logisticFunc),innerSk)
+                                                          let mixingNode = Node1(Logistic(scale,loc),innerSk)
                                                           (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode
         | ErrorModelp(innerModelp) -> (defaultSkeletonForSampling innerModelp |> SkeletonTree.shift 0 1 0) .-. (Leaf(Variable(0)))
 

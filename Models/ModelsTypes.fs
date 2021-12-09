@@ -20,7 +20,8 @@ module ModelsTypes =
         | Fitting of Model
 
     type Op1<'T> = 
-        | Apply of ('T -> 'T)
+        | Logistic of gamma:float * c:float
+        | GradientLogistic of gamma:float * c:float
 
     type Op2 = 
         | Addition

@@ -59,14 +59,15 @@ module SkeletonTree =
                                 | _ -> Leaf(input) |> k)
              skeleton
 
-    let gradientInputForParameter idxParam = function
+    let _gradientInputForParameter idxParam = function
         | Parameter(idx) -> if idx = idxParam then Leaf(Constant(1.0)) else Leaf(Constant(0.0))
         | _ -> Leaf(Constant(0.0))
 
     // The first element of the tuple is the gradient skeleton
     let gradientSkeletonForParameter idxParam skeleton = 
         fold (fun op nk _ k -> match op with
-                                | Apply(f) -> nk (fun nacc -> (Node1(Apply(f), fst nacc),Node1(Apply(f), snd nacc)) |> k))
+                                | Logistic(gamma,c) as x -> nk (fun nacc -> (Node1(GradientLogistic(gamma,c), fst nacc),Node1(x, snd nacc)) |> k)
+                                | GradientLogistic(_) as x-> nk (fun nacc -> (Node1(x, fst nacc),Node1(x, snd nacc)) |> k)) // Not correct (find a way to generalize for gradient)
              (fun op kl kr _ k -> match op with
                                     | Addition -> kl (fun lacc -> kr (fun racc -> (Node2(Addition,fst lacc,fst racc),Node2(Addition,snd lacc,snd racc)) |> k)) 
                                     | Multiplication -> kl (fun lacc -> kr (fun racc -> let lg, l = lacc  
@@ -74,9 +75,9 @@ module SkeletonTree =
                                                                                         ((Node2(Addition,Node2(Multiplication,lg,r),Node2(Multiplication,rg,l))),Node2(Multiplication,snd lacc,snd racc)) |> k))
                                     | Substraction -> kl (fun lacc -> kr (fun racc ->  (Node2(Substraction,fst lacc,fst racc),Node2(Substraction,snd lacc,snd racc)) |> k)))
              (fun input _ k -> match input with
-                                | Parameter(idx) as x -> (gradientInputForParameter idxParam x,Leaf(Parameter(idx))) |> k
+                                | Parameter(idx) as x -> (_gradientInputForParameter idxParam x,Leaf(Parameter(idx))) |> k
                                 | Variable(idx) as x -> (Leaf(Constant(0.0)),Leaf(Variable(idx))) |> k
                                 | Innovation(idx) as x -> (Leaf(Constant(0.0)),Leaf(Innovation(idx))) |> k  
                                 | Constant(value) as x -> (Leaf(Constant(0.0)),Leaf(Constant(value))) |> k)
-             skeleton 
+             skeleton
 
