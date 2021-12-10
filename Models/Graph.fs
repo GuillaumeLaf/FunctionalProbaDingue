@@ -14,6 +14,7 @@ module Graph =
     let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Addition, N1, N2)
     let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Multiplication, N1, N2)
     let inline ( .-. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Substraction, N1, N2)
+    let inline ( ./. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Division, N1, N2)
 
     let rec convertModelToParameters = function
         | AR(order) -> ARp(Array.zeroCreate order)
@@ -67,9 +68,9 @@ module Graph =
     let setInnovationsM array = Array.mapi (fun i x -> setInnovationM i x) array |> Monad.mapFoldM >>= (fun _ -> Monad.rets ())
 
     // Function nodes could be made into skeleton trees (easier to take higher derivatives)
-    let functionNode = function
+(*    let functionNode = function
         | Logistic(gamma,c) -> (fun x -> -gamma*(x-c) |> exp |> (+) 1.0 |> (/) 1.0)
-        | GradientLogistic(gamma,c) -> (fun x -> gamma*(x-c) |> exp |> (+) 1.0 |> (/) (gamma*(x-c) |> exp))
+        | GradientLogistic(gamma,c) -> (fun x -> gamma*(x-c) |> exp |> (+) 1.0 |> (/) (gamma*(x-c) |> exp))*)
 
     let inline skeletonM parameterM variableM innovationM skeleton = 
         SkeletonTree.fold (fun op nk _ k -> nk (fun nacc -> Monad.map (functionNode op) nacc |> k))
@@ -77,6 +78,7 @@ module Graph =
                                                 | Addition -> kl (fun lacc -> kr (fun racc -> (Monad.add lacc racc) |> k)) 
                                                 | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Monad.mult lacc racc) |> k))
                                                 | Substraction -> kl (fun lacc -> kr (fun racc ->  (Monad.sub lacc racc) |> k))
+                                                | Division -> kl (fun lacc -> kr (fun racc ->  (Monad.div lacc racc) |> k)) // Cannot divide by zero ! 
                                                 )
                           (fun input _ k -> match input with
                                                 | Parameter(idx) -> parameterM idx |> k

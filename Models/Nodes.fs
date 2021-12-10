@@ -4,6 +4,7 @@ module Nodes =
     let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Addition, N1, N2)
     let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Multiplication, N1, N2)
     let inline ( .-. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Substraction, N1, N2)
+    let inline ( ./. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Division, N1, N2)
 
     let linearCombinaisons n = 
         Array.zeroCreate n |> Array.mapi (fun i _ -> Leaf(Parameter(i)) .*. Leaf(Variable(i)))
@@ -23,5 +24,7 @@ module Nodes =
         let shiftedMixingNode = SkeletonTree.shift (nLeaves12.[0]) 0 0 mixingNode
         (shiftedMixingNode .*. node1) .+. ((Leaf(Constant(1.0)) .-. shiftedMixingNode) .*. shiftedNode2)
 
-
-
+    let logisticNode gamma c x = 
+        let exponent = Leaf(Constant(-gamma)) .*. (x .-. Leaf(Constant(c)))
+        Leaf(Constant(1.0)) ./. (Leaf(Constant(1.0)) .+. Node1(Exponential, exponent))
+        

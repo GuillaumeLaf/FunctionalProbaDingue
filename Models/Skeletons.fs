@@ -3,6 +3,8 @@
 module SkeletonTree = 
     let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Addition, N1, N2)
     let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Multiplication, N1, N2)
+    let inline ( .-. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Substraction, N1, N2)
+    let inline ( ./. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Division, N1, N2)
 
     let equalInputs input1 input2 = 
         match (input1,input2) with
@@ -11,6 +13,26 @@ module SkeletonTree =
         | Innovation(idx1),Innovation(idx2) -> idx1 = idx2 
         | Constant(value1),Constant(value2) -> value1 = value2
         | _ -> false
+
+    let simplifyAddition lsk rsk =
+        match (lsk,rsk) with
+        | Leaf(Constant(0.0)), _ -> rsk
+        | _, Leaf(Constant(0.0)) -> lsk
+        | _,_ -> Node2(Addition,lsk,rsk)
+
+    let simplifySubstraction lsk rsk = 
+        match (lsk,rsk) with
+        | Leaf(Constant(0.0)), _ -> rsk
+        | _, Leaf(Constant(0.0)) -> lsk
+        | _,_ -> Node2(Substraction,lsk,rsk)
+
+    let simplifyMultiplication lsk rsk = 
+        match (lsk,rsk) with
+        | Leaf(Constant(0.0)), _ -> Leaf(Constant(0.0))
+        | _, Leaf(Constant(0.0)) -> Leaf(Constant(0.0))
+        | Leaf(Constant(1.0)), _ -> rsk
+        | _, Leaf(Constant(1.0)) -> lsk
+        | _, _ -> Node2(Multiplication,lsk,rsk)
 
     let inline fold node1F node2F leafV sk = 
         let rec loop n k = 
@@ -66,14 +88,20 @@ module SkeletonTree =
     // The first element of the tuple is the gradient skeleton
     let gradientSkeletonForParameter idxParam skeleton = 
         fold (fun op nk _ k -> match op with
-                                | Logistic(gamma,c) as x -> nk (fun nacc -> (Node1(GradientLogistic(gamma,c), fst nacc),Node1(x, snd nacc)) |> k)
-                                | GradientLogistic(_) as x-> nk (fun nacc -> (Node1(x, fst nacc),Node1(x, snd nacc)) |> k)) // Not correct (find a way to generalize for gradient)
+                                | Exponential as x -> nk (fun nacc -> (Node1(x, fst nacc),Node1(x, snd nacc)) |> k)
+                                | Polynomial(e) as x -> nk (fun nacc -> (Leaf(Constant(e)) .*. Node1(Polynomial(e-1.0), snd nacc),Node1(x, snd nacc)) |> k)
+                                )
              (fun op kl kr _ k -> match op with
-                                    | Addition -> kl (fun lacc -> kr (fun racc -> (Node2(Addition,fst lacc,fst racc),Node2(Addition,snd lacc,snd racc)) |> k)) 
+                                    | Addition -> kl (fun lacc -> kr (fun racc -> (fst lacc .+. fst racc, snd lacc .+. snd racc) |> k)) 
                                     | Multiplication -> kl (fun lacc -> kr (fun racc -> let lg, l = lacc  
                                                                                         let rg, r = racc
-                                                                                        ((Node2(Addition,Node2(Multiplication,lg,r),Node2(Multiplication,rg,l))),Node2(Multiplication,snd lacc,snd racc)) |> k))
-                                    | Substraction -> kl (fun lacc -> kr (fun racc ->  (Node2(Substraction,fst lacc,fst racc),Node2(Substraction,snd lacc,snd racc)) |> k)))
+                                                                                        ((lg .*. r) .+. (rg .*. l), snd lacc .*. snd racc) |> k))
+                                    | Substraction -> kl (fun lacc -> kr (fun racc ->  (fst lacc .-. fst racc, snd lacc .-. snd racc) |> k))
+                                    | Division -> kl (fun lacc -> kr (fun racc -> let lg, l = lacc  
+                                                                                  let rg, r = racc
+                                                                                  // should change to polynomial function
+                                                                                  (((lg .*. r) .-. (l .*. rg)) ./. (r .*. r),snd lacc ./. snd racc) |> k))
+                                    )
              (fun input _ k -> match input with
                                 | Parameter(idx) as x -> (_gradientInputForParameter idxParam x,Leaf(Parameter(idx))) |> k
                                 | Variable(idx) as x -> (Leaf(Constant(0.0)),Leaf(Variable(idx))) |> k
@@ -81,3 +109,15 @@ module SkeletonTree =
                                 | Constant(value) as x -> (Leaf(Constant(0.0)),Leaf(Constant(value))) |> k)
              skeleton
 
+    let simplify skeleton = 
+        fold (fun op nk _ k -> nk (fun nacc -> Node1(op, nacc) |> k))
+             (fun op kl kr _ k -> match op with
+                                    | Addition -> kl (fun lacc -> kr (fun racc -> simplifyAddition lacc racc |> k)) 
+                                    | Multiplication -> kl (fun lacc -> kr (fun racc -> simplifyMultiplication lacc racc |> k))
+                                    | Substraction -> kl (fun lacc -> kr (fun racc ->  simplifySubstraction lacc racc |> k)))
+             (fun input _ k -> match input with
+                                | Parameter(idx) as x -> Leaf(Parameter(idx)) |> k
+                                | Variable(idx) as x -> Leaf(Variable(idx)) |> k
+                                | Innovation(idx) as x -> Leaf(Innovation(idx)) |> k  
+                                | Constant(value) as x -> Leaf(Constant(value)) |> k)
+             skeleton

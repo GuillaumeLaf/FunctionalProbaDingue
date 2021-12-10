@@ -25,9 +25,11 @@ let main argv =
     //let smoother = WaveletSmoothing.HighFrequencyCut(1)
     //printfn "%A" (Graph.defaultStateForSampling (STARp([|0.7|], [|-0.2|], 0.0,1.0,ARp([|0.5|]))))
 
-    let sk = Node2(Multiplication,Leaf(Parameter(0)),Graph.defaultSkeletonForFitting m)
+    //let sk = Node2(Multiplication,Leaf(Parameter(0)),Graph.defaultSkeletonForFitting m2)
+    let sk = Graph.defaultSkeletonForFitting m2
     let gradientSk = SkeletonTree.gradientSkeletonForParameter 0 sk
-    printfn "%A" gradientSk
+    printfn "%A" (gradientSk |> fst)
+    printfn "%A" (gradientSk |> fst |> SkeletonTree.simplify)
 
 (*    let sk = Graph.defaultSkeletonForFitting m2
     DrawStructure.Model sk*)

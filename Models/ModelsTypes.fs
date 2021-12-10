@@ -20,13 +20,14 @@ module ModelsTypes =
         | Fitting of Model
 
     type Op1<'T> = 
-        | Logistic of gamma:float * c:float
-        | GradientLogistic of gamma:float * c:float
+        | Exponential
+        | Polynomial of exponent:float
 
     type Op2 = 
         | Addition
         | Multiplication
         | Substraction
+        | Division      // The RHS is the denominator.
 
     type Input<'T> = 
         | Parameter of idx:int 
