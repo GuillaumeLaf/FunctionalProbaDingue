@@ -6,14 +6,6 @@ module SkeletonTree =
     let inline ( .-. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Substraction, N1, N2)
     let inline ( ./. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Division, N1, N2)
 
-    let equalInputs input1 input2 = 
-        match (input1,input2) with
-        | Parameter(idx1),Parameter(idx2) -> idx1 = idx2 
-        | Variable(idx1),Variable(idx2) -> idx1 = idx2 
-        | Innovation(idx1),Innovation(idx2) -> idx1 = idx2 
-        | Constant(value1),Constant(value2) -> value1 = value2
-        | _ -> false
-
     let simplifyAddition lsk rsk =
         match (lsk,rsk) with
         | Leaf(Constant(0.0)), _ -> rsk
@@ -33,6 +25,17 @@ module SkeletonTree =
         | Leaf(Constant(1.0)), _ -> rsk
         | _, Leaf(Constant(1.0)) -> lsk
         | _, _ -> Node2(Multiplication,lsk,rsk)
+
+    let simplifyDivision lsk rsk = 
+        match (lsk,rsk) with
+        | Leaf(Constant(0.0)), _ -> Leaf(Constant(0.0))
+        | _, Leaf(Constant(0.0)) -> invalidArg "rsk" "Cannot divide by zero in division node."
+        | _, Leaf(Constant(1.0)) -> lsk
+        | _, _ -> Node2(Division,lsk,rsk)
+
+    let simplifyPolynomial sk = function
+        | Polynomial(1.0) -> sk
+        | x -> Node1(x,sk)
 
     let inline fold node1F node2F leafV sk = 
         let rec loop n k = 
@@ -88,8 +91,8 @@ module SkeletonTree =
     // The first element of the tuple is the gradient skeleton
     let gradientSkeletonForParameter idxParam skeleton = 
         fold (fun op nk _ k -> match op with
-                                | Exponential as x -> nk (fun nacc -> (Node1(x, fst nacc),Node1(x, snd nacc)) |> k)
-                                | Polynomial(e) as x -> nk (fun nacc -> (Leaf(Constant(e)) .*. Node1(Polynomial(e-1.0), snd nacc),Node1(x, snd nacc)) |> k)
+                                | Exponential as x -> nk (fun nacc -> (fst nacc .*. Node1(x, snd nacc),Node1(x, snd nacc)) |> k)
+                                | Polynomial(e) as x -> nk (fun nacc -> (fst nacc .*. Leaf(Constant(e)) .*. Node1(Polynomial(e-1.0), snd nacc),Node1(x, snd nacc)) |> k)
                                 )
              (fun op kl kr _ k -> match op with
                                     | Addition -> kl (fun lacc -> kr (fun racc -> (fst lacc .+. fst racc, snd lacc .+. snd racc) |> k)) 
@@ -99,8 +102,7 @@ module SkeletonTree =
                                     | Substraction -> kl (fun lacc -> kr (fun racc ->  (fst lacc .-. fst racc, snd lacc .-. snd racc) |> k))
                                     | Division -> kl (fun lacc -> kr (fun racc -> let lg, l = lacc  
                                                                                   let rg, r = racc
-                                                                                  // should change to polynomial function
-                                                                                  (((lg .*. r) .-. (l .*. rg)) ./. (r .*. r),snd lacc ./. snd racc) |> k))
+                                                                                  (((lg .*. r) .-. (l .*. rg)) ./. (Node1(Polynomial(2.0),r)),snd lacc ./. snd racc) |> k))
                                     )
              (fun input _ k -> match input with
                                 | Parameter(idx) as x -> (_gradientInputForParameter idxParam x,Leaf(Parameter(idx))) |> k
@@ -109,12 +111,22 @@ module SkeletonTree =
                                 | Constant(value) as x -> (Leaf(Constant(0.0)),Leaf(Constant(value))) |> k)
              skeleton
 
+    let gradientSkeleton skeleton = 
+        let nParameters = Array.get (countLeaves skeleton) 0
+        Array.zeroCreate nParameters |> Array.mapi (fun idx _ -> gradientSkeletonForParameter idx skeleton |> fst)
+
+
     let simplify skeleton = 
-        fold (fun op nk _ k -> nk (fun nacc -> Node1(op, nacc) |> k))
+        fold (fun op nk _ k -> match op with
+                                | Polynomial(n) as x -> nk (fun nacc -> simplifyPolynomial nacc x |> k)
+                                | _ -> nk (fun nacc -> Node1(op, nacc) |> k)
+                                )
              (fun op kl kr _ k -> match op with
                                     | Addition -> kl (fun lacc -> kr (fun racc -> simplifyAddition lacc racc |> k)) 
                                     | Multiplication -> kl (fun lacc -> kr (fun racc -> simplifyMultiplication lacc racc |> k))
-                                    | Substraction -> kl (fun lacc -> kr (fun racc ->  simplifySubstraction lacc racc |> k)))
+                                    | Substraction -> kl (fun lacc -> kr (fun racc ->  simplifySubstraction lacc racc |> k))
+                                    | Division -> kl (fun lacc -> kr (fun racc ->  simplifyDivision lacc racc |> k))
+                                    )
              (fun input _ k -> match input with
                                 | Parameter(idx) as x -> Leaf(Parameter(idx)) |> k
                                 | Variable(idx) as x -> Leaf(Variable(idx)) |> k

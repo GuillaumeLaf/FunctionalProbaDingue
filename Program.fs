@@ -16,6 +16,12 @@ open MathNet.Numerics.IntegralTransforms
 
 [<EntryPoint>]
 let main argv =
+
+    let inline ( .+. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Addition, N1, N2)
+    let inline ( .*. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Multiplication, N1, N2)
+    let inline ( .-. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Substraction, N1, N2)
+    let inline ( ./. ) (N1:Skeleton<'T>) (N2:Skeleton<'T>) = Node2(Division, N1, N2)
+
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
     let m = AR(3)
@@ -26,15 +32,16 @@ let main argv =
     //printfn "%A" (Graph.defaultStateForSampling (STARp([|0.7|], [|-0.2|], 0.0,1.0,ARp([|0.5|]))))
 
     //let sk = Node2(Multiplication,Leaf(Parameter(0)),Graph.defaultSkeletonForFitting m2)
-    let sk = Graph.defaultSkeletonForFitting m2
-    let gradientSk = SkeletonTree.gradientSkeletonForParameter 0 sk
-    printfn "%A" (gradientSk |> fst)
-    printfn "%A" (gradientSk |> fst |> SkeletonTree.simplify)
+(*    let sk = Graph.defaultSkeletonForFitting m2
+    let gradientSk = SkeletonTree.gradientSkeletonForParameter 0 sk |> fst
+    printfn "%A" (gradientSk)
+    printfn "%A" (gradientSk |> SkeletonTree.simplify)
+    DrawStructure.Model (sk |> SkeletonTree.simplify)*)
 
 (*    let sk = Graph.defaultSkeletonForFitting m2
     DrawStructure.Model sk*)
 
-    //let s = Models.GraphTS.sample 1000 param
+    //let s = Models.GraphTS.sample 1000 param2
 (*    let mean = s |> Array.fold (fun st x -> st + x / float s.Length) 0.0
     let std = s |> Array.fold (fun st x -> st + (x-mean)*(x-mean) / (float s.Length-1.0)) 0.0 |> sqrt
     let s = s |> Array.map (fun x -> x / std)*)

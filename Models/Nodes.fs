@@ -24,7 +24,7 @@ module Nodes =
         let shiftedMixingNode = SkeletonTree.shift (nLeaves12.[0]) 0 0 mixingNode
         (shiftedMixingNode .*. node1) .+. ((Leaf(Constant(1.0)) .-. shiftedMixingNode) .*. shiftedNode2)
 
-    let logisticNode gamma c x = 
-        let exponent = Leaf(Constant(-gamma)) .*. (x .-. Leaf(Constant(c)))
+    let logisticNode gamma c innerSk = 
+        let exponent = Leaf(Constant(-gamma)) .*. (innerSk .-. Leaf(Constant(c)))
         Leaf(Constant(1.0)) ./. (Leaf(Constant(1.0)) .+. Node1(Exponential, exponent))
         

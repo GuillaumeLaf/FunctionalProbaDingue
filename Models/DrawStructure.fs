@@ -68,6 +68,7 @@ module DrawStructure =
                                       | Addition -> drawNodeAt point ("+"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
                                       | Multiplication -> drawNodeAt point ("*"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
                                       | Substraction -> drawNodeAt point ("-"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
+                                      | Division -> drawNodeAt point ("/"); loop left leftPoint (depth+1) (fun lacc -> loop right rightPoint (depth+1) (fun racc -> () |> k))
             | Leaf(input) -> match input with
                              | Innovation(idx) -> (drawLeafAt innovationPen point (string(idx))) |> k   // input arrays must at least be the same length as the number of innovation nodes.
                              | Parameter(idx) -> (drawLeafAt parameterPen point (string(idx))) |> k

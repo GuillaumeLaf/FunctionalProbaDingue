@@ -67,13 +67,15 @@ module Graph =
     let setVariablesM array = Array.mapi (fun i x -> setVariableM i x) array |> Monad.mapFoldM >>= (fun _ -> Monad.rets ())
     let setInnovationsM array = Array.mapi (fun i x -> setInnovationM i x) array |> Monad.mapFoldM >>= (fun _ -> Monad.rets ())
 
-    // Function nodes could be made into skeleton trees (easier to take higher derivatives)
-(*    let functionNode = function
-        | Logistic(gamma,c) -> (fun x -> -gamma*(x-c) |> exp |> (+) 1.0 |> (/) 1.0)
-        | GradientLogistic(gamma,c) -> (fun x -> gamma*(x-c) |> exp |> (+) 1.0 |> (/) (gamma*(x-c) |> exp))*)
-
     let inline skeletonM parameterM variableM innovationM skeleton = 
-        SkeletonTree.fold (fun op nk _ k -> nk (fun nacc -> Monad.map (functionNode op) nacc |> k))
+        SkeletonTree.fold (fun op nk _ k -> match op with
+                                            | Exponential -> nk (fun nacc -> Monad.map exp nacc |> k)
+                                            | Polynomial(1.0) -> nk (fun nacc -> nacc |> k)
+                                            | Polynomial(2.0) -> nk (fun nacc -> Monad.map (fun x -> x*x) nacc |> k)
+                                            | Polynomial(3.0) -> nk (fun nacc -> Monad.map (fun x -> x*x*x) nacc |> k)
+                                            | Polynomial(4.0) -> nk (fun nacc -> Monad.map (fun x -> x*x*x*x) nacc |> k)
+                                            | Polynomial(n) -> nk (fun nacc -> Monad.map (fun x -> x**n) nacc |> k)
+                                            )
                           (fun op kl kr _ k -> match op with
                                                 | Addition -> kl (fun lacc -> kr (fun racc -> (Monad.add lacc racc) |> k)) 
                                                 | Multiplication -> kl (fun lacc -> kr (fun racc ->  (Monad.mult lacc racc) |> k))
@@ -87,7 +89,7 @@ module Graph =
                                                 | Constant(value) -> Monad.rets value |> k)
                           skeleton 
 
-    let skeletonGradientForParameterM wantedIdx skeleton = 
+(*    let skeletonGradientForParameterM wantedIdx skeleton = 
         let shift = 1e-10
         let getParameterShiftedM wantedIdx = function 
             | x when x=wantedIdx -> Monad.add (getParameterM wantedIdx) (Monad.rets shift) 
@@ -96,7 +98,7 @@ module Graph =
             let! x = skeletonM getParameterM getVariableM getInnovationM skeleton
             let! x_dt = skeletonM (getParameterShiftedM wantedIdx) getVariableM getInnovationM skeleton
             return (x_dt - x)/shift
-        }
+        }*)
 
 (*    // Create new skeleton for each parameter gradient and then convert it to a monad.
     let rec inline skeletonParameterGradientM modelP =
@@ -104,17 +106,23 @@ module Graph =
         match modelP with
         | ARp(coeffs) | MAp(coeffs) -> [| for i in 0..coeffs.Length-1 do Leaf(Variable(i)) |] 
         | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let innerGradientM = skeletonParameterGradientM innerModelp*)
-
+    
     let skeletonGradientM skeleton = 
+        let transfoToMonad sk = skeletonM getParameterM getVariableM getInnovationM sk
+        skeleton |> SkeletonTree.gradientSkeleton 
+                 |> Array.map (fun skg -> transfoToMonad skg)
+                 |> Monad.mapFoldM
+
+(*    let skeletonGradientM2 skeleton = 
         Array.mapi <!> (Monad.rets (fun i _ -> skeletonGradientForParameterM i skeleton)) 
                    <*> parametersM
-                   >>= (fun arrayM -> Monad.mapFoldM arrayM)
+                   >>= (fun arrayM -> Monad.mapFoldM arrayM)*)
                    
     let rec defaultSkeletonForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))
         | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let ARs = defaultSkeletonForSampling (ARp(coeffs1))
                                                           let innerSk = defaultSkeletonForSampling innerModelp |> SkeletonTree.deactivateInnovations
-                                                          let mixingNode = Node1(Logistic(scale,loc),innerSk)
+                                                          let mixingNode = Nodes.logisticNode scale loc innerSk
                                                           (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode
         | ErrorModelp(innerModelp) -> (defaultSkeletonForSampling innerModelp |> SkeletonTree.shift 0 1 0) .-. (Leaf(Variable(0)))
 

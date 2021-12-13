@@ -79,10 +79,10 @@ module SGD =
         | _ -> invalidArg "Optimizer" "Unknown optimizer or not right parameters."
 
     // Updating of the parameters must be made after running the model.
-    let updateParametersM optimizer skeleton indices = 
+    let updateParametersM optimizer skGradient indices = 
         Monad.state {
             let! parameterValues = GraphTS.runGraphM Graph.parametersM
-            let! gradient = aggregateCurrentErrorGradientM (parameterValues.Length) skeleton indices
+            let! gradient = aggregateCurrentErrorGradientM (parameterValues.Length) skGradient indices
             let newOptimizerHist,newParameters = updatedOptimizerAndParameters parameterValues gradient optimizer
             let newParameters = newParameters |> Array.map (fun x -> limitParams x)
             do! GraphTS.runGraphM (Graph.setParametersM newParameters)
@@ -97,6 +97,7 @@ module SGD =
         let errorSkM = model |> Fitting |> Graph.modelM
         let updateVarM = GraphTS.updateForFittingM model
         let defaultOptParams = defaultOptimizerParameters model optimizer
+        let skeletonGradientM = Graph.skeletonGradientM defaultSk
         
 
         let fittingM optHist indices = 
