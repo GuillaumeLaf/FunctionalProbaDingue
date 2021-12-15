@@ -57,6 +57,7 @@ module SkeletonTree =
 
     // count the number of leaves by type: 
     // index 0 = Parameters; index 1 = Variables; index 2 = Innovations
+    // Careful ! Doesn't count the unique nodes ! (only the row number of nodes present in skeleton)
     let countLeaves skeleton = 
         let count = Array.zeroCreate 3
         fold (fun op nk _ k -> nk (fun nacc -> () |> k))
@@ -69,6 +70,8 @@ module SkeletonTree =
                                  )
              skeleton |> ignore
         count
+
+    let countUniqueLeaves skeleton = 
 
     let height skeleton = 
         fold (fun op nk _ k -> nk (fun nacc -> (nacc + 1) |> k))
@@ -112,7 +115,8 @@ module SkeletonTree =
              skeleton
 
     let gradientSkeleton skeleton = 
-        let nParameters = Array.get (countLeaves skeleton) 0
+        // problem with counting number of nodes ! (nodes could have same index and thus be 'unique')
+        let nParameters = Array.get (countLeaves skeleton) 0 
         Array.zeroCreate nParameters |> Array.mapi (fun idx _ -> gradientSkeletonForParameter idx skeleton |> fst)
 
 

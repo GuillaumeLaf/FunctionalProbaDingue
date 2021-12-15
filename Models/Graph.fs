@@ -88,35 +88,12 @@ module Graph =
                                                 | Innovation(idx) -> innovationM idx |> k  
                                                 | Constant(value) -> Monad.rets value |> k)
                           skeleton 
-
-(*    let skeletonGradientForParameterM wantedIdx skeleton = 
-        let shift = 1e-10
-        let getParameterShiftedM wantedIdx = function 
-            | x when x=wantedIdx -> Monad.add (getParameterM wantedIdx) (Monad.rets shift) 
-            | x -> getParameterM x
-        Monad.state {
-            let! x = skeletonM getParameterM getVariableM getInnovationM skeleton
-            let! x_dt = skeletonM (getParameterShiftedM wantedIdx) getVariableM getInnovationM skeleton
-            return (x_dt - x)/shift
-        }*)
-
-(*    // Create new skeleton for each parameter gradient and then convert it to a monad.
-    let rec inline skeletonParameterGradientM modelP =
-        let convertToMonad = skeletonM getParameterM getVariableM getInnovationM
-        match modelP with
-        | ARp(coeffs) | MAp(coeffs) -> [| for i in 0..coeffs.Length-1 do Leaf(Variable(i)) |] 
-        | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let innerGradientM = skeletonParameterGradientM innerModelp*)
-    
+ 
     let skeletonGradientM skeleton = 
         let transfoToMonad sk = skeletonM getParameterM getVariableM getInnovationM sk
         skeleton |> SkeletonTree.gradientSkeleton 
                  |> Array.map (fun skg -> transfoToMonad skg)
                  |> Monad.mapFoldM
-
-(*    let skeletonGradientM2 skeleton = 
-        Array.mapi <!> (Monad.rets (fun i _ -> skeletonGradientForParameterM i skeleton)) 
-                   <*> parametersM
-                   >>= (fun arrayM -> Monad.mapFoldM arrayM)*)
                    
     let rec defaultSkeletonForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))
