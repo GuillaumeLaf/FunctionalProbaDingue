@@ -97,10 +97,16 @@ module Graph =
                    
     let rec defaultSkeletonForSampling = function
         | ARp(coeffs) | MAp(coeffs) -> Nodes.linearCombinaisons coeffs.Length .+. (Leaf(Innovation(0)))
-        | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let ARs = defaultSkeletonForSampling (ARp(coeffs1))
+(*        | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let ARs = defaultSkeletonForSampling (ARp(coeffs1))
                                                           let innerSk = defaultSkeletonForSampling innerModelp |> SkeletonTree.deactivateInnovations
                                                           let mixingNode = Nodes.logisticNode scale loc innerSk
-                                                          (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode
+                                                          (ARs,ARs) ||> Nodes.mixture id (fun _ -> 0) (fun _ -> 0) mixingNode*)
+        | STARp(coeffs1,coeffs2,loc,scale,innerModelp) -> let AR1 = defaultSkeletonForSampling (ARp(coeffs1))
+                                                          let sAR2 = defaultSkeletonForSampling (ARp(coeffs1)) |> SkeletonTree.shift (coeffs1.Length) 0 0
+                                                          let innerSk = defaultSkeletonForSampling innerModelp |> SkeletonTree.deactivateInnovations
+                                                          let smixingNode = Nodes.logisticNode scale loc innerSk |> SkeletonTree.shift (2*coeffs1.Length) 0 0
+                                                          (smixingNode .*. AR1) .+. ((Leaf(Constant(1.0)) .-. smixingNode) .*. sAR2)
+                                                          
         | ErrorModelp(innerModelp) -> (defaultSkeletonForSampling innerModelp |> SkeletonTree.shift 0 1 0) .-. (Leaf(Variable(0)))
 
     let defaultSkeletonForFitting = convertModelToParameters >> defaultSkeletonForSampling

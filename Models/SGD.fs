@@ -54,8 +54,10 @@ module SGD =
         Monad.state{
             let! (currentGradients:float[][]) = Array.map (fun idx -> currentGradientEstimateM skGradient updateVarM idx) indices |> Monad.mapM
             let initialGradient = (Array.zeroCreate currentGradients.[0].Length)
+            // Takes the avg since we are min. the avg error squared
             return Array.foldBack (fun x s -> UtilitiesSIMD.ArraySIMD.multScalar (1.0/float indices.Length) x
-                                                |> UtilitiesSIMD.ArraySIMD.add s) currentGradients initialGradient
+                                                |> UtilitiesSIMD.ArraySIMD.add s) currentGradients initialGradient 
+(*            return Array.foldBack (fun x s -> UtilitiesSIMD.ArraySIMD.add s x) currentGradients initialGradient*)
         }
 
     let updatedOptimizerAndParameters parameterValues gradient = function
@@ -65,7 +67,7 @@ module SGD =
         | RMSProp(momRate,learnRate),RMSPropP(pastMomentum) -> let newMomentum = Array.map2 (fun mm g -> momRate*mm + (1.0-momRate)*g*g) pastMomentum gradient
                                                                RMSPropP(newMomentum), Array.map3 (fun p mm g -> p - g*(learnRate/(sqrt(mm+1e-8))))
                                                                                                     parameterValues newMomentum gradient
-        | Adam(momRateG,momRateG2,learnRate),AdamP(pastMomG,pastMomG2,time) -> printfn "%A" (pastMomG); printfn "%A" (gradient)
+        | Adam(momRateG,momRateG2,learnRate),AdamP(pastMomG,pastMomG2,time) -> // printfn "%A" (pastMomG); printfn "%A" (gradient)
                                                                                let newMomG = Array.map2 (fun mmG g -> momRateG*mmG + (1.0-momRateG)*g) pastMomG gradient
                                                                                let newMomG2 = Array.map2 (fun mmG2 g -> momRateG2*mmG2 + (1.0-momRateG2)*g*g) pastMomG2 gradient
                                                                                let t = float time
@@ -98,7 +100,6 @@ module SGD =
         let updateVarM = GraphTS.updateForFittingM model
         let defaultOptParams = defaultOptimizerParameters model optimizer
         let skeletonGradientM = Graph.skeletonGradientM defaultSk
-        
 
         let fittingM optHist indices = 
             Monad.state {
@@ -107,9 +108,9 @@ module SGD =
             }
                          
         // function that will fold on the indices. 
-        let folder optInitHistory states = Array.fold (fun s idx -> let newOptHist,newStates = s
-                                                                    let nxtOpt,nxtStates = newStates |> Monad.run (fittingM newOptHist idx) 
-                                                                    (nxtOpt,nxtStates)) (optInitHistory,states)                              
+        let folder optInitHistory states = Array.fold (fun s indices -> let newOptHist,newStates = s
+                                                                        let nxtOpt,nxtStates = newStates |> Monad.run (fittingM newOptHist indices) 
+                                                                        (nxtOpt,nxtStates)) (optInitHistory,states)                              
         let err = Array.zeroCreate epochs
         let printCurrent states epochs = 
             let (Graph.State(p,_,_),TimeSeries.Univariate.State(_,_,errors,_)) = states
@@ -118,10 +119,12 @@ module SGD =
             err.[epochs-1] <- errorSquared
             errorSquared, p
 
+        // During each epoch, we go through all the samples.
         let rec loop idxArray epochs optHist states = 
             match epochs with
-            | 1 -> printfn "%A" (printCurrent states epochs); folder optHist states (idxArray |> Array.chunkBySize 32)
-            | _ -> let newOptHist, newStates = folder optHist states (idxArray |> Array.chunkBySize 32)
+            // Issue with batching of gradient (get biased results).
+            | 1 -> printfn "%A" (printCurrent states epochs); folder optHist states (idxArray |> Array.chunkBySize 1)
+            | _ -> let newOptHist, newStates = folder optHist states (idxArray |> Array.chunkBySize 1)
                    printfn "%A" (printCurrent states epochs); 
                    loop (Utilities.shuffle idxArray) (epochs-1) newOptHist newStates
         loop (Array.init array.Length id) epochs defaultOptParams (initStateG,initStateTS) |> snd |> fst, Array.rev err

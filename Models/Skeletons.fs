@@ -71,7 +71,20 @@ module SkeletonTree =
              skeleton |> ignore
         count
 
+    // count the number of leaves by type: 
+    // index 0 = Parameters; index 1 = Variables; index 2 = Innovations
     let countUniqueLeaves skeleton = 
+        let count = [|[];[];[]|]
+        fold (fun op nk _ k -> nk (fun nacc -> () |> k))
+             (fun op kl kr _ k -> kl (fun lacc -> kr (fun racc -> () |> k)))
+             (fun input _ k -> match input with
+                                 | Parameter(idx) -> (count.[0] <- idx :: count.[0]) |> k
+                                 | Variable(idx) -> (count.[1] <- idx :: count.[1]) |> k
+                                 | Innovation(idx) -> (count.[2] <- idx :: count.[2]) |> k
+                                 | Constant(_) -> () |> k
+                                 )
+             skeleton |> ignore
+        count |> Array.map (fun x -> x |> List.distinct |> List.length)
 
     let height skeleton = 
         fold (fun op nk _ k -> nk (fun nacc -> (nacc + 1) |> k))
@@ -114,12 +127,6 @@ module SkeletonTree =
                                 | Constant(value) as x -> (Leaf(Constant(0.0)),Leaf(Constant(value))) |> k)
              skeleton
 
-    let gradientSkeleton skeleton = 
-        // problem with counting number of nodes ! (nodes could have same index and thus be 'unique')
-        let nParameters = Array.get (countLeaves skeleton) 0 
-        Array.zeroCreate nParameters |> Array.mapi (fun idx _ -> gradientSkeletonForParameter idx skeleton |> fst)
-
-
     let simplify skeleton = 
         fold (fun op nk _ k -> match op with
                                 | Polynomial(n) as x -> nk (fun nacc -> simplifyPolynomial nacc x |> k)
@@ -137,3 +144,11 @@ module SkeletonTree =
                                 | Innovation(idx) as x -> Leaf(Innovation(idx)) |> k  
                                 | Constant(value) as x -> Leaf(Constant(value)) |> k)
              skeleton
+
+    let gradientSkeleton skeleton = 
+        // problem with counting number of nodes ! (nodes could have same index and thus be 'unique')
+        let nParameters = Array.get (countUniqueLeaves skeleton) 0 
+        Array.zeroCreate nParameters |> Array.mapi (fun idx _ -> gradientSkeletonForParameter idx skeleton |> fst |> simplify)
+
+
+

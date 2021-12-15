@@ -15,12 +15,12 @@ module Nodes =
     // in the 1st tree and output the shift of the numbering for the 2nd node.
     // The current implementation does not allow multivariate mixingNode. 
     let mixture parameterShiftF variableShiftF innovationShiftF mixingNode node1 node2 = 
-        let nLeaves1 = SkeletonTree.countLeaves node1
+        let nLeaves1 = SkeletonTree.countUniqueLeaves node1
         let shiftedNode2 = SkeletonTree.shift (parameterShiftF nLeaves1.[0])
                                               (variableShiftF nLeaves1.[1])
                                               (innovationShiftF nLeaves1.[2])
                                               node2
-        let nLeaves12 = SkeletonTree.countLeaves (node1 .+. node2)
+        let nLeaves12 = SkeletonTree.countUniqueLeaves (node1 .+. shiftedNode2)
         let shiftedMixingNode = SkeletonTree.shift (nLeaves12.[0]) 0 0 mixingNode
         (shiftedMixingNode .*. node1) .+. ((Leaf(Constant(1.0)) .-. shiftedMixingNode) .*. shiftedNode2)
 

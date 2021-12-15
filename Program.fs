@@ -24,10 +24,13 @@ let main argv =
 
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
-    let m = AR(1)
+    let m = AR(3)
     let m2 = STAR(1,0.0,1.0,AR(1))
-    let param = ARp([|0.7|]) |> Sampling
-    let param2 = STARp([|0.5|], [|-0.2|], 0.0,1.0,ARp([|0.5|])) |> Sampling
+    let param = ARp([|-0.6;-0.3;0.1|]) |> Sampling
+    let param2 = STARp([|-0.6|],[|0.3|], 0.0,1.0,ARp([|1.0|])) |> Sampling
+
+    //printfn "%A" (Graph.defaultSkeletonForFitting m2)
+
     //let smoother = WaveletSmoothing.HighFrequencyCut(1)
     //printfn "%A" (Graph.defaultStateForSampling (STARp([|0.7|], [|-0.2|], 0.0,1.0,ARp([|0.5|]))))
 
@@ -42,10 +45,11 @@ let main argv =
     DrawStructure.Model sk*)
 
     let s = Models.GraphTS.sample 1000 param2
-(*    let mean = s |> Array.fold (fun st x -> st + x / float s.Length) 0.0
+    let ch1 = Chart.Line s
+    let mean = s |> Array.fold (fun st x -> st + x / float s.Length) 0.0
     let std = s |> Array.fold (fun st x -> st + (x-mean)*(x-mean) / (float s.Length-1.0)) 0.0 |> sqrt
-    let s = s |> Array.map (fun x -> x / std)*)
-    //Chart.Line s |> Chart.Show
+    let s = s |> Array.map (fun x -> x / std)
+    Chart.Combine([ch1;Chart.Line s]) |> Chart.Show
 
 (*    let c1 = Chart.Line sd
     let s = s |> Array.scan (fun s x -> s + x) 0.0
@@ -55,8 +59,8 @@ let main argv =
     Chart.Combine([c1; Chart.Line s]) |> Chart.Show*)
     
     let s = s |> Array.map (fun x -> Some x)
-    let opti = Models.SGD.Adam(0.9,0.999,0.0001)
-    let fittedModel, errors = Models.SGD.fit m2 opti 2000 s
+    let opti = Models.SGD.RMSProp(0.9,0.0001)
+    let fittedModel, errors = Models.SGD.fit m2 opti 500 s
     printfn "%A" fittedModel
     Chart.Line errors |> Chart.Show
 
