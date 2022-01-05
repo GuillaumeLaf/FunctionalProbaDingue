@@ -18,20 +18,22 @@ module Graph =
     let parameterM idx = Array.get <!> parametersM() <*> result idx
     let variableM idx = Array.get <!> variablesM() <*> result idx
     let innovationM idx = Array.get <!> innovationsM() <*> result idx
-    
+
     type Input<'T> = 
         | Parameter of idx:int
         //| Variable of idx:int
+        | Constant of value:'T
 
     type Graph<'T> = 
         | Input of Input<'T>
         | Addition of Graph<'T> * Graph<'T>
         | Multiplication of Graph<'T> * Graph<'T>
+        static member inline get_Zero() = Input(Constant(LanguagePrimitives.GenericZero)) // ONLY INT !
         static member inline (+) (l:Graph<'T>, r:Graph<'T>) = Addition(l,r)
         static member inline (*) (l:Graph<'T>, r:Graph<'T>) = Multiplication(l,r)
         
         // Run the graph with the indices of the Inputs as data
-        static member inline run (x:Graph<'T>) = 
+        static member inline run (x:Graph<int>) = 
             let opCont op lg rg f : Cont<'a,'b> = monad { let! xl = f lg
                                                           let! xr = f rg
                                                           return op xl xr }
@@ -41,21 +43,21 @@ module Graph =
                 | Multiplication(lg,rg) -> return! opCont (*) lg rg loop
                 | Input(i) -> match i with
                               | Parameter(idx) -> return idx
+                              | Constant(value) -> return value
             }
             Cont.run (loop x) id
 
         // Create a State monad from the Graph
-        static member inline ToMonad (x:Graph<'T>) = 
-            let opCont op lg rg f : Cont<'a,State<'b,'c>> = monad { let! xl = f lg
-                                                                    let! xr = f rg
-                                                                    return op <!> xl <*> xr }
-            let rec loop g = monad {
-                match g with 
-                | Addition(l,r) -> return! opCont (+) l r loop
-                | Multiplication(l,r) -> return! opCont (*) l r loop
+        static member inline ToMonad (x:Graph<'a>) = 
+            let rec loop g : ContT<State<S<'a>,'b>,'a> = monad {
+                match g with
+                | Addition(l,r) -> return! (+) <!> (loop l) <*> (loop r)
+                | Multiplication(l,r) -> return! (*) <!> (loop l) <*> (loop r)
                 | Input(i) -> match i with
-                              | Parameter(idx) -> return parameterM idx
+                              | Parameter(idx) -> return! lift (parameterM idx)
+                              | Constant(value) -> return! lift (result value)
             }
-            Cont.run (loop x) id
+            ContT.eval (loop x)
+
 
         
