@@ -14,50 +14,62 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="CSVManagement.fs" />
-    <Compile Include="Monad.fs" />
-    <Compile Include="UtilitiesSIMD.fs" />
-    <Compile Include="PSO_algorithm.fs" />
-    <Compile Include="Utilities.fs" />
-    <Compile Include="Distributions.fs" />
-	<Compile Include="Binance\Binance.fs" />
-	<Compile Include="DataBase\DataPreps.fs" />
-	<Compile Include="DataBase\DBTest.fs" />
-	<Compile Include="DataBase\DB.fs" />
-    <Compile Include="TimeSeries\TimeSeries.fs" />
-    <Compile Include="TimeSeries\Statistics.fs" />
-    <Compile Include="TimeSeries\Transformations\WaveletSmoothing.fs" />
-    <Compile Include="TimeSeries\Transformations\Transformations.fs" />
-    <Compile Include="Models\ModelsTypes.fs" />
-    <Compile Include="Models\Skeletons.fs" />
-    <Compile Include="Models\Nodes.fs" />
-    <Compile Include="Models\Graph.fs" />
-    <Compile Include="Models\GraphTimeSeries.fs" />
-    <!--<Compile Include="Models\Optimization.fs" />-->
-    <Compile Include="Models\SGD.fs" />
-	<Compile Include="Models\DrawStructure.fs" />
-    <Compile Include="Backtester\BacktesterTypes.fs" />
-    <Compile Include="Backtester\DataHandling.fs" />
-    <Compile Include="Backtester\Strategies.fs" />
-    <Compile Include="Backtester\Backtester.fs" />
-    <Compile Include="Program.fs" />
+	<!--<Compile Include="OldImplementation\CSVManagement.fs" />
+    <Compile Include="OldImplementation\Monad.fs" />
+    <Compile Include="OldImplementation\UtilitiesSIMD.fs" />
+    <Compile Include="OldImplementation\PSO_algorithm.fs" />
+    <Compile Include="OldImplementation\Utilities.fs" />
+    <Compile Include="OldImplementation\Distributions.fs" />
+	<Compile Include="OldImplementation\Binance\Binance.fs" />
+	<Compile Include="OldImplementation\DataBase\DataPreps.fs" />
+	<Compile Include="OldImplementation\DataBase\DBTest.fs" />
+	<Compile Include="OldImplementation\DataBase\DB.fs" />
+    <Compile Include="OldImplementation\TimeSeries\TimeSeries.fs" />
+    <Compile Include="OldImplementation\TimeSeries\Statistics.fs" />
+    <Compile Include="OldImplementation\TimeSeries\Transformations\WaveletSmoothing.fs" />
+    <Compile Include="OldImplementation\TimeSeries\Transformations\Transformations.fs" />
+    <Compile Include="OldImplementation\Models\ModelsTypes.fs" />
+    <Compile Include="OldImplementation\Models\Skeletons.fs" />
+    <Compile Include="OldImplementation\Models\Nodes.fs" />
+    <Compile Include="OldImplementation\Models\Graph.fs" />
+    <Compile Include="OldImplementation\Models\GraphTimeSeries.fs" />
+    <Compile Include="Models\Optimization.fs" />
+    <Compile Include="OldImplementation\Models\SGD.fs" />
+	<Compile Include="OldImplementation\Models\DrawStructure.fs" />
+    <Compile Include="OldImplementation\Backtester\BacktesterTypes.fs" />
+    <Compile Include="OldImplementation\Backtester\DataHandling.fs" />
+    <Compile Include="OldImplementation\Backtester\Strategies.fs" />
+    <Compile Include="OldImplementation\Backtester\Backtester.fs" />
+    <Compile Include="OldImplementation\Program.fs" />-->
+	<Compile Include="ComputationalGraph\Graph.fs" />
+	<Compile Include="UnitTests\ComputationalGraphTest\GraphTest.fs" />
+    <Compile Include="Main.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Binance.Net" Version="7.2.5" />
     <PackageReference Include="CryptoExchange.Net" Version="4.2.8" />
     <PackageReference Include="FSharp.Charting" Version="2.1.0" />
-    <PackageReference Include="FSharp.Data" Version="4.2.2" />
-    <PackageReference Include="FSharpPlus" Version="1.2.1" />
+    <PackageReference Include="FSharp.Data" Version="4.2.7" />
+    <PackageReference Include="FSharpPlus" Version="1.2.2" />
     <PackageReference Include="MathNet.Numerics" Version="4.15.0" />
     <PackageReference Include="MathNet.Numerics.FSharp" Version="4.15.0" />
     <PackageReference Include="SQLProvider" Version="1.2.10" />
     <PackageReference Include="System.Data.OleDb" Version="5.0.0" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
     <PackageReference Include="System.Runtime.Numerics" Version="4.3.0" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="6.0.1" />
   </ItemGroup>
 </Project>
