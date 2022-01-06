@@ -42,6 +42,8 @@
     <Compile Include="OldImplementation\Backtester\Backtester.fs" />
     <Compile Include="OldImplementation\Program.fs" />-->
 	<Compile Include="ComputationalGraph\Graph.fs" />
+	<Compile Include="ComputationalGraph\Node.fs" />
+	<Compile Include="ComputationalGraph\Model.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\GraphTest.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>

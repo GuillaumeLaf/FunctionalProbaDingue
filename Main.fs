@@ -1,6 +1,6 @@
 ﻿
 open System
-open CG
+open ComputationalGraph
 open FSharpPlus.Data
 open FSharpPlus
 
@@ -8,7 +8,7 @@ open FSharpPlus
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     
-    
+    printfn "%A" (foldMap (compare 2) [1;2;3])
 
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)
