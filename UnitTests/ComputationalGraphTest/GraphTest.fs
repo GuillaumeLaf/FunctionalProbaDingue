@@ -33,7 +33,7 @@
     [<Fact>]
     let ``Count the number of Input nodes in a graph by group`` () = 
         let g = DataPoint(Parameter(0,0)) + DataPoint(Variable(1,0)) + DataPoint(Parameter(0,1)) * DataPoint(Variable(0,1))
-        let expected = [|[|Parameter(0,2); Variable(0,2)|]; [|Parameter(1,0);Variable(1,1)|]|]
+        let expected = [|Parameter(0,2); Variable(0,1); Variable(1,1)|]
         let actual = Graph<int>.groupSizes g
-        Assert.Equal<Input[][]>(expected,actual)
+        Assert.Equal<Input[]>(expected,actual)
 
