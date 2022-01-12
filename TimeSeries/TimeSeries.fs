@@ -18,20 +18,36 @@ module TimeSeries =
 
         module Multivariate =
             // Everything that touches timeseries is implemented as multivariate operations.
-            // The Monad State contains the current index (int) and the timeseries ('T[,]:array2D option).
-            // The first index corresponds to a particular time point. 
-            // The second index correponds to a given timeseries.
+            // The Monad State contains the current index (int) and the timeseries ('T[ts,time]:array2D option).
+            // The first index of the 'State' corresponds to a particular time point. 
+            // The second index of the 'State' correponds to a given timeseries.
             // By using 'array2D' to store the timeseries, 
             // it will be slightly more challenging to parallelize the code (cannot use Array.parallel).
-            // Note the type 'Option' for the timeseries. 
-            // In the multivariate case some obs may not be available for all timeseries.
 
-            let currentIdx () = fst <!> State.get       : State<(int * 'T option [,]),int> 
-            let timeSeries () = snd <!> State.get       : State<(int * 'T option [,]),'T option [,]>
+            let currentIndex () = fst <!> State.get       : State<(int * 'T [,]),int> 
+            let timeSeries () = snd <!> State.get       : State<(int * 'T [,]),'T [,]>
+            let timeSeriesCount () = Array2D.length1 <!> timeSeries ()
+            let periodCount () =  Array2D.length2 <!> timeSeries ()
 
-            let currentElements () = Array2D.cols <!> currentIdx() <*> timeSeries()
-            let lagElements lag = 
-                (fun idx arrays -> )
+            let currentElements () = Array2D.cols <!> currentIndex() <*> timeSeries()
+
+            // This expression is expensive and will be used often.
+            // I should find another way of getting lag elements (change data structure ?)
+            let lagElements lag = monad {
+                let! ts = timeSeries()
+                let! currentidx = currentIndex()
+                return match (currentidx-lag) with
+                        | x when x < 0 -> Array.zeroCreate (Array2D.length1 ts)
+                        | x when x >= Array2D.length2 ts -> Array.zeroCreate (Array2D.length1 ts)
+                        | x -> ts.[*,x]
+            }
+
+            let leadElement lead = lagElements (-lead)
+
+            let setIndex newIdx = State.modify (fun (idx,ts) -> (newIdx,ts))        : State<(int * 'T [,]),unit> 
+            let incrementIndex () = setIndex 1
+            
+
 
 
 
