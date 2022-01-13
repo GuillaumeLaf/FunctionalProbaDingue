@@ -1,9 +1,8 @@
 ﻿
 open System
-open ComputationalGraph
-open TimeSeries
 open FSharpPlus.Data
 open FSharpPlus
+open ComputationalGraph
 
 [<EntryPoint>]
 let main argv =

@@ -14,38 +14,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-	<!--<Compile Include="OldImplementation\CSVManagement.fs" />
-    <Compile Include="OldImplementation\Monad.fs" />
-    <Compile Include="OldImplementation\UtilitiesSIMD.fs" />
-    <Compile Include="OldImplementation\PSO_algorithm.fs" />
-    <Compile Include="OldImplementation\Utilities.fs" />
-    <Compile Include="OldImplementation\Distributions.fs" />
-	<Compile Include="OldImplementation\Binance\Binance.fs" />
-	<Compile Include="OldImplementation\DataBase\DataPreps.fs" />
-	<Compile Include="OldImplementation\DataBase\DBTest.fs" />
-	<Compile Include="OldImplementation\DataBase\DB.fs" />
-    <Compile Include="OldImplementation\TimeSeries\TimeSeries.fs" />
-    <Compile Include="OldImplementation\TimeSeries\Statistics.fs" />
-    <Compile Include="OldImplementation\TimeSeries\Transformations\WaveletSmoothing.fs" />
-    <Compile Include="OldImplementation\TimeSeries\Transformations\Transformations.fs" />
-    <Compile Include="OldImplementation\Models\ModelsTypes.fs" />
-    <Compile Include="OldImplementation\Models\Skeletons.fs" />
-    <Compile Include="OldImplementation\Models\Nodes.fs" />
-    <Compile Include="OldImplementation\Models\Graph.fs" />
-    <Compile Include="OldImplementation\Models\GraphTimeSeries.fs" />
-    <Compile Include="Models\Optimization.fs" />
-    <Compile Include="OldImplementation\Models\SGD.fs" />
-	<Compile Include="OldImplementation\Models\DrawStructure.fs" />
-    <Compile Include="OldImplementation\Backtester\BacktesterTypes.fs" />
-    <Compile Include="OldImplementation\Backtester\DataHandling.fs" />
-    <Compile Include="OldImplementation\Backtester\Strategies.fs" />
-    <Compile Include="OldImplementation\Backtester\Backtester.fs" />
-    <Compile Include="OldImplementation\Program.fs" />-->
 	<Compile Include="Utils.fs" />
 	<Compile Include="ComputationalGraph\Graph.fs" />
 	<Compile Include="ComputationalGraph\Node.fs" />
-	<Compile Include="ComputationalGraph\Model.fs" />
 	<Compile Include="TimeSeries\TimeSeries.fs" />
+	<Compile Include="Model\Model.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\TimeSeriesTest.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\GraphTest.fs" />
     <Compile Include="Main.fs" />
