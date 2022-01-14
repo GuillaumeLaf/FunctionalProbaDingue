@@ -62,10 +62,13 @@ open FSharpPlus.Data
         let lagElements lag = TS.getTime <!> ((+) -lag <!> currentTime()) <*> timeSeries()
 
         // Extract the cross-sections at a given lead in the future (from the current time)
-        let leadElement lead = lagElements (-lead)
+        let leadElements lead = lagElements (-lead)
 
+        // Modify the current time
         let setIndex newIdx = State.modify (fun (_,ts) -> (newIdx,ts))        : State<(int * TS<'T>),unit> 
-        let incrementIndex () = setIndex 1
+
+        // Increment the current time by one.
+        let incrementIndex () = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS<'T>),unit> 
             
 
 
