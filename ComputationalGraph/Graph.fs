@@ -12,19 +12,19 @@ module Graph =
         // Type that represents nodes that are considered as input in the graph
         // I can do a little algebra with them and group them which will allow multivariate graph.
         [<IsReadOnly;Struct>]
-        type Input = 
+        type BasicInput = 
             | Parameter of GroupidxP:int * Parameteridx:int
             | Variable of GroupidxV:int * Variableidx:int
-            static member inline op_Equality (input1:Input,input2:Input) = match (input1,input2) with
+            static member inline op_Equality (input1:BasicInput,input2:BasicInput) = match (input1,input2) with
                                                                             | Parameter(grpidx1,idx1),Parameter(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)  
                                                                             | Variable(grpidx1,idx1),Variable(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)
                                                                             | _,_ -> false
                     
-            static member inline (+) (input:Input, n:int) = match input with 
+            static member inline (+) (input:BasicInput, n:int) = match input with 
                                                             | Parameter(grpidx,idx) -> Parameter(grpidx,idx+n)
                                                             | Variable(grpidx,idx) -> Variable(grpidx,idx+n)
 
-            static member inline (+) (n:int, input:Input) = (+) input n
+            static member inline (+) (n:int, input:BasicInput) = (+) input n
 
     module Monad =     
         // Monadic graph type allows easy manipulation and update of graph.
@@ -55,7 +55,7 @@ module Graph =
     // Creating a computational graph eases creation of complex computations. 
     // The ideal would be to begin with a classical computational graph and then convert/compile it to blazingly fast arrays operations. 
     type Graph<'T> = 
-        | DataPoint of Input
+        | Input of BasicInput
         | Constant of value:'T
         | Addition of Graph<'T> * Graph<'T>
         | Multiplication of Graph<'T> * Graph<'T>
@@ -63,17 +63,26 @@ module Graph =
         static member inline ( + ) (l:Graph<'T>, r:Graph<'T>) = Addition(l,r)
         static member inline ( * ) (l:Graph<'T>, r:Graph<'T>) = Multiplication(l,r)
 
+        static member inline cataFold constF addF multF dataPointF (x:Graph<'T>) = 
+            let opCont opF lg rg f : Cont<'a,'b> = monad { let! xl = f lg
+                                                           let! xr = f rg
+                                                           return opF xl xr }
+            let rec loop g = monad {
+                match g with
+                | Constant(value) -> return constF value
+                | Addition(lg,rg) -> return! opCont addF lg rg loop
+                | Multiplication(lg,rg) -> return! opCont multF lg rg loop
+                | Input(i) -> return dataPointF i
+            }
+            Cont.run (loop x) id
+
         // Concatenate in an array all the 'Input' nodes of the graph 'x'. 
         static member inline collectInputs (x:Graph<'T>) = 
-            let rec loop g acc = monad {
-                match g with
-                | Constant(_) -> return acc
-                | Addition(l,r) | Multiplication(l,r) -> let! lacc = (loop l acc)
-                                                         let! racc = (loop r acc)
-                                                         return lacc @ racc
-                | DataPoint(i) ->  return i::acc 
-            }
-            Cont.run (loop x []) id |> Array.ofList
+            Graph<'T>.cataFold (fun _ acc -> acc)
+                               (fun lacc racc acc -> lacc (racc acc))
+                               (fun lacc racc acc -> lacc (racc acc))
+                               (fun i acc -> i::acc)
+                               x [] |> Array.ofList
         
         // Get the 'Input's contained in the graph as an array.
         // There is only one 'Input' type -e.g. Parameter(_,_), Variable(_,_)- for each group of 'Input'.
@@ -87,22 +96,19 @@ module Graph =
                                                          | Variable(grpidx,_),c -> Variable(grpidx,c))
                                   |> Array.sortBy (function | Parameter(grpidx,_) | Variable(grpidx,_) -> grpidx)
 
+        // Change the 'Group Index' of some 'BasicInput' from 'oldGrp' to 'newGrp'.
+        static member inline changeGroup oldGrp newGrp =
+            Graph<'T>.cataFold (fun v -> Constant(v))
+                               (fun l r -> Addition(l,r))
+                               (fun l r -> Multiplication(l,r))
+                               (function | Parameter(grpidx,idx) as x -> if grpidx=oldGrp then Input(Parameter(newGrp,idx)) else Input(x)
+                                         | Variable(grpidx,idx) as x -> if grpidx=oldGrp then Input(Variable(newGrp,idx)) else Input(x))
+            
+
         // Run the graph with the indices of the Inputs as data.
         // This method was primarily to test the graph's computations.
-        static member inline run (x:Graph<int>) = 
-            let opCont op lg rg f : Cont<'a,'b> = monad { let! xl = f lg
-                                                          let! xr = f rg
-                                                          return op xl xr }
-            let rec loop g = monad {
-                match g with
-                | Constant(value) -> return value
-                | Addition(lg,rg) -> return! opCont ( + ) lg rg loop
-                | Multiplication(lg,rg) -> return! opCont ( * ) lg rg loop
-                | DataPoint(i) -> match i with
-                                  | Parameter(_,idx) -> return idx
-                                  | Variable(_,idx) -> return idx
-            }
-            Cont.run (loop x) id
+        static member inline run : (Graph<int> -> int) = 
+            Graph<int>.cataFold id (+) (*) (function Parameter(_,idx) | Variable(_,idx) -> idx)
 
         // Create a State Monad from the Graph
         // Working with monads makes composing computations easier and,
@@ -116,7 +122,7 @@ module Graph =
                 | Constant(value) -> return! lift (result value)
                 | Addition(l,r) -> return! (+) <!> (loop l) <*> (loop r)
                 | Multiplication(l,r) -> return! (*) <!> (loop l) <*> (loop r)
-                | DataPoint(i) -> match i with
+                | Input(i) -> match i with
                                   | Parameter(grpidx,idx) -> return! lift (Monad.parameterM grpidx idx)
                                   | Variable(grpidx,idx) -> return! lift (Monad.variableM grpidx idx)
             }

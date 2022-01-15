@@ -24,6 +24,7 @@ module Multivariate =
         member this.fit() = 0
         member this.sample() = 0
 
-        static member get_Graph (m:Model) : Graph<'T> = DataPoint(Parameter(0,0))
+        static member inline get_Graph = function
+            | VAR(orders) = 
         
 
