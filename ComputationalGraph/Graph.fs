@@ -15,14 +15,17 @@ module Graph =
         type BasicInput = 
             | Parameter of GroupidxP:int * Parameteridx:int
             | Variable of GroupidxV:int * Variableidx:int
+            | Innovation of GroupidxI:int * Innovaitonidx:int
             static member inline op_Equality (input1:BasicInput,input2:BasicInput) = match (input1,input2) with
-                                                                            | Parameter(grpidx1,idx1),Parameter(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)  
-                                                                            | Variable(grpidx1,idx1),Variable(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)
-                                                                            | _,_ -> false
+                                                                                        | Parameter(grpidx1,idx1),Parameter(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)  
+                                                                                        | Variable(grpidx1,idx1),Variable(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)
+                                                                                        | Innovation(grpidx1,idx1),Innovation(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)
+                                                                                        | _,_ -> false
                     
             static member inline (+) (input:BasicInput, n:int) = match input with 
-                                                            | Parameter(grpidx,idx) -> Parameter(grpidx,idx+n)
-                                                            | Variable(grpidx,idx) -> Variable(grpidx,idx+n)
+                                                                    | Parameter(grpidx,idx) -> Parameter(grpidx,idx+n)
+                                                                    | Variable(grpidx,idx) -> Variable(grpidx,idx+n)
+                                                                    | Innovation(grpidx,idx) -> Innovation(grpidx,idx+n)
 
             static member inline (+) (n:int, input:BasicInput) = (+) input n
 
@@ -54,16 +57,16 @@ module Graph =
     // The most important part of this project.
     // Creating a computational graph eases creation of complex computations. 
     // The ideal would be to begin with a classical computational graph and then convert/compile it to blazingly fast arrays operations. 
-    type Graph<'T> = 
+    type Graph = 
         | Input of BasicInput
-        | Constant of value:'T
-        | Addition of Graph<'T> * Graph<'T>
-        | Multiplication of Graph<'T> * Graph<'T>
+        | Constant of value:float32
+        | Addition of Graph * Graph
+        | Multiplication of Graph * Graph
         static member inline get_Zero() = Constant(LanguagePrimitives.GenericZero)
-        static member inline ( + ) (l:Graph<'T>, r:Graph<'T>) = Addition(l,r)
-        static member inline ( * ) (l:Graph<'T>, r:Graph<'T>) = Multiplication(l,r)
+        static member inline ( + ) (l:Graph, r:Graph) = Addition(l,r)
+        static member inline ( * ) (l:Graph, r:Graph) = Multiplication(l,r)
 
-        static member inline cataFold constF addF multF dataPointF (x:Graph<'T>) = 
+        static member inline cataFold constF addF multF dataPointF (x:Graph) = 
             let opCont opF lg rg f : Cont<'a,'b> = monad { let! xl = f lg
                                                            let! xr = f rg
                                                            return opF xl xr }
@@ -77,8 +80,8 @@ module Graph =
             Cont.run (loop x) id
 
         // Concatenate in an array all the 'Input' nodes of the graph 'x'. 
-        static member inline collectInputs (x:Graph<'T>) = 
-            Graph<'T>.cataFold (fun _ acc -> acc)
+        static member inline collectInputs (x:Graph) = 
+            Graph.cataFold (fun _ acc -> acc)
                                (fun lacc racc acc -> lacc (racc acc))
                                (fun lacc racc acc -> lacc (racc acc))
                                (fun i acc -> i::acc)
@@ -89,26 +92,29 @@ module Graph =
         // For instance if the output array is of the form : [|Parameter(0,2);Variable(1,3)|], 
         // It translates into a graph with 2 'Parameter's in group 0,
         // and 3 'Variable's in group 1.
-        static member inline groupSizes (x:Graph<'T>) = 
+        static member inline groupSizes (x:Graph) = 
             Graph.collectInputs x |> Array.countBy (function | Parameter(grpidx,_) -> Parameter(grpidx,0)
-                                                             | Variable(grpidx,_) -> Variable(grpidx,0))
+                                                             | Variable(grpidx,_) -> Variable(grpidx,0)
+                                                             | Innovation(grpidx,_) -> Innovation(grpidx,0))
                                   |> Array.map (function | Parameter(grpidx,_),c -> Parameter(grpidx,c)
-                                                         | Variable(grpidx,_),c -> Variable(grpidx,c))
-                                  |> Array.sortBy (function | Parameter(grpidx,_) | Variable(grpidx,_) -> grpidx)
+                                                         | Variable(grpidx,_),c -> Variable(grpidx,c)
+                                                         | Innovation(grpidx,_),c -> Innovation(grpidx,c))
+                                  |> Array.sortBy (function | Parameter(grpidx,_) | Variable(grpidx,_) | Innovation(grpidx,_) -> grpidx)
 
         // Change the 'Group Index' of some 'BasicInput' from 'oldGrp' to 'newGrp'.
         static member inline changeGroup oldGrp newGrp =
-            Graph<'T>.cataFold (fun v -> Constant(v))
+            Graph.cataFold (fun v -> Constant(v))
                                (fun l r -> Addition(l,r))
                                (fun l r -> Multiplication(l,r))
                                (function | Parameter(grpidx,idx) as x -> if grpidx=oldGrp then Input(Parameter(newGrp,idx)) else Input(x)
-                                         | Variable(grpidx,idx) as x -> if grpidx=oldGrp then Input(Variable(newGrp,idx)) else Input(x))
+                                         | Variable(grpidx,idx) as x -> if grpidx=oldGrp then Input(Variable(newGrp,idx)) else Input(x)
+                                         | Innovation(grpidx,idx) as x -> if grpidx=oldGrp then Input(Innovation(newGrp,idx)) else Input(x))
             
 
         // Run the graph with the indices of the Inputs as data.
         // This method was primarily to test the graph's computations.
-        static member inline run : (Graph<int> -> int) = 
-            Graph<int>.cataFold id (+) (*) (function Parameter(_,idx) | Variable(_,idx) -> idx)
+        static member inline run : (Graph -> float32) = 
+            Graph.cataFold id (+) (*) (function Parameter(_,idx) | Variable(_,idx) | Innovation(_,idx) -> float32 idx)
 
         // Create a State Monad from the Graph
         // Working with monads makes composing computations easier and,
@@ -116,8 +122,8 @@ module Graph =
         // However, for speedy computations Monads may not be the best option.
         // In the far end, one should create a compiler with faster than light compiled Monad operations.
         // But for now, I trust 'FSharpPlus' to efficiently compile my Monads.
-        static member inline ToMonad (x:Graph<'a>) = 
-            let rec loop g : ContT<State<Monad.S<'a>,'b>,'a> = monad {
+        static member inline ToMonad (x:Graph) = 
+            let rec loop g : ContT<State<Monad.S<float32>,'b>,float32> = monad {
                 match g with
                 | Constant(value) -> return! lift (result value)
                 | Addition(l,r) -> return! (+) <!> (loop l) <*> (loop r)
@@ -125,6 +131,7 @@ module Graph =
                 | Input(i) -> match i with
                                   | Parameter(grpidx,idx) -> return! lift (Monad.parameterM grpidx idx)
                                   | Variable(grpidx,idx) -> return! lift (Monad.variableM grpidx idx)
+                                  | Innovation(grpidx,idx) -> return! lift (Monad.innovationM grpidx idx)
             }
             ContT.eval (loop x)
 
