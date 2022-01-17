@@ -109,7 +109,6 @@ module Graph =
                                (function | Parameter(grpidx,idx) as x -> if grpidx=oldGrp then Input(Parameter(newGrp,idx)) else Input(x)
                                          | Variable(grpidx,idx) as x -> if grpidx=oldGrp then Input(Variable(newGrp,idx)) else Input(x)
                                          | Innovation(grpidx,idx) as x -> if grpidx=oldGrp then Input(Innovation(newGrp,idx)) else Input(x))
-            
 
         // Run the graph with the indices of the Inputs as data.
         // This method was primarily to test the graph's computations.
