@@ -8,35 +8,51 @@ module Node =
     // Special nodes groups represents basic templates.
     // For instance, 'Group Indices' should be normally be zero and then later modified.
 
-    type Vector(s:seq<Graph>) =
-        let vec = s
-        member this.seq = vec
-        member this.ToArray = Array.ofSeq vec
-        static member init basicinput n = Seq.init n (fun idx -> Input(basicinput(0,idx))) |> Vector
-        static member (+) (v1:Vector, v2:Vector) = Seq.map2 (+) v1.seq v2.seq |> Vector
+    type Vector(arrIn:Graph[]) =
+        let arr = arrIn
+        let dim = arrIn.Length
+        member this.Value = arrIn
+        member this.Length = dim
+        override this.GetHashCode() = hash (dim, arr)
+        override this.Equals(v) = 
+            match v with
+            | :? Vector as v -> Array.forall2 (=) this.Value v.Value
+            | _ -> false
+            
+        static member value (v:Vector) = v.Value
+        static member length (v:Vector) = v.Length
+        static member init basicinput grpIdx n = [| for idx in 0..n-1 do Input(basicinput(grpIdx,idx)) |] |> Vector
+        static member ( + ) (v1:Vector, v2:Vector) = Array.map2 ( + ) v1.Value v2.Value |> Vector
+        static member ( * ) (v1:Vector, v2:Vector) = Array.map2 ( * ) v1.Value v2.Value |> Vector
+        static member ( */ ) (v1:Vector, v2:Vector) = v1 * v2 |> Vector.value |> Array.reduce (+)
+        
 
-    type Matrix<'T> = Matrix of seq<seq<'T>>
+    type Matrix(mIn:Vector[]) as self =
+        let m = mIn
+        let dim = (mIn.[0].Length,mIn.Length)               // (Vector length, #Vectors) -> Vectors stacked column-wise
+        member this.Vectors = mIn
+        member this.Size = dim
+        member this.T = Matrix.transpose self
+        override this.GetHashCode() = hash (dim, mIn)
+        override this.Equals(m) = 
+            match m with
+            | :? Matrix as m -> Array.forall2 (=) this.Vectors m.Vectors
+            | _ -> false
 
-    // InnerProduct of two arrays of 'Graph' objects
-    let inline innerProduct arrG1 arrG2 = (arrG1, arrG2) ||> Seq.map2 (fun x1 x2 -> x1 * x2) |> sum   
-    
-    // Dot Product of a matrix 'A' of 'Parameter's (as 'Input') and a vector of 'Variable's (as 'Input).
-    // Should be extended to take the dot product of 2 matrices.
-    let inline dotProduct A b = Seq.map (fun aRow -> innerProduct aRow b) A
+        static member vectors (m:Matrix) = m.Vectors
+        static member size (m:Matrix) = m.Size
+        static member init basicinput (i,j) = [| for grpidx in 0..j-1 do Vector.init basicinput grpidx i |] |> Matrix
+        static member transpose = Matrix.vectors >> Array.map (fun v -> v.Value) >> Array.transpose >> Array.map (fun v -> Vector(v)) >> Matrix
+        static member ( + ) (m1:Matrix, m2:Matrix) = if m1.Size = m2.Size then Array.map2 ( + ) m1.Vectors m2.Vectors |> Matrix else invalidArg "Matrix" "Cannot add matrices of different dimensions"
+        static member ( * ) (m1:Matrix, m2:Matrix) = if m1.Size = m2.Size then Array.map2 ( * ) m1.Vectors m2.Vectors |> Matrix else invalidArg "Matrix" "Cannot mult. matrices of different dimension" 
+        static member ( */ ) (v:Vector, m:Matrix) = if fst m.Size = v.Length then m |> (Matrix.vectors >> Array.map (fun vm -> vm */ v) >> Vector) else invalidArg "Matrix" "Cannot dotproduct matrix and vector of different dimensions."
+        static member ( */ ) (m:Matrix, v:Vector) = ( */ ) v m.T 
+        static member ( */ ) (m1:Matrix, m2:Matrix) = if snd m1.Size = fst m2.Size then m1.T |> (Matrix.vectors >> Array.map (fun vm1 -> vm1 */ m2) >> Matrix >> Matrix.transpose) else invalidArg "Matrix" "Cannot dotproduct matrices with wrong dimensions."
 
-    // Construct a sequence of 'BasicInput' types
-    // 'Start_' ('end_') specifies the first (last) index of the 'BasicInput'.
-    // 'end_' is included.
-    let basicArray basicInput grpIdx start_ end_ = Seq.init (end_-start_+1) (fun idx -> Input(basicInput(grpIdx,idx+start_))) |> Seq.cache
+    let inline linearCombinaison grpIdx start_ end_ = 0
 
-    // Specialized function to construct 'BasicInput' types
-    let ParameterVector = basicArray Parameter
-    let VariableVector = basicArray Variable
-
-    let inline linearCombinaison grpIdx start_ end_ = innerProduct (ParameterVector grpIdx start_ end_) (VariableVector grpIdx start_ end_)
-
-    let inline multivariateLinearCombinaison lag n = 
-        dotProduct (Seq.init n (fun i -> Seq.init n (fun j -> Input(Parameter(j,i*n+j))))) (Seq.init n (fun idx -> Input(Variable(idx,lag))))
+    let inline multivariateLinearCombinaison lag n = 0
+        
 
 
 

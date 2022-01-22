@@ -21,6 +21,7 @@
 	<Compile Include="Model\Model.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\TimeSeriesTest.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\GraphTest.fs" />
+	<Compile Include="UnitTests\ComputationalGraphTest\NodeTest.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

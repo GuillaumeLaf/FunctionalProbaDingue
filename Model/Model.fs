@@ -20,14 +20,14 @@ module Multivariate =
 
     type Model<'T>(m:Model) as self = 
         let model = m                               : Model
-        let graph = self.get_Graph m                : Graph
-        let graphMonad = Graph.ToMonad graph        : State<Monad.S<float32>,float32>
+        //let graph = self.get_Graph m                : Graph
+        //let graphMonad = Graph.ToMonad graph        : State<Monad.S<float32>,float32>
         member this.fit() = 0
         member this.sample() = 0
 
         // Get the graph for a given model.
         // The graph must be multivariate in order to be able to sample simultaneously for all series.
-        member this.get_Graph (m:Model) : Graph = 
+(*        member this.get_Graph (m:Model) : Graph = 
             match m with
-            | VAR(nTS,order) -> 
+            | VAR(nTS,order) -> *)
 

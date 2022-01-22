@@ -20,7 +20,7 @@ module Graph =
                                                                                         | Parameter(grpidx1,idx1),Parameter(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)  
                                                                                         | Variable(grpidx1,idx1),Variable(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)
                                                                                         | Innovation(grpidx1,idx1),Innovation(grpidx2,idx2) -> (grpidx1 = grpidx2) && (idx1 = idx2)
-                                                                                        | _,_ -> false
+                                                                                        | _ -> false        // !!!
                     
             static member inline (+) (input:BasicInput, n:int) = match input with 
                                                                     | Parameter(grpidx,idx) -> Parameter(grpidx,idx+n)
@@ -65,27 +65,50 @@ module Graph =
         static member inline get_Zero() = Constant(LanguagePrimitives.GenericZero)
         static member inline ( + ) (l:Graph, r:Graph) = Addition(l,r)
         static member inline ( * ) (l:Graph, r:Graph) = Multiplication(l,r)
+        static member inline op_Equality (g1:Graph, g2:Graph) = 
+            let opCont l1 r1 l2 r2 f : Cont<'a,bool> = monad { let! xl = f l1 l2
+                                                               let! xr = f r1 r2
+                                                               return xl && xr }
+            let rec loop g1 g2 = monad {
+                match g1,g2 with
+                | Input(i1),Input(i2) -> return i1 = i2
+                | Addition(l1,r1),Addition(l2,r2) -> return! opCont l1 r1 l2 r2 loop
+                | Multiplication(l1,r1),Multiplication(l2,r2) -> return! opCont l1 r1 l2 r2 loop
+                | _ -> return false         // !!!
+            }
+            Cont.run (loop g1 g2) id
 
-        static member inline cataFold constF addF multF dataPointF (x:Graph) = 
-            let opCont opF lg rg f : Cont<'a,'b> = monad { let! xl = f lg
-                                                           let! xr = f rg
-                                                           return opF xl xr }
+        static member inline cataFoldX constF addF multF inputF (x:Graph) = 
+            let opCont opF x lg rg f : Cont<'a,'b> = monad { let! xl = f lg
+                                                             let! xr = f rg
+                                                             return opF x xl xr }
             let rec loop g = monad {
                 match g with
-                | Constant(value) -> return constF value
-                | Addition(lg,rg) -> return! opCont addF lg rg loop
-                | Multiplication(lg,rg) -> return! opCont multF lg rg loop
-                | Input(i) -> return dataPointF i
+                | Constant(value) as x -> return constF x value
+                | Addition(lg,rg) as x -> return! opCont addF x lg rg loop
+                | Multiplication(lg,rg) as x -> return! opCont multF x lg rg loop
+                | Input(i) as x -> return inputF x i
             }
             Cont.run (loop x) id
+
+        static member inline cataFold constF addF multF inputF = 
+            Graph.cataFoldX (fun _ -> constF) (fun _ -> addF) (fun _ -> multF) (fun _ -> inputF)
+
+        // Collect in an array all the subgraphs from the graph 'x'
+        static member inline collectSubGraphs (x:Graph) = 
+            Graph.cataFoldX (fun x _ acc -> x::acc)
+                           (fun x lacc racc acc -> x::(racc >> lacc) acc)
+                           (fun x lacc racc acc -> x::(racc >> lacc) acc)
+                           (fun x _ acc -> x::acc)
+                           x [] |> Array.ofList
 
         // Concatenate in an array all the 'Input' nodes of the graph 'x'. 
         static member inline collectInputs (x:Graph) = 
             Graph.cataFold (fun _ acc -> acc)
-                               (fun lacc racc acc -> lacc (racc acc))
-                               (fun lacc racc acc -> lacc (racc acc))
-                               (fun i acc -> i::acc)
-                               x [] |> Array.ofList
+                           (fun lacc racc acc -> lacc (racc acc))
+                           (fun lacc racc acc -> lacc (racc acc))
+                           (fun i acc -> i::acc)
+                           x [] |> Array.ofList
         
         // Get the 'Input's contained in the graph as an array.
         // There is only one 'Input' type -e.g. Parameter(_,_), Variable(_,_)- for each group of 'Input'.
