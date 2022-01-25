@@ -24,18 +24,18 @@ open FSharpPlus.Data
         // it will be slightly more challenging to parallelize the code (cannot use Array.parallel).
 
         (*     Basic Multivariate Timeseries Object     *)
-        type TS<'T> (tsIn:'T[,]) =
+        type TS (tsIn:float32[,]) =
             let data = tsIn
+            let stats = Statistics.Multivariate.Stats(tsIn)
             member this.Get () = data
             member this.Get idx = if (0 < idx || idx <= Array2D.length1 data) then Some data.[idx,*] else None 
             member this.Get (a:int[]) = Array2D.init (Array.length a) (Array2D.length2 data) (fun i j -> data.[a.[i],j])
             member this.GetTime t = if (0 < t || t <= Array2D.length2 data) then Some data.[*,t] else None 
                 
-                 
-            static member length (ts:TS<'T>) = ts.Get () |> Array2D.length1
-            static member size (ts:TS<'T>) = ts.Get () |> Array2D.length2
-            static member get (ts:TS<'T>) = ts.Get ()      
-            static member getTime t (ts:TS<'T>) = ts.GetTime t
+            static member length (ts:TS) = ts.Get () |> Array2D.length2
+            static member size (ts:TS) = ts.Get () |> Array2D.length1
+            static member get (ts:TS) = ts.Get ()      
+            static member getTime t (ts:TS) = ts.GetTime t
 
         (*****************************************************************************************)
         //                                                                                       //
@@ -46,10 +46,10 @@ open FSharpPlus.Data
         (*   Basic Operations   *)
 
         // Get current Index
-        let currentTime () = fst <!> State.get       : State<(int * TS<'T>),int> 
+        let currentTime () = fst <!> State.get       : State<(int * TS),int> 
 
         // Get the Array2D object representing the 'TimeSeries'
-        let timeSeries () = snd <!> State.get       : State<(int * TS<'T>),TS<'T>>
+        let timeSeries () = snd <!> State.get       : State<(int * TS),TS>
 
         // Get the cross-sectional (or time) dimension
         let crossSectionDim () = (TS.get >> Array2D.length1) <!> (timeSeries ())
@@ -60,15 +60,16 @@ open FSharpPlus.Data
 
         // Extract the cross-sections at a given lag (from the current time)
         let lagElements lag = TS.getTime <!> ((+) -lag <!> currentTime()) <*> timeSeries()
+        let lagElementsDefault lag = Option.defaultValue <!> (Array.zeroCreate <!> crossSectionDim()) <*> lagElements lag
 
         // Extract the cross-sections at a given lead in the future (from the current time)
         let leadElements lead = lagElements (-lead)
 
         // Modify the current time
-        let setIndex newIdx = State.modify (fun (_,ts) -> (newIdx,ts))        : State<(int * TS<'T>),unit> 
+        let setIndex newIdx = State.modify (fun (_,ts) -> (newIdx,ts))        : State<(int * TS),unit> 
 
         // Increment the current time by one.
-        let incrementIndex () = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS<'T>),unit> 
+        let incrementIndex () = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS),unit> 
             
 
 

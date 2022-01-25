@@ -17,6 +17,7 @@
 	<Compile Include="Utils.fs" />
 	<Compile Include="ComputationalGraph\Graph.fs" />
 	<Compile Include="ComputationalGraph\Node.fs" />
+	<Compile Include="TimeSeries\Statistics.fs" />
 	<Compile Include="TimeSeries\TimeSeries.fs" />
 	<Compile Include="Model\Model.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\TimeSeriesTest.fs" />

@@ -1,5 +1,12 @@
 ﻿[<AutoOpen>]
 module Utils 
+    
+    let mapTuple f (x,y) = (f x, f y)
+
+    module Array2D = 
+        let getRow idx (array:'T[,]) = array.[idx,*]
+        let getCol idx (array:'T[,]) = array.[*,idx]
+
     module State =  
         open FSharpPlus
         open FSharpPlus.Data

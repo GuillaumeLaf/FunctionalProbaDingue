@@ -54,6 +54,12 @@ module Graph =
         let variableM grpidx idx = Array.get <!> variableForGroupM grpidx <*> result idx
         let innovationM grpidx idx = Array.get <!> innovationForGroupM grpidx <*> result idx
 
+        let updateParameters newParameters = State.modify (fun (S(_,v,i)) -> S(newParameters,v,i))
+        let updateVariables newVariables = State.modify (fun (S(p,_,i)) -> S(p,newVariables,i))
+        let updateInnovations newInnovations = State.modify (fun (S(p,v,_)) -> S(p,v,newInnovations))
+
+
+
     // The most important part of this project.
     // Creating a computational graph eases creation of complex computations. 
     // The ideal would be to begin with a classical computational graph and then convert/compile it to blazingly fast arrays operations. 
