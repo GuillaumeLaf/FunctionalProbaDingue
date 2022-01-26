@@ -29,13 +29,19 @@ open FSharpPlus.Data
             let stats = Statistics.Multivariate.Stats(tsIn)
             member this.Get () = data
             member this.Get idx = if (0 < idx || idx <= Array2D.length1 data) then Some data.[idx,*] else None 
+            member this.Set idx newTs = if (0 < idx || idx <= Array2D.length1 data) then data.[idx,*] <- newTs else invalidArg "Idx" "cross-section index out of number of timeseries."
             member this.Get (a:int[]) = Array2D.init (Array.length a) (Array2D.length2 data) (fun i j -> data.[a.[i],j])
-            member this.GetTime t = if (0 < t || t <= Array2D.length2 data) then Some data.[*,t] else None 
-                
+            member this.GetAtTime t = if (0 < t || t <= Array2D.length2 data) then Some data.[*,t] else None 
+            member this.SetAtTime t values = if (0 < t || t <= Array2D.length2 data) then data.[*,t] <- values else invalidArg "t" "Time index out of current timeseries length." 
+            member this.Stats = stats
+
+            static member empty n = Array2D.zeroCreate n 0 |> TS
+            static member init n t = Array2D.zeroCreate n t |> TS
             static member length (ts:TS) = ts.Get () |> Array2D.length2
             static member size (ts:TS) = ts.Get () |> Array2D.length1
             static member get (ts:TS) = ts.Get ()      
-            static member getTime t (ts:TS) = ts.GetTime t
+            static member getAtTime t (ts:TS) = ts.GetAtTime t
+            static member setAtTime t values (ts:TS) = ts.SetAtTime t values
 
         (*****************************************************************************************)
         //                                                                                       //
@@ -46,30 +52,34 @@ open FSharpPlus.Data
         (*   Basic Operations   *)
 
         // Get current Index
-        let currentTime () = fst <!> State.get       : State<(int * TS),int> 
+        let currentTime = fst <!> State.get       : State<(int * TS),int> 
+
+        // Modify the current time
+        let setTime newIdx = State.modify (fun (_,ts) -> (newIdx,ts))        : State<(int * TS),unit> 
+
+        // Increment the current time by one.
+        let incrementTime = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS),unit> 
 
         // Get the Array2D object representing the 'TimeSeries'
-        let timeSeries () = snd <!> State.get       : State<(int * TS),TS>
+        let timeSeries = snd <!> State.get       : State<(int * TS),TS>
 
         // Get the cross-sectional (or time) dimension
-        let crossSectionDim () = (TS.get >> Array2D.length1) <!> (timeSeries ())
-        let timeDim () =  (TS.get >> Array2D.length2) <!> (timeSeries ())
+        let crossSectionDim = (TS.get >> Array2D.length1) <!> timeSeries
+        let timeDim = (TS.get >> Array2D.length2) <!> timeSeries
 
         // Extract the current cross-section
-        let currentElements () = TS.getTime <!> currentTime() <*> timeSeries()
+        let currentElements = TS.getAtTime <!> currentTime <*> timeSeries
+
+        // Set the current elements of the cross-section
+        let setCurrentElements e = State.modify (fun (idx,ts) -> ts.SetAtTime idx e; (idx,ts))      : State<(int * TS),unit> 
 
         // Extract the cross-sections at a given lag (from the current time)
-        let lagElements lag = TS.getTime <!> ((+) -lag <!> currentTime()) <*> timeSeries()
-        let lagElementsDefault lag = Option.defaultValue <!> (Array.zeroCreate <!> crossSectionDim()) <*> lagElements lag
+        let lagElements lag = TS.getAtTime <!> ((+) -lag <!> currentTime) <*> timeSeries
+        let lagElementsDefault lag = Option.defaultValue <!> (Array.zeroCreate <!> crossSectionDim) <*> lagElements lag
 
         // Extract the cross-sections at a given lead in the future (from the current time)
         let leadElements lead = lagElements (-lead)
 
-        // Modify the current time
-        let setIndex newIdx = State.modify (fun (_,ts) -> (newIdx,ts))        : State<(int * TS),unit> 
-
-        // Increment the current time by one.
-        let incrementIndex () = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS),unit> 
             
 
 

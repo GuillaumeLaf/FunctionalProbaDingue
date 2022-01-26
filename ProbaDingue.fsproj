@@ -20,6 +20,7 @@
 	<Compile Include="TimeSeries\Statistics.fs" />
 	<Compile Include="TimeSeries\TimeSeries.fs" />
 	<Compile Include="Model\Model.fs" />
+	<Compile Include="UnitTests\TimeSeriesTest\StatisticsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\TimeSeriesTest.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\GraphTest.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\NodeTest.fs" />
