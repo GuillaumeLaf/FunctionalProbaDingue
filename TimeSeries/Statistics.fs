@@ -21,22 +21,22 @@ module Statistics =
             let _memoize idx f = 
                 match mem.[idx] with
                 | Some(x) -> x
-                | None -> let x = (f >> float32)(data)
+                | None -> let x = f(data)
                           mem.[idx] <- Some x
                           x
 
             // Compute the mean
-            member this.mean = _memoize 0 Statistics.Mean
+            member this.Mean = _memoize 0 (Statistics.Mean >> float32)
 
             // Compute the standard deviation
-            member this.std = _memoize 1 Statistics.StandardDeviation
+            member this.Std = _memoize 1 (Statistics.StandardDeviation >> float32)
 
             // Compute the variance
-            member this.var = _memoize 2 (fun _ -> this.std * this.std |> float)
+            member this.Var = _memoize 2 (fun _ -> this.Std * this.Std)
 
-            static member Mean (s:Stats) = s.mean
-            static member Std (s:Stats) = s.std
-            static member Var (s:Stats) = s.var
+            static member mean (s:Stats) = s.Mean
+            static member std (s:Stats) = s.Std
+            static member var (s:Stats) = s.Var
 
     module Multivariate = 
         // Module for multivariate timeseries statistics.
@@ -80,18 +80,18 @@ module Statistics =
                           x
 
             // Compte the mean (of each timeseries)
-            member this.Means = memoize1D 0 Univariate.Stats.Mean
+            member this.Means = memoize1D 0 Univariate.Stats.mean
 
             // Compte the standard deviation (of each timeseries)
-            member this.Stds = memoize1D 1 Univariate.Stats.Std
+            member this.Stds = memoize1D 1 Univariate.Stats.std
 
             // Compte the variance (of each timeseries)
-            member this.Vars = memoize1D 2 Univariate.Stats.Var
+            member this.Vars = memoize1D 2 Univariate.Stats.var
 
             // // Compte the covariance matrix
             member this.Covs = memoize2D 0 (fun (data:float32[,]) -> Array2D.zeroCreate n n |> Array2D.mapi (fun i j _ -> Statistics.Covariance(data.[i,*],data.[j,*]) |> float32))
 
-            member this.CholeskyLowerCovs = memoize2D 1 (fun (data:float32[,]) -> (Matrix<float32>.Build.DenseOfArray(this.Covs)).Cholesky().Factor.ToArray() )
+            member this.CholeskyLowerCovs = memoize2D 1 cholesky
 
             member this.AddCovs = Some >> Array.set mem2D 0 
 

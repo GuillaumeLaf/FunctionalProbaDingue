@@ -8,7 +8,7 @@
     // 'run'
     let ``run graph and treat indices as data`` () = 
         let g : Graph = Input(Parameter(0,0)) + Input(Parameter(0,1)) + Input(Parameter(0,2)) * Input(Parameter(0,3))
-        let initialState = Monad.S([|[|0;1;2;3|]|], [|[|0|]|], [|[|0|]|])
+        let initialState = Monad.S(Array2D.ofArray [|[|0;1;2;3|]|], Array2D.ofArray [|[|0|]|], [|0|])
         let result = Graph.run g
         let expected = 7f
         Assert.Equal<float32>(expected, result)
@@ -17,7 +17,7 @@
     // 'ToMonad'
     let ``Create State monad with graph and runs it`` () = 
         let (g:Graph) = Input(Parameter(0,0)) + Input(Parameter(0,1)) + Input(Parameter(0,2)) * Input(Parameter(0,3))
-        let initialState = Monad.S([|[|0f;1f;2f;3f|]|], [|[|0f|]|], [|[|0f|]|])       : Monad.S<float32>
+        let initialState = Monad.S(Array2D.ofArray [|[|0f;1f;2f;3f|]|], Array2D.ofArray [|[|0f|]|], [|0f|])       : Monad.S<float32>
         let m = Graph.ToMonad g
         let expected = 7f
         let actual = State.eval m initialState
@@ -26,7 +26,7 @@
     [<Fact>]
     let ``Humongous graph to check StackOverflow`` () = 
         let g = Seq.init 10000 (fun _ -> Input(Parameter(0,0))) |> sum
-        let initialState = Monad.S([|[|0f|]|], [|[|0f|]|], [|[|0f|]|])         : Monad.S<float32>
+        let initialState = Monad.S(Array2D.ofArray [|[|0f|]|], Array2D.ofArray [|[|0f|]|], [|0f|])         : Monad.S<float32>
         let m = Graph.ToMonad g
         let expected = 0f
         let actual = State.eval m initialState

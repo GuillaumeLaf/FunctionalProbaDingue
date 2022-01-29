@@ -1,7 +1,8 @@
 ﻿namespace ComputationalGraph
 
-open FSharpPlus.Data
 open FSharpPlus
+open FSharpPlus.Data
+open FSharpPlus.Control
 open Graph
 
 module Node = 
@@ -13,26 +14,31 @@ module Node =
         | Standard of int
         | Group of int
 
-    type Vector(arrIn:Graph[]) =
-        // 'Vector' = 'Array' of 'Graph's
-        // Using 'Vector's will ease creation of complex 'Graph's.
-        let arr = arrIn
+    type Vector = { size:int; graphs:Graph[] }
 
-        // Number of 'Graph's in a 'Vector'
-        let dim = arrIn.Length
-        member this.Value = arrIn
-        member this.Length = dim
-        override this.GetHashCode() = hash (dim, arr)
+    // Dimensions of the matrix (Length of 'Vector's, number of vectors)
+    // Therefore, the vectors are stacked column-wise
+    type Matrix = { size:int*int; vectors:Vector[]}
 
-        // Two 'Vector's are equal if every 'Graph's are equal.
-        override this.Equals(v) = 
-            match v with
-            | :? Vector as v -> Array.forall2 (=) this.Value v.Value
-            | _ -> false
-            
-        // Get the 'Array' of 'Graph's in the object
-        static member toArray (v:Vector) = v.Value
-        static member length (v:Vector) = v.Length
+    [<RequireQualifiedAccess>]
+    module Vector = 
+        
+        let create size graphs = {size=size; graphs=graphs}
+
+        let graphs (v:Vector) = v.graphs
+        let size (v:Vector) = v.size
+
+        let inline private returnIfEqualSize ((v1,v2):Vector*Vector) result = if v1.size = v2.size then result else invalidArg "Vector" "Cannot return the result, 'Vectors' don't have the same size."
+
+        let equal (v1:Vector) (v2:Vector) = Array.forall2 Graph.equal v1.graphs v2.graphs
+
+        let sum = graphs >> Array.reduce Graph.add
+
+        let add (v1:Vector) (v2:Vector) = { v1 with graphs=Array.map2 Graph.add v1.graphs v2.graphs } |> returnIfEqualSize (v1,v2) 
+        let multiply (v1:Vector) (v2:Vector) = { v1 with graphs=Array.map2 Graph.multiply v1.graphs v2.graphs } |> returnIfEqualSize (v1,v2) 
+        
+        // Dot product of two 'Vector's, thus creating a 'Graph'.
+        let dotProduct =  (uncurry multiply) >> sum |> curry
 
         // Create a standard 'Vector' of graph 'Parameter' or graph 'Variable' 
         // basicInput : specifies the 'Graph.Inputs.BasicInput' type 
@@ -41,75 +47,71 @@ module Node =
         // n : length of the 'Vector'
         // For instance, if 'Group' is the fixed type then the 'Standard' index will
         // vary over 'shift'...'n'+'shift'.
-        static member initShifted basicInput idxType shift n = 
+        let initShifted basicInput idxType shift n = 
             match idxType with
-            | Standard(idx) -> [| for i in 0..n-1 do Input(basicInput(i+shift,idx)) |] |> Vector
-            | Group(idx) -> [| for i in 0..n-1 do Input(basicInput(idx,i+shift)) |] |> Vector
-                
+            | Standard(idx) -> { size=n; graphs=[| for i in 0..n-1 do Input(basicInput(i+shift,idx)) |] }
+            | Group(idx) -> { size=n; graphs=[| for i in 0..n-1 do Input(basicInput(idx,i+shift)) |] }
+
         // Specialized version of 'initShifted' function where
         // the shift is set to 0.
-        static member init basicInput idxType n  = Vector.initShifted basicInput idxType 0 n
-
-        // Create a 'Vector' by elementwise addition of two 'Vector's.
-        static member ( + ) (v1:Vector, v2:Vector) = Array.map2 ( + ) v1.Value v2.Value |> Vector
-
-        // Create a 'Vector' by elementwise multiplication of two 'Vector's.
-        static member ( * ) (v1:Vector, v2:Vector) = Array.map2 ( * ) v1.Value v2.Value |> Vector
-
-        // Dot product of two 'Vector's, thus creating a 'Graph'.
-        static member ( */ ) (v1:Vector, v2:Vector) = v1 * v2 |> Vector.toArray |> Array.reduce (+)
+        let init basicInput idxType n  = initShifted basicInput idxType 0 n
         
+    [<RequireQualifiedAccess>]
+    module Matrix = 
+        
+        let create size vectors = {size=size; vectors=vectors}
 
-    type Matrix(mIn:Vector[]) as self =
-        // 'Matrix' = 'Array' of 'Vector's.
-        let m = mIn
+        let vectors (m:Matrix) = m.vectors
+        let size (m:Matrix) = m.size
+        let size1 = size >> fst
+        let size2 = size >> snd
 
-        // Dimensions of the matrix (Length of 'Vector's, number of vectors)
-        // Therefore, the vectors are stacked column-wise
-        let dim = (mIn.[0].Length,mIn.Length)               
-        member this.Vectors = mIn
-        member this.Size = dim
-
-        // Transpose the matrix
-        member this.T = Matrix.transpose self
-        override this.GetHashCode() = hash (dim, mIn)
-
-        // Two 'Matrix' are equal when ell their 'Vector's are equal
-        override this.Equals(m) = 
-            match m with
-            | :? Matrix as m -> Array.forall2 (=) this.Vectors m.Vectors
-            | _ -> false
-
-        // Get the 'Vector's inside the 'Matrix'
-        static member vectors (m:Matrix) = m.Vectors
-        static member size (m:Matrix) = m.Size
+        let inline private returnIfEqualSize ((v1,v2):Matrix*Matrix) result = if v1.size = v2.size then result else invalidArg "Matrix" "Cannot return the result, 'Matrix' don't have the same size."
 
         // Create a standard 'Matrix' of graph 'Parameter' or graph 'Variable' 
         // basicInput : specifies the 'Graph.Inputs.BasicInput' type 
         // shift : choose the shift to be applied to the changing index.
         // (i,j) : number of rows and columns
         // Note : each column/'Vector' has fixed 'Group' index.
-        static member initShifted basicInput shift (i,j) = [| for grpidx in 0..j-1 do Vector.initShifted basicInput (Group(grpidx)) shift i |] |> Matrix
-        
+        let initShifted basicInput shift (i,j) = {size=(i,j); vectors=[| for grpidx in 0..j-1 do Vector.initShifted basicInput (Group(grpidx)) shift i |]}
+
         // Specialize 'initShifted' function where
         // 'shift' parameter is set to 0.
-        static member init basicInput (i,j) = Matrix.initShifted basicInput 0 (i,j)
-        
+        let init basicInput (i,j) = initShifted basicInput 0 (i,j)
+
         // Matrix transpose
-        static member transpose = Matrix.vectors >> Array.map (fun v -> v.Value) >> Array.transpose >> Array.map (fun v -> Vector(v)) >> Matrix
-        
+        let transpose m = {size=(snd m.size, fst m.size); 
+                           vectors=(Array.map Vector.graphs >> Array.transpose >> Array.map (Vector.create (size2 m))) m.vectors }
+              
         // Create a 'Matrix' by elementwise addition of two 'Matrix'.
-        static member ( + ) (m1:Matrix, m2:Matrix) = if m1.Size = m2.Size then Array.map2 ( + ) m1.Vectors m2.Vectors |> Matrix else invalidArg "Matrix" "Cannot add matrices of different dimensions"
+        let add (m1:Matrix) (m2:Matrix) = { m1 with vectors=Array.map2 Vector.add m1.vectors m2.vectors } |> returnIfEqualSize (m1,m2)
         
         // Create a 'Matrix' by elementwise multiplication of two 'Matrix'.
-        static member ( * ) (m1:Matrix, m2:Matrix) = if m1.Size = m2.Size then Array.map2 ( * ) m1.Vectors m2.Vectors |> Matrix else invalidArg "Matrix" "Cannot mult. matrices of different dimension" 
+        let multiply (m1:Matrix) (m2:Matrix) = { m1 with vectors=Array.map2 Vector.multiply m1.vectors m2.vectors } |> returnIfEqualSize (m1,m2)
         
         // Create a 'Vector' by the dot product of a 'Vector' and a 'Matrix'.
-        static member ( */ ) (v:Vector, m:Matrix) = if fst m.Size = v.Length then m |> (Matrix.vectors >> Array.map (fun vm -> vm */ v) >> Vector) else invalidArg "Matrix" "Cannot dotproduct matrix and vector of different dimensions."
-        static member ( */ ) (m:Matrix, v:Vector) = ( */ ) v m.T 
-        
+        let dotProduct (v:Vector) (m:Matrix) = 
+            if fst m.size = v.size then 
+                m |> (vectors >> Array.map (fun vm -> Vector.dotProduct vm v) >> Vector.create (size2 m) ) 
+            else invalidArg "Matrix" "Cannot dotproduct matrix and vector of different dimensions."
+                  
+        let dotProduct (m:Matrix) (v:Vector) = m |> (transpose >> dotProduct v)
+
         // Create a 'Matrix' by the dot product of two 'Matrix'.
-        static member ( */ ) (m1:Matrix, m2:Matrix) = if snd m1.Size = fst m2.Size then m1.T |> (Matrix.vectors >> Array.map (fun vm1 -> vm1 */ m2) >> Matrix >> Matrix.transpose) else invalidArg "Matrix" "Cannot dotproduct matrices with wrong dimensions."
+        let dotProduct (m1:Matrix) (m2:Matrix) = 
+            if snd m1.size = fst m2.size then 
+                m1 |> (transpose >> vectors >> Array.map (fun vm1 -> dotProduct vm1 m2) >> Matrix >> Matrix.transpose) 
+            else invalidArg "Matrix" "Cannot dotproduct matrices with wrong dimensions."
+
+        // Two 'Matrix' are equal when ell their 'Vector's are equal
+        override this.Equals(m) = 
+            match m with
+            | :? Matrix as m -> Array.forall2 (=) this.Vectors m.Vectors
+            | _ -> false
+        
+        
+        
+
 
     // Create a 'Graph' from the linear combinaison of 'Parameter's and 'Variable's.
     // grpIdx : 'Group' index for every element of the linear combinaison.
