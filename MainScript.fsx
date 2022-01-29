@@ -4,6 +4,7 @@
 #load "ComputationalGraph\BasicInput.fs"
 #load "ComputationalGraph\StateGraph.fs"
 #load "ComputationalGraph\Graph.fs"
+#load "ComputationalGraph\Node.fs"
 
 
 

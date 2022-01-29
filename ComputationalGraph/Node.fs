@@ -58,7 +58,7 @@ module Node =
         
     [<RequireQualifiedAccess>]
     module Matrix = 
-        
+
         let create size vectors = {size=size; vectors=vectors}
 
         let vectors (m:Matrix) = m.vectors
@@ -66,7 +66,10 @@ module Node =
         let size1 = size >> fst
         let size2 = size >> snd
 
-        let inline private returnIfEqualSize ((v1,v2):Matrix*Matrix) result = if v1.size = v2.size then result else invalidArg "Matrix" "Cannot return the result, 'Matrix' don't have the same size."
+        let inline private returnIfEqualSize ((m1,m2):Matrix*Matrix) result = if m1.size = m2.size then result else invalidArg "Matrix" "Cannot return the result, 'Matrix' don't have the same size."
+
+        // Two 'Matrix' are equal when all their 'Vector's are equal
+        let equal (m1:Matrix) (m2:Matrix) = Array.forall2 Vector.equal m1.vectors m2.vectors |> returnIfEqualSize (m1,m2)
 
         // Create a standard 'Matrix' of graph 'Parameter' or graph 'Variable' 
         // basicInput : specifies the 'Graph.Inputs.BasicInput' type 
@@ -90,41 +93,32 @@ module Node =
         let multiply (m1:Matrix) (m2:Matrix) = { m1 with vectors=Array.map2 Vector.multiply m1.vectors m2.vectors } |> returnIfEqualSize (m1,m2)
         
         // Create a 'Vector' by the dot product of a 'Vector' and a 'Matrix'.
-        let dotProduct (v:Vector) (m:Matrix) = 
+        let LeftVectorProduct (v:Vector) (m:Matrix) = 
             if fst m.size = v.size then 
                 m |> (vectors >> Array.map (fun vm -> Vector.dotProduct vm v) >> Vector.create (size2 m) ) 
             else invalidArg "Matrix" "Cannot dotproduct matrix and vector of different dimensions."
                   
-        let dotProduct (m:Matrix) (v:Vector) = m |> (transpose >> dotProduct v)
+        let RightVectorProduct (m:Matrix) (v:Vector) = m |> (transpose >> LeftVectorProduct v)
 
         // Create a 'Matrix' by the dot product of two 'Matrix'.
-        let dotProduct (m1:Matrix) (m2:Matrix) = 
+        let MatrixProduct (m1:Matrix) (m2:Matrix) = 
             if snd m1.size = fst m2.size then 
-                m1 |> (transpose >> vectors >> Array.map (fun vm1 -> dotProduct vm1 m2) >> Matrix >> Matrix.transpose) 
-            else invalidArg "Matrix" "Cannot dotproduct matrices with wrong dimensions."
-
-        // Two 'Matrix' are equal when ell their 'Vector's are equal
-        override this.Equals(m) = 
-            match m with
-            | :? Matrix as m -> Array.forall2 (=) this.Vectors m.Vectors
-            | _ -> false
+                transpose { size=(fst m1.size, snd m2.size); vectors= m1 |> (transpose >> vectors >> Array.map (fun vm1 -> LeftVectorProduct vm1 m2)) }
+            else invalidArg "Matrix" "Cannot MatrixProduct matrices with wrong dimensions."
         
-        
-        
-
-
+    
     // Create a 'Graph' from the linear combinaison of 'Parameter's and 'Variable's.
     // grpIdx : 'Group' index for every element of the linear combinaison.
     // startLag_, endLag_ : the first (inclu.) and last (inclu.) 'Standard' index for each element ('Parameter' and 'Variable')
-    let inline linearCombinaison grpIdx startLag_ endLag_ = ( */ ) (Vector.initShifted Parameter (Group(grpIdx)) startLag_ (endLag_-startLag_+1))
-                                                                   (Vector.initShifted Variable (Group(grpIdx)) startLag_ (endLag_-startLag_+1))
+    let inline linearCombinaison grpIdx startLag_ endLag_ = Vector.dotProduct (Vector.initShifted Parameter (Group(grpIdx)) startLag_ (endLag_-startLag_+1))
+                                                                              (Vector.initShifted Variable (Group(grpIdx)) startLag_ (endLag_-startLag_+1))
         
     // Create a 'Array' of 'Graph's from the sum of dotproducts.
     // For instance, Ax + By + ...
     let inline multivariateLinearCombinaison startLag_ endLag_ n = 
-        let AtLag l = (Matrix.initShifted Parameter ((l-startLag_)*n) (n,n)) */ (Vector.init Variable (Standard(l)) n)
+        let AtLag l = Matrix.RightVectorProduct (Matrix.initShifted Parameter ((l-startLag_)*n) (n,n)) (Vector.init Variable (Standard(l)) n)
         [|startLag_..endLag_|] |> Array.map AtLag
-                               |> Array.reduce (+)
-                               |> Vector.toArray
+                               |> Array.reduce Vector.add
+                               |> Vector.graphs
 
 
