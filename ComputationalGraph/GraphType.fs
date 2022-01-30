@@ -2,7 +2,6 @@
 
 open System.Runtime.CompilerServices
 
-[<AutoOpen>]
 module GraphType = 
     
     [<IsReadOnly;Struct>]

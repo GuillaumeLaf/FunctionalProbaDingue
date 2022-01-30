@@ -4,6 +4,7 @@ open System.Runtime.CompilerServices
 open FSharpPlus.Data
 open FSharpPlus.Control
 open FSharpPlus
+open GraphType
 
 module Graph =   
     

@@ -1,5 +1,7 @@
 ﻿namespace ComputationalGraph
 
+open GraphType
+
 module BasicInput =
     
     let increment (input:BasicInput) (n:int) = 

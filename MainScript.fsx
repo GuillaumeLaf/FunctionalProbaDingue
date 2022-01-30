@@ -6,6 +6,11 @@
 #load "ComputationalGraph\Graph.fs"
 #load "ComputationalGraph\Node.fs"
 
+#load "TimeSeries\Statistics.fs"
+#load "TimeSeries\TimeseriesType.fs"
+#load "TimeSeries\TimeSeries.fs"
+#load "TimeSeries\TimeseriesState.fs"
+
 
 
 

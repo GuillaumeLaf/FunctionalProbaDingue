@@ -4,6 +4,7 @@ open FSharpPlus
 open FSharpPlus.Data
 open FSharpPlus.Control
 open Graph
+open GraphType
 
 module Node = 
     // Special nodes groups represents basic templates.

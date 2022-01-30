@@ -2,6 +2,7 @@
 
 open FSharpPlus
 open FSharpPlus.Data
+open GraphType
 
 module StateGraph = 
     

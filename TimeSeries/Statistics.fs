@@ -1,4 +1,4 @@
-﻿namespace TimeSeries
+﻿namespace Timeseries
 
 open MathNet.Numerics.LinearAlgebra
 open MathNet.Numerics.Statistics

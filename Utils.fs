@@ -23,11 +23,13 @@ module Utils
     module Array2D = 
         let length (array:'T[,]) = Array2D.length1 array * Array2D.length2 array
         let getRow idx (array:'T[,]) = array.[idx,*]
-        let setRow idx (array:'T[,]) values = array.[idx,*] <- values
+        let setRow idx values (array:'T[,]) = array.[idx,*] <- values; array
         let getCol idx (array:'T[,]) = array.[*,idx]
-        let setCol idx (array:'T[,]) values = array.[*,idx] <- values
+        let setCol idx values (array:'T[,]) = array.[*,idx] <- values; array
 
-        let ofArray (array: 'T[][]) = 
+        let ofSingleArray (array:'T[]) = Array2D.init array.Length 1 (fun i _ -> array.[i])
+
+        let ofArray (array:'T[][]) = 
             if (Array.concat >> Array.length) array % array.[0].Length = 0 then     
                 Array2D.init array.Length array.[0].Length (fun i j -> array.[i].[j])
             else invalidArg "array" "Jagged array cannot be casted into Array2D. At least one inner array hasn't the right size."
