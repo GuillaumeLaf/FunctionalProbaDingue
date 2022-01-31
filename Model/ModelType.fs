@@ -12,13 +12,16 @@ module ModelType =
     // Snd : state of the timeseries
     type S = S of GraphType.S * (int*TimeseriesType.TS)
 
+    // Vector Autoregressive Model
     type VAR = {n:int; order:int; parameters:float32[,][] option }
 
     type T = 
         | VAR of VAR 
 
-    type Model = { ts:TS option ;
+    type Model = { n:int;
+                   ts:TS option ;
+                   innovations:TS option;
                    model:T;
-                   graph:Graph;
+                   graphs:Graph[];
                    }
 

@@ -5,64 +5,67 @@ open FSharpPlus.Data
 open MathNet.Numerics.LinearAlgebra
 open MathNet.Numerics.Distributions
 open ComputationalGraph
+open ComputationalGraph.GraphType
 open ComputationalGraph.Graph
-open GraphType
 open Timeseries
+open Timeseries.TimeseriesState
+open ModelType
+open ModelState
+
 
 module Model = 
+    
+    let ts m = m.ts |> Option.get
+    let innovations m = m.innovations |> Option.get
+    let model m = m.model 
+    let graphs m = m.graphs
 
-    module Univariate = 
+    module ModelTimeseries = 
+        // Timeseries Monad for computing the new 'Variable' values in the 'State Graph' 
+        let updateRule = (function
+            | VAR(var) -> [| for i in 1..var.order do lagElementsDefault i |]) 
+                            >> State.traverseBack >> map Array.transpose >> map Array2D.ofArray
+
+    // Module grouping function for creating/managing graphs of a given model.
+    module ModelGraph = 
+        
+        let create = function
+        | VAR(var) -> Node.multivariateLinearCombinaison 0 (var.order-1) var.n 
+                       |> Array.mapi (fun idxG g -> Graph.add g (Input(Innovation(idxG,0)))) 
+
+        let toMonad = Array.map Graph.toMonad >> State.traverseBack 
+
+        let updateVariables = ModelTimeseries.updateRule >> evalT >> bind (GraphState.updateVariables >> modifyG) 
+
+
+    let create (m:T) = 
+        let tmp = ModelGraph.create m
+        { n=tmp.Length; ts=None; innovations=None; model=m; graphs=tmp }
+
+    // Add the innovations covariance matrix.
+    let addInnovationCovariance cov (m:Model) = 
+        if (Array2D.length1 cov) = m.n && (Array2D.length2 cov) = m.n then 
+             let tmpInnov = innovations m
+             { m with innovations= Some{ tmpInnov with stats= tmpInnov.stats.AddCovs cov } }
+        else invalidArg "Covs" "Covariance matrix is not squared or not the same size as the number of timeseries."
+
+    let randomNormalVector length lowerCholesky = ( * ) (Matrix<float32>.Build.DenseOfArray(lowerCholesky))
+                                                        (Vector<float32>.Build.Random(length, new Normal())) |> Vector.toArray
+
+    // Sample an 'Array' from a multivariate normal
+    // Note : Covariance matrix must be already initialized in the 'innovations' 'TS'.
+    let randomNormalInnovations (m:Model) = randomNormalVector ((ts >> TS.size) m) ((innovations >> TS.stats >> Statistics.Multivariate.Stats.lowerCholesky) m)
+
+
+    
+            
+(*    module Univariate = 
         // This module will only serve as an interface for the multivariate case.
         // We can always represent a Univariate model from a Multivariate one.
         let x = 0
 
-    module Multivariate = 
 
-        // Model type with the parameters of the corresponding model.
-        type Model = 
-            | VAR of order:int      // Vector Autoregressive Model
 
-        type ModelParameter = 
-            | VARp of coeffs:float32[,]
-
-        let defaultParameters = function        
-            | VAR(order) -> VARp(Array2D.zeroCreate order order)
-
-        let areParametersCompatible = function
-            | VARp(p1),VARp(p2) -> (Array2D.length1 p1 = Array2D.length1 p2) && (Array2D.length2 p1 = Array2D.length2 p2)
-
-        // 'Model' class
-        type Model<'T>(nTimeseries:int, m:Model) = 
-            let n = nTimeseries
-            let model = m   
-        
-            // 'Timeseries' object representing innovations for the model.
-            let mutable innovations = TimeSeries.Multivariate.TS.empty nTimeseries 
-
-            // 'ModelParameter' storing parameter values of model.
-            let mutable parameters = defaultParameters m
-
-            // Compute the 'Array' of 'Graph's
-            let g = match m with
-                         | VAR(order) -> Node.multivariateLinearCombinaison 0 (order-1) nTimeseries 
-                                            |> Array.mapi (fun idxG g -> g + Input(Innovation(idxG,0)))
-        
-            // Graph Monad extension of the 'Graph'
-            let graphMonad = Array.map Graph.ToMonad g |> State.traverseBack                            : State<Graph.Monad.S<float32>,float32[]>
-        
-            // Timeseries Monad for computing the new 'Variable' values in the 'State Graph' 
-            let updateRule = 
-                match m with
-                | VAR(order) -> [| for i in 1..order do TimeSeries.Multivariate.lagElementsDefault i |] 
-                |> (State.traverseBack >> map Array.transpose >> map Array2D.ofArray)
-        
-            // Model Monad updating the 'Variable's in the 'State Model'.
-            let updateVariables = Monad.evalT updateRule >>= (Graph.Monad.updateVariables >> Monad.modifyG) 
-
-            // Sample an 'Array' from a multivariate normal
-            // Note : Covariance matrix must be already initialized in the 'innovations' 'TS'.
-            let randomNormalInnovations () = ( * ) (Matrix<float32>.Build.DenseOfArray(innovations.Stats.CholeskyLowerCovs))
-                                                   (Vector<float32>.Build.Random(nTimeseries, new Normal())) |> Vector.toArray
 
             let updateInnovations idx = monad {
                 let sampleInnov = randomNormalInnovations()
@@ -92,11 +95,8 @@ module Model =
                 match (parameters, (defaultParameters m)) with
                 | VARp(p1),VARp(p2) -> p1 = p2
 
-            // Add the innovations covariance matrix. 
-            member this.AddInnovationsCovariance covs = 
-                if (Array2D.length1 covs) = nTimeseries && (Array2D.length2 covs) = nTimeseries then 
-                    innovations.Stats.AddCovs covs
-                else invalidArg "Covs" "Covariance matrix is not squared or not the same size as the number of timeseries."
+             
+
 
             // Add parameters to the current model.
             member this.AddParameters p = 
@@ -112,7 +112,7 @@ module Model =
                 else invalidArg "Innovations" "Innovations Covariance Matrix must be instantiated before sampling."
             
         
-        
+        *)
 
 
 

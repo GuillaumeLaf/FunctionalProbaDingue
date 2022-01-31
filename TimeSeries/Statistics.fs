@@ -40,7 +40,7 @@ module Statistics =
 
     module Multivariate = 
         // Module for multivariate timeseries statistics.
-        type Stats (tsIn:float32[,]) = 
+        type Stats (tsIn:float32[,]) as self = 
             // Timeseries data but MUST NOT be modified
             // Fst : Cross-section dimension
             // Snd : Time dimension
@@ -93,7 +93,7 @@ module Statistics =
 
             member this.CholeskyLowerCovs = memoize2D 1 cholesky
 
-            member this.AddCovs = Some >> Array.set mem2D 0 
+            member this.AddCovs cov = (Some >> Array.set mem2D 0) cov; self
 
             member this.HasCovs = not ((mem2D.[0]) = None)
 
@@ -101,6 +101,7 @@ module Statistics =
             static member stds (s:Stats) = s.Stds
             static member vars (s:Stats) = s.Vars
             static member covs (s:Stats) = s.Covs
+            static member lowerCholesky (s:Stats) = s.CholeskyLowerCovs
 
 
             

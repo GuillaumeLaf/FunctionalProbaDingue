@@ -17,7 +17,7 @@
 	<Compile Include="Utils.fs" />
 	<Compile Include="ComputationalGraph\GraphType.fs" />
 	<Compile Include="ComputationalGraph\BasicInput.fs" />
-	<Compile Include="ComputationalGraph\StateGraph.fs" />
+	<Compile Include="ComputationalGraph\GraphState.fs" />
 	<Compile Include="ComputationalGraph\Graph.fs" />
 	<Compile Include="ComputationalGraph\Node.fs" />
 	<Compile Include="TimeSeries\Statistics.fs" />

@@ -4,7 +4,7 @@ open FSharpPlus
 open FSharpPlus.Data
 open GraphType
 
-module StateGraph = 
+module GraphState = 
     
     // Extract the whole array of the 'S' type.
     let getParameters (S(p,_,_)) = p
