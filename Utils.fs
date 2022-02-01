@@ -1,7 +1,13 @@
 ﻿[<AutoOpen>]
 module Utils 
     
+    open MathNet.Numerics.LinearAlgebra
+    open MathNet.Numerics.Distributions
+
     let mapTuple f (x,y) = (f x, f y)
+
+    let randomNormalVector length lowerCholesky = ( * ) (Matrix<float32>.Build.DenseOfArray(lowerCholesky))
+                                                        (Vector<float32>.Build.Random(length, new Normal())) |> Vector.toArray
 
     // https://rosettacode.org/wiki/Cholesky_decomposition#F.23
     let cholesky a =

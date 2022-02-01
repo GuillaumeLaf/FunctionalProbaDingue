@@ -96,9 +96,9 @@ module Graph =
             | Addition(l,r) -> return! (+) <!> (loop l) <*> (loop r)
             | Multiplication(l,r) -> return! (*) <!> (loop l) <*> (loop r)
             | Input(i) -> match i with
-                              | Parameter(grpidx,idx) -> return! lift (StateGraph.parameterM grpidx idx)
-                              | Variable(grpidx,idx) -> return! lift (StateGraph.variableM grpidx idx)
-                              | Innovation(grpidx,idx) -> return! lift (StateGraph.innovationM idx)
+                              | Parameter(grpidx,idx) -> return! lift (GraphState.parameterM grpidx idx)
+                              | Variable(grpidx,idx) -> return! lift (GraphState.variableM grpidx idx)
+                              | Innovation(grpidx,idx) -> return! lift (GraphState.innovationM idx)
         }
         loop >> ContT.eval  
 

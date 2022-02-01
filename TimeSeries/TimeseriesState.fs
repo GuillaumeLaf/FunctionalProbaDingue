@@ -22,20 +22,20 @@ module TimeseriesState =
     let incrementTime = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS),unit> 
 
     // Get the Array2D object representing the 'TimeSeries'
-    let timeSeries = snd <!> State.get       : State<(int * TS),TS>
+    let timeseries = snd <!> State.get       : State<(int * TS),TS>
 
     // Get the cross-sectional (or time) dimension
-    let size = TS.size <!> timeSeries
-    let length = TS.length <!> timeSeries
+    let size = TS.size <!> timeseries
+    let length = TS.length <!> timeseries
 
     // Extract the current cross-section
-    let currentElements = TS.atTime <!> currentTime <*> timeSeries
+    let currentElements = TS.atTime <!> currentTime <*> timeseries
 
     // Set the current elements of the cross-section
     let setCurrentElements e = State.modify (fun (idx,ts) -> (idx,TS.modifyAtTime idx e ts))      : State<(int * TS),unit> 
 
     // Extract the cross-sections at a given lag (from the current time)
-    let lagElements lag = TS.atTime <!> ((+) -lag <!> currentTime) <*> timeSeries
+    let lagElements lag = TS.atTime <!> ((+) -lag <!> currentTime) <*> timeseries
     let lagElementsDefault lag = Option.defaultValue <!> (Array.zeroCreate <!> size) <*> lagElements lag
 
     // Extract the cross-sections at a given lead in the future (from the current time)

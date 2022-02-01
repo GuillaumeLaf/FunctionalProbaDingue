@@ -101,6 +101,7 @@ module Statistics =
             static member stds (s:Stats) = s.Stds
             static member vars (s:Stats) = s.Vars
             static member covs (s:Stats) = s.Covs
+            static member hasCov (s:Stats) = s.HasCovs
             static member lowerCholesky (s:Stats) = s.CholeskyLowerCovs
 
 

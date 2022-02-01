@@ -6,6 +6,8 @@ open FSharpPlus.Data
 open TimeseriesType
 
 // Everything that touches timeseries is implemented as multivariate operations.
+// 'TS' are stored as 'Array2D' where the first index is the number of timeseries and
+// the second is the length of each timeseries.
 module TS = 
     
     let length ts = ts.length
@@ -19,6 +21,9 @@ module TS =
 
     let createMultivariate (ts:float32[,]) = {length=ts.[0,*].Length; size=ts.[*,0].Length; data=ts; stats=Statistics.Multivariate.Stats(ts)}
 
+    let univariateZeroCreate = Array.zeroCreate >> createUnivariate
+    let multivariateZeroCreate i j = Array2D.zeroCreate i j |> createMultivariate
+    
     let get idx ts = ts.data.[idx,*]
     let atTime t ts = if (0 <= t || t < ts.length) then Some ts.data.[*,t] else None 
 
