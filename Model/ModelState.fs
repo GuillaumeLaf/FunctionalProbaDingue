@@ -37,7 +37,7 @@ module ModelState =
     let updateInnovations rndVectorFunc = monad {
         let rndSampleVector = rndVectorFunc ()
         do! (GraphState.updateInnovations >> modifyG) rndSampleVector
-        do! (TimeseriesState.setCurrentElements >> modifyI) rndSampleVector 
+        do! (TimeseriesState.setCurrentElements >> modifyI) rndSampleVector.[*,0] 
     }
 
     let updateVariables = evalT >> bind (GraphState.updateVariables >> modifyG) 

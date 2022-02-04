@@ -2,14 +2,22 @@
 open System
 open FSharpPlus.Data
 open FSharpPlus
-open ComputationalGraph.Graph
+open Models
+open Models.ModelType
+
 
 [<EntryPoint>]
 let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
-    let g = Input(Parameter(0,0)) + Input(Parameter(0,1)) + Input(Parameter(0,2)) * Input(Parameter(0,3))
-    printfn "%A" (Graph.DefaultState g)
+    let parameters = (Array2D.ofArray >> Array.singleton) [|[|0.25f; 0.0f|]; [|0.6f; 0.45f|]|]
+    let innovCovariance = Array2D.ofArray [|[|1.0f;0.0f|];[|0.0f;1.0f|]|]
+    let m = VAR({n=2; order=1; parameters=Some parameters; covariance=Some innovCovariance})
+    let model = Model.create m
+    
+    let sampledModel = Model.sample 1000 model
+    printfn "%A" sampledModel
+    let data = sampledModel.ts.Value.data.[0,*] |> Array.map float
 
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)

@@ -3,9 +3,42 @@
 open MathNet.Numerics.LinearAlgebra
 open MathNet.Numerics.Statistics
 
-module Statistics = 
+open FSharpPlus
+open FSharpPlus.Data
+
+open TimeseriesType
+
+module Stats = 
     // Module to create descriptive - and other - statistics about a timeseries. 
     // The module treats 'Array's and 'Array2D's not 'TS' (timeseries).
+
+    module Computations = 
+        let Mean = Array2D.collectByRow Array.average
+        let Std = Array2D.collectByRow (Statistics.StandardDeviation >> float32)        : (float32[,] -> float32[])
+
+    module private StatsState =     
+
+        let data = TS.data <!> State.get        : State<TS,float32[,]>
+        let stats = TS.stats <!> State.get      : State<TS,Stats>
+
+        let memoize statistic compute set = monad {
+            let! s = stats
+            let! d = data
+            if (statistic s) = None then
+                let result = compute d
+                do! State.modify (fun t -> { t with Stats=set result s })
+                return result
+            else return (statistic >> Option.get) s
+        }
+
+        let mean = memoize Stats.mean Computations.Mean Stats.setMean
+        let std = memoize Stats.std Computations.Std Stats.setStd
+        let var = std >>= (Array.map (fun x -> x*x)  >> result)
+                                     
+    let mean = State.run StatsState.mean 
+    let std = State.run StatsState.std
+    let var = State.run StatsState.var
+        
 
     module Univariate = 
         // Module for univariate timeseries statistics.
@@ -39,6 +72,7 @@ module Statistics =
             static member var (s:Stats) = s.Var
 
     module Multivariate = 
+
         // Module for multivariate timeseries statistics.
         type Stats (tsIn:float32[,]) as self = 
             // Timeseries data but MUST NOT be modified

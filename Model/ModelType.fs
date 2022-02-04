@@ -15,7 +15,10 @@ module ModelType =
     type S = S of GraphType.S * (int*TimeseriesType.TS*TimeseriesType.TS)
 
     // Vector Autoregressive Model
-    type VAR = {n:int; order:int; parameters:float32[,][] option }
+    // 'parameters' -> Fst : which timeseries
+    //              -> Snd : which parameter
+    //              -> Third : which lag
+    type VAR = {n:int; order:int; parameters:float32[,][] option; covariance:float32[,] option }
 
     type DGP = 
         | VAR of VAR 

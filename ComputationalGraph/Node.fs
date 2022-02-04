@@ -117,7 +117,7 @@ module Node =
     // Create a 'Array' of 'Graph's from the sum of dotproducts.
     // For instance, Ax + By + ...
     let inline multivariateLinearCombinaison startLag_ endLag_ n = 
-        let AtLag l = Matrix.RightVectorProduct (Matrix.initShifted Parameter ((l-startLag_)*n) (n,n)) (Vector.init Variable (Standard(l)) n)
+        let AtLag l = Matrix.LeftVectorProduct (Vector.init Variable (Standard(l)) n) (Matrix.initShifted Parameter ((l-startLag_)*n) (n,n)) 
         [|startLag_..endLag_|] |> Array.map AtLag
                                |> Array.reduce Vector.add
                                |> Vector.graphs

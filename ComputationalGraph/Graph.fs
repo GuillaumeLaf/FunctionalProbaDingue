@@ -6,6 +6,10 @@ open FSharpPlus.Control
 open FSharpPlus
 open GraphType
 
+
+// The most important part of this project.
+// Creating a computational graph eases creation of complex computations. 
+// The ideal would be to begin with a classical computational graph and then convert/compile it to blazingly fast arrays operations. 
 module Graph =   
     
     let add g1 g2 = Addition(g1,g2)
@@ -98,11 +102,11 @@ module Graph =
             | Input(i) -> match i with
                               | Parameter(grpidx,idx) -> return! lift (GraphState.parameterM grpidx idx)
                               | Variable(grpidx,idx) -> return! lift (GraphState.variableM grpidx idx)
-                              | Innovation(grpidx,idx) -> return! lift (GraphState.innovationM idx)
+                              | Innovation(grpidx,idx) -> return! lift (GraphState.innovationM grpidx idx)
         }
         loop >> ContT.eval  
 
-    let defaultState : (Graph -> BasicInput[,][]) = 
+    let defaultState : (Graph -> S) = 
         collectInputs
           >> Array.groupBy (function | Parameter(_,_) -> 0 | Variable(_,_) -> 1 | Innovation(_,_) -> 2)
           >> Array.sortBy fst
@@ -111,32 +115,11 @@ module Graph =
                                                       | Innovation(grp,_) -> grp) 
                             >> Array.map (snd >> Array.distinct >> Array.length >> Array.zeroCreate)
                             >> Array2D.ofArray)
+          >> (fun a -> S(a.[0],a.[1],a.[2]))
 
 
 
-    // The most important part of this project.
-    // Creating a computational graph eases creation of complex computations. 
-    // The ideal would be to begin with a classical computational graph and then convert/compile it to blazingly fast arrays operations. 
-(*    type Graph = 
-        | Input of BasicInput
-        | Constant of value:float32
-        | Addition of Graph * Graph
-        | Multiplication of Graph * Graph
-        static member inline get_Zero() = Constant(LanguagePrimitives.GenericZero)
-        static member inline ( + ) (l:Graph, r:Graph) = Addition(l,r)
-        static member inline ( * ) (l:Graph, r:Graph) = Multiplication(l,r)
-        static member inline op_Equality (g1:Graph, g2:Graph) = 
-            let opCont l1 r1 l2 r2 f : Cont<'a,bool> = monad { let! xl = f l1 l2
-                                                               let! xr = f r1 r2
-                                                               return xl && xr }
-            let rec loop g1 g2 = monad {
-                match g1,g2 with
-                | Input(i1),Input(i2) -> return i1 = i2
-                | Addition(l1,r1),Addition(l2,r2) -> return! opCont l1 r1 l2 r2 loop
-                | Multiplication(l1,r1),Multiplication(l2,r2) -> return! opCont l1 r1 l2 r2 loop
-                | _ -> return false         // !!!
-            }
-            Cont.run (loop g1 g2) id*)
+
 
 
 

@@ -20,18 +20,20 @@
 	<Compile Include="ComputationalGraph\GraphState.fs" />
 	<Compile Include="ComputationalGraph\Graph.fs" />
 	<Compile Include="ComputationalGraph\Node.fs" />
-	<Compile Include="TimeSeries\Statistics.fs" />
 	<Compile Include="TimeSeries\TimeseriesType.fs" />
+	<Compile Include="TimeSeries\Statistics.fs" />
 	<Compile Include="TimeSeries\TimeSeries.fs" />
 	<Compile Include="TimeSeries\TimeseriesState.fs" />
 	<Compile Include="Model\ModelType.fs" />
 	<Compile Include="Model\ModelState.fs" />
 	<Compile Include="Model\Model.fs" />
+	 <!--
 	<Compile Include="UnitTests\UtilsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\StatisticsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\TimeSeriesTest.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\GraphTest.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\NodeTest.fs" />
+	-->
     <Compile Include="Main.fs" />
     <None Include="MainScript.fsx" />
   </ItemGroup>
