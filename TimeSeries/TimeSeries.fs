@@ -17,10 +17,12 @@ module TS =
 (*    let univariateZeroCreate = Array.zeroCreate >> createUnivariate
     let multivariateZeroCreate i j = Array2D.zeroCreate i j |> createMultivariate*)
     
-    let get idx ts = ts.data.[idx,*]
-    let atTime t ts = if (0 <= t) && (t < ts.length) then Some ts.data.[*,t] else None 
+    let create i j = (Array2D.zeroCreate i >> TS.create) j
 
-    let modifyAtTime t values ts = if (0 <= t || t < ts.length) then { ts with data= Array2D.setCol t values ts.data} else invalidArg "Index" "Time index greater than length of Timeseries."
+    let get idx = TS.data >> Array2D.row idx 
+    let atTime t ts = if (0 <= t) && (t < ts.Length) then Some ts.Data.[*,t] else None 
+
+    let modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Array2D.setCol t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
     
 
 

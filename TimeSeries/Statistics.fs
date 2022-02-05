@@ -5,6 +5,7 @@ open MathNet.Numerics.Statistics
 
 open FSharpPlus
 open FSharpPlus.Data
+open FSharpPlus.Control
 
 open TimeseriesType
 
@@ -15,13 +16,14 @@ module Stats =
     module Computations = 
         let Mean = Array2D.collectByRow Array.average
         let Std = Array2D.collectByRow (Statistics.StandardDeviation >> float32)        : (float32[,] -> float32[])
-
+        let Cov (data:float32[,]) = Array2D.zeroCreate (Array2D.length1 data) (Array2D.length1 data) |> Array2D.mapi (fun i j _ -> Statistics.Covariance(data.[i,*],data.[j,*]) |> float32)
+        
     module private StatsState =     
 
         let data = TS.data <!> State.get        : State<TS,float32[,]>
         let stats = TS.stats <!> State.get      : State<TS,Stats>
 
-        let memoize statistic compute set = monad {
+        let inline memoize statistic compute set = monad {
             let! s = stats
             let! d = data
             if (statistic s) = None then
@@ -31,13 +33,19 @@ module Stats =
             else return (statistic >> Option.get) s
         }
 
+        let inline memoizeFromArg arg statistics compute set = arg >>= (fun a -> memoize statistics (flip compute a) set)
+                                  
         let mean = memoize Stats.mean Computations.Mean Stats.setMean
         let std = memoize Stats.std Computations.Std Stats.setStd
         let var = std >>= (Array.map (fun x -> x*x)  >> result)
+        let cov = memoize Stats.cov Computations.Cov Stats.setCov
+        let lowerCholeskyCov = memoizeFromArg cov Stats.lowerCholeskyCov (fun _ -> cholesky) Stats.setLowerCholeskyCov
                                      
     let mean = State.run StatsState.mean 
     let std = State.run StatsState.std
     let var = State.run StatsState.var
+    let cov = State.run StatsState.cov
+    let lowerCholeskyCov = State.run StatsState.lowerCholeskyCov
         
 
     module Univariate = 

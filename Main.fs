@@ -17,7 +17,7 @@ let main argv =
     
     let sampledModel = Model.sample 1000 model
     printfn "%A" sampledModel
-    let data = sampledModel.ts.Value.data.[0,*] |> Array.map float
+    let data = sampledModel.Ts.Value.data.[0,*] |> Array.map float
 
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)

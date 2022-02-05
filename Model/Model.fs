@@ -7,16 +7,12 @@ open ComputationalGraph.GraphType
 open ComputationalGraph.Graph
 open Timeseries
 open Timeseries.TimeseriesState
+open Timeseries.TimeseriesType
 open ModelType
 open ModelState
 
 
 module Model = 
-    
-    let ts m = m.ts |> Option.get
-    let innovations m = m.innovations |> Option.get
-    let model m = m.model 
-    let graphs m = m.graphs
 
     module ModelTimeseries = 
         // Timeseries Monad for computing the new 'Variable' values in the 'State Graph' 
@@ -50,10 +46,10 @@ module Model =
 
     let create (m:DGP) = 
         let tmp = ModelGraph.create m
-        { n=tmp.Length; ts=None; innovations=None; model=m; 
-        graphs=tmp; graphMonad=ModelState.graphToMonad tmp; updateRule=ModelTimeseries.updateRule m}
+        { N=tmp.Length; Ts=None; Innovations=None; Model=m; 
+          Graphs=tmp; GraphMonad=ModelState.graphToMonad tmp; UpdateRule=ModelTimeseries.updateRule m}
 
-    let defaultState (m:Model) = S(ModelGraph.state m.model, (0,ts m, innovations m))
+    let defaultState (m:Model) = S(ModelGraph.state m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
         
     // Add the innovations covariance matrix to 'DGP' of 'Model' 'm'
 (*    let addInnovationCovariance cov (m:Model) = 
@@ -63,22 +59,19 @@ module Model =
 
     // Sample an 'Array' from a multivariate normal
     // Note : Covariance matrix must be already initialized in the 'innovations' 'TS'.
-(*    let randomNormalInnovations2 (m:Model) () = randomNormalVector ((ts >> TS.size) m) ((innovations >> TS.stats >> Statistics.Multivariate.Stats.lowerCholesky) m)
-                                                 |> (Array.map Array.singleton >> Array2D.ofArray)*)
-
-    let randomNormalInnovations (m:Model) () = randomNormalVector ((ts >> TS.size) m) ((ModelGraph.covariance >> cholesky) m.model)
-                                                |> (Array.map Array.singleton >> Array2D.ofArray)
+    let randomNormalInnovations (m:Model) () = randomNormalVector ((Model.ts >> Option.get >> TS.size) m) ((Model.innovations >> Option.get >> Stats.lowerCholeskyCov >> fst) m)
+                                                 |> (Array.map Array.singleton >> Array2D.ofArray)
 
     let sample n (m:Model) = 
         if true then 
-            let newTS = TS.multivariateZeroCreate m.n n
-            let newInnov = TS.multivariateZeroCreate m.n n
-            let reInitModel = { m with ts=Some newTS; innovations=Some newInnov } 
+            let newInnov = TS.create m.N n
+            let corrInnov = ((TS.stats >> Stats.setLowerCholeskyCov ((ModelGraph.covariance >> cholesky) m.Model)) newInnov |> TS.setStats) newInnov
+            let reInitModel = { m with Ts=Some (TS.create m.N n); Innovations=Some corrInnov } 
 
             let defaultState = defaultState reInitModel
             let newInnovFunc = randomNormalInnovations reInitModel
             let (S(_,(_,ts,innov))) = State.exec (ModelState.sample n newInnovFunc reInitModel) defaultState
-            { reInitModel with ts=Some ts; innovations=Some innov }
+            { reInitModel with Ts=Some ts; Innovations=Some innov }
         else invalidArg "Innovations" "Innovations and its Covariance Matrix must be instantiated before sampling."
     
     // Adapt how we compute contemporaneously correlation innovations from Innvovation 'TS' to record type 'DGP'.
