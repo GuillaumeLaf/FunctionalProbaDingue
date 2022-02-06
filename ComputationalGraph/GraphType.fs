@@ -26,5 +26,8 @@ module GraphType =
         | Addition of Graph * Graph
         | Multiplication of Graph * Graph
 
+        static member ( + ) (g1:Graph, g2:Graph) = Addition(g1,g2)
+        static member ( * ) (g1:Graph, g2:Graph) = Multiplication(g1,g2)
+
 
 

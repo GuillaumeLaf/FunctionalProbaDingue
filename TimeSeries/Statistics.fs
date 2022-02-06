@@ -9,13 +9,14 @@ open FSharpPlus.Control
 
 open TimeseriesType
 
+[<RequireQualifiedAccess>]
 module Stats = 
     // Module to create descriptive - and other - statistics about a timeseries. 
     // The module treats 'Array's and 'Array2D's not 'TS' (timeseries).
 
     module Computations = 
-        let Mean = Array2D.collectByRow Array.average
-        let Std = Array2D.collectByRow (Statistics.StandardDeviation >> float32)        : (float32[,] -> float32[])
+        let Mean = Utils.Array2D.collectByRow Array.average
+        let Std = Utils.Array2D.collectByRow (Statistics.StandardDeviation >> float32)        : (float32[,] -> float32[])
         let Cov (data:float32[,]) = Array2D.zeroCreate (Array2D.length1 data) (Array2D.length1 data) |> Array2D.mapi (fun i j _ -> Statistics.Covariance(data.[i,*],data.[j,*]) |> float32)
         
     module private StatsState =     
@@ -39,16 +40,22 @@ module Stats =
         let std = memoize Stats.std Computations.Std Stats.setStd
         let var = std >>= (Array.map (fun x -> x*x)  >> result)
         let cov = memoize Stats.cov Computations.Cov Stats.setCov
-        let lowerCholeskyCov = memoizeFromArg cov Stats.lowerCholeskyCov (fun _ -> cholesky) Stats.setLowerCholeskyCov
+        let lowerCholeskyCov = memoizeFromArg cov Stats.lowerCholeskyCov (fun _ -> Utils.cholesky) Stats.setLowerCholeskyCov
                                      
     let mean = State.run StatsState.mean 
     let std = State.run StatsState.std
     let var = State.run StatsState.var
     let cov = State.run StatsState.cov
     let lowerCholeskyCov = State.run StatsState.lowerCholeskyCov
+
+    let onlyMean = mean >> fst
+    let onlyStd = std >> fst
+    let onlyVar = var >> fst
+    let onlyCov = cov >> fst
+    let onlyLowerCholeskyCov = lowerCholeskyCov >> fst
         
 
-    module Univariate = 
+    (*module Univariate = 
         // Module for univariate timeseries statistics.
         type Stats (tsIn:float32[]) = 
             // Timeseries data but MUST NOT be modified
@@ -133,7 +140,7 @@ module Stats =
             // // Compte the covariance matrix
             member this.Covs = memoize2D 0 (fun (data:float32[,]) -> Array2D.zeroCreate n n |> Array2D.mapi (fun i j _ -> Statistics.Covariance(data.[i,*],data.[j,*]) |> float32))
 
-            member this.CholeskyLowerCovs = memoize2D 1 cholesky
+            member this.CholeskyLowerCovs = memoize2D 1 Utils.cholesky
 
             member this.AddCovs cov = (Some >> Array.set mem2D 0) cov; self
 
@@ -144,7 +151,7 @@ module Stats =
             static member vars (s:Stats) = s.Vars
             static member covs (s:Stats) = s.Covs
             static member hasCov (s:Stats) = s.HasCovs
-            static member lowerCholesky (s:Stats) = s.CholeskyLowerCovs
+            static member lowerCholesky (s:Stats) = s.CholeskyLowerCovs*)
 
 
             

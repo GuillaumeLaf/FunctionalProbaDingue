@@ -1,6 +1,6 @@
 ﻿module UtilsTest
     open Xunit
-    open TimeSeries
+    open Timeseries
     open FSharpPlus.Data
     open FSharpPlus
 

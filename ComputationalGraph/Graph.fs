@@ -10,6 +10,7 @@ open GraphType
 // The most important part of this project.
 // Creating a computational graph eases creation of complex computations. 
 // The ideal would be to begin with a classical computational graph and then convert/compile it to blazingly fast arrays operations. 
+[<RequireQualifiedAccess>]
 module Graph =   
     
     let add g1 g2 = Addition(g1,g2)
@@ -114,7 +115,7 @@ module Graph =
                                                       | Variable(grp,_) -> grp 
                                                       | Innovation(grp,_) -> grp) 
                             >> Array.map (snd >> Array.distinct >> Array.length >> Array.zeroCreate)
-                            >> Array2D.ofArray)
+                            >> Utils.Array2D.ofArray)
           >> (fun a -> S(a.[0],a.[1],a.[2]))
 
 

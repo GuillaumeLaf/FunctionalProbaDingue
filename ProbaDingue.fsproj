@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net472</TargetFramework> 
+    <TargetFramework>net48</TargetFramework> 
 
     <WarnOn>3390;$(WarnOn)</WarnOn> 
 
@@ -11,6 +11,20 @@
 		<gcServer enabled="true" />
 		<gcConcurrent enabled="true" />
 	</runtime>
+
+	<Platforms>AnyCPU;x86</Platforms>
+
+	<PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <PlatformTarget>x86</PlatformTarget>
+    <Optimize>True</Optimize>
+    <Tailcalls>True</Tailcalls>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+    <PlatformTarget>x86</PlatformTarget>
+    <Optimize>True</Optimize>
+    <Tailcalls>True</Tailcalls>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,18 +41,14 @@
 	<Compile Include="Model\ModelType.fs" />
 	<Compile Include="Model\ModelState.fs" />
 	<Compile Include="Model\Model.fs" />
-	 <!--
 	<Compile Include="UnitTests\UtilsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\StatisticsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\TimeSeriesTest.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\GraphTest.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\NodeTest.fs" />
-	-->
     <Compile Include="Main.fs" />
     <None Include="MainScript.fsx" />
   </ItemGroup>
-
-  <ItemGroup />
 
   <ItemGroup>
     <PackageReference Include="Binance.Net" Version="7.2.5" />
@@ -49,8 +59,10 @@
     <PackageReference Include="MathNet.Numerics" Version="4.15.0" />
     <PackageReference Include="MathNet.Numerics.FSharp" Version="4.15.0" />
     <PackageReference Include="SQLProvider" Version="1.2.10" />
+    <PackageReference Include="System.Core" Version="3.5.21022.801" />
     <PackageReference Include="System.Data.OleDb" Version="5.0.0" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
+    <PackageReference Include="System.Runtime" Version="4.3.1" />
     <PackageReference Include="System.Runtime.Numerics" Version="4.3.0" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3">
@@ -64,6 +76,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="6.0.1" />
+    <PackageReference Update="FSharp.Core" Version="6.0.3" />
   </ItemGroup>
 </Project>

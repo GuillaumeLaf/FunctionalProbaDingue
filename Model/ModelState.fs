@@ -10,7 +10,7 @@ open ModelType
 
 module ModelState = 
 
-    let graphToMonad = Array.map Graph.toMonad >> State.traverseBack 
+    let graphToMonad = Array.map Graph.toMonad >> Utils.State.traverseBack 
 
     // Get the Graph, Timeseries or Innovation State from the 'State' Model.
     let getGraphState (S(gs,_)) = gs                            : GraphType.S
@@ -43,7 +43,7 @@ module ModelState =
     let updateVariables = evalT >> bind (GraphState.updateVariables >> modifyG) 
 
     let update rndVectorFunc (m:Model) = monad {
-        do! updateVariables m.updateRule
+        do! updateVariables m.UpdateRule
         do! updateInnovations rndVectorFunc
     }
 
@@ -53,7 +53,7 @@ module ModelState =
             for i in 0..n-1 do 
                 do! modifyT (TimeseriesState.setTime i) 
                 do! update rndVectorFunc m
-                let! currentResult = evalG m.graphMonad
+                let! currentResult = evalG m.GraphMonad
                 do! modifyT (TimeseriesState.setCurrentElements currentResult)
         } 
 
