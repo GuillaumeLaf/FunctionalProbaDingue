@@ -4,8 +4,6 @@ open FSharpPlus
 open FSharpPlus.Data
 open ComputationalGraph
 open ComputationalGraph.GraphType
-open ComputationalGraph.Graph
-open ComputationalGraph.Node
 open Timeseries
 open Timeseries.TimeseriesState
 open Timeseries.TimeseriesType
@@ -54,12 +52,6 @@ module Model =
           UpdateRule=ModelTimeseries.updateRule m } 
 
     let defaultState (m:Model) = S(ModelGraph.state m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
-        
-    // Add the innovations covariance matrix to 'DGP' of 'Model' 'm'
-(*    let addInnovationCovariance cov (m:Model) = 
-        if (Array2D.length1 cov) = m.n && (Array2D.length2 cov) = m.n then 
-            { m with model=ModelGraph.addCovariance cov m.model }
-        else invalidArg "Covs" "Covariance matrix is not squared or not the same size as the number of timeseries."*)
 
     // Sample an 'Array' from a multivariate normal
     // Note : Covariance matrix must be already initialized in the 'innovations' 'TS'.

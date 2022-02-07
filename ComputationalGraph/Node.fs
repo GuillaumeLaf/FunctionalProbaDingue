@@ -25,12 +25,16 @@ module Node =
 
     // Dimensions of the matrix (Length of 'Vector's, number of vectors)
     // Therefore, the vectors are stacked column-wise
-    type Matrix = { Size:int*int; Vectors:Vector[]}
+    type Matrix = 
+        { Size:int*int; Vectors:Vector[]}
+        static member ( + ) (m1:Matrix, m2:Matrix) = if m1.Size = m2.Size then { m1 with Vectors=Array.map2 ( + ) m1.Vectors m2.Vectors } else invalidArg (nameof m1) "Cannot return the addition, 'Matrix' don't have the same size."
+        static member ( * ) (m1:Matrix, m2:Matrix) = if m1.Size = m2.Size then { m1 with Vectors=Array.map2 ( * ) m1.Vectors m2.Vectors } else invalidArg (nameof m1) "Cannot return the multiplication, 'Matrix' don't have the same size."
 
     [<RequireQualifiedAccess>]
     module Vector = 
         
         let create size graphs = {Size=size; Graphs=graphs}
+        let createFrom (graphs:Graph[]) = create graphs.Length graphs
 
         let graphs (v:Vector) = v.Graphs
         let size (v:Vector) = v.Size
@@ -101,17 +105,17 @@ module Node =
         let multiply (m1:Matrix) (m2:Matrix) = { m1 with Vectors=Array.map2 Vector.multiply m1.Vectors m2.Vectors } |> returnIfEqualSize (m1,m2)
         
         // Create a 'Vector' by the dot product of a 'Vector' and a 'Matrix'.
-        let LeftVectorProduct (v:Vector) (m:Matrix) = 
+        let leftVectorProduct (v:Vector) (m:Matrix) = 
             if fst m.Size = v.Size then 
                 m |> (vectors >> Array.map (fun vm -> Vector.dotProduct vm v) >> Vector.create (size2 m) ) 
             else invalidArg (nameof m) "Cannot dotproduct matrix and vector of different dimensions."
                   
-        let RightVectorProduct (m:Matrix) (v:Vector) = m |> (transpose >> LeftVectorProduct v)
+        let rightVectorProduct (m:Matrix) (v:Vector) = m |> (transpose >> leftVectorProduct v)
 
         // Create a 'Matrix' by the dot product of two 'Matrix'.
-        let MatrixProduct (m1:Matrix) (m2:Matrix) = 
+        let matrixProduct (m1:Matrix) (m2:Matrix) = 
             if snd m1.Size = fst m2.Size then 
-                transpose { Size=(fst m1.Size, snd m2.Size); Vectors= m1 |> (transpose >> vectors >> Array.map (fun vm1 -> LeftVectorProduct vm1 m2)) }
+                transpose { Size=(fst m1.Size, snd m2.Size); Vectors= m1 |> (transpose >> vectors >> Array.map (fun vm1 -> leftVectorProduct vm1 m2)) }
             else invalidArg "Matrix" "Cannot MatrixProduct matrices with wrong dimensions."
         
     
@@ -124,7 +128,7 @@ module Node =
     // Create a 'Array' of 'Graph's from the sum of dotproducts.
     // For instance, Ax + By + ...
     let inline multivariateLinearCombinaison startLag_ endLag_ n = 
-        let AtLag l = Matrix.LeftVectorProduct (Vector.init Variable (Standard(l)) n) (Matrix.initShifted Parameter ((l-startLag_)*n) (n,n)) 
+        let AtLag l = Matrix.leftVectorProduct (Vector.init Variable (Standard(l)) n) (Matrix.initShifted Parameter ((l-startLag_)*n) (n,n)) 
         [|startLag_..endLag_|] |> Array.map AtLag
                                |> Array.reduce Vector.add
                                |> Vector.graphs
