@@ -2,6 +2,9 @@
 
 module TimeseriesType =
 
+    // Record Type representing available statistics.
+    // 'Stats' does not contain the data only statistics about some data.
+    // Therefore the data holder must have a 'Stats' object. 
     type Stats = 
         { Mean:float32[] option;
           Std:float32[] option;
@@ -20,7 +23,7 @@ module TimeseriesType =
         static member setCov x s = { s with Cov=Some x }
         static member setLowerCholeskyCov x s = { s with LowerCholeskyCov=Some x } 
                     
-    
+    // Record Type representing a MULTIVARIATE timeseries. 
     type TS = 
         { Length:int;
           Size:int;

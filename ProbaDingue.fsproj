@@ -40,6 +40,7 @@
 	<Compile Include="TimeSeries\TimeseriesState.fs" />
 	<Compile Include="Model\ModelType.fs" />
 	<Compile Include="Model\ModelState.fs" />
+	<Compile Include="Model\Optimisation.fs" />
 	<Compile Include="Model\Model.fs" />
 	<Compile Include="UnitTests\UtilsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\StatisticsTest.fs" />

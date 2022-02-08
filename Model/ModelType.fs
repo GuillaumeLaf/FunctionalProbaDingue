@@ -20,9 +20,12 @@ module ModelType =
     //              -> Third : which lag
     type VAR = {n:int; order:int; parameters:float32[,][] option; covariance:float32[,] option }
 
+    // Discriminated Union for grouping model types.
     type DGP = 
         | VAR of VAR 
 
+    // Record Type representing a model.
+    // Contains all information required for using a model.
     type Model = 
         { N:int;
           Ts:TS option ;

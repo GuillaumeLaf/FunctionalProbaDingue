@@ -18,7 +18,11 @@ module TS =
     let atTime t ts = if (0 <= t) && (t < ts.Length) then Some ts.Data.[*,t] else None 
     let modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setCol t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
     
+    // Function to set a given statistic to the 'TS'.
+    // 'statsFunc' is a function which output a 'Stats' from a given value and 'Stats'.
+    // Modify the given 'Stats' by replacing a 'value' inside.
     let addStats statsFunc s ts = (TS.stats >> statsFunc s >> TS.setStats) ts ts
+
     let addCovariance = addStats Stats.setCov
     let addLowerCholeskyCov = addStats Stats.setLowerCholeskyCov
 

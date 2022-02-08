@@ -23,6 +23,7 @@ module GraphState =
     let variableM grpidx idx = Array2D.get <!> variablesM <*> result grpidx <*> result idx
     let innovationM grpidx idx = Array2D.get <!> innovationsM <*> result grpidx <*> result idx
 
+    // Update 'S' in the State of the monad.
     let updateParameters newParameters = State.modify (fun (S(_,v,i)) -> S(newParameters,v,i))
     let updateVariables newVariables = State.modify (fun (S(p,_,i)) -> S(p,newVariables,i))
     let updateInnovations newInnovations = State.modify (fun (S(p,v,_)) -> S(p,v,newInnovations))

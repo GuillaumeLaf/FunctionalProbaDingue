@@ -34,6 +34,8 @@ module Node =
     module Vector = 
         
         let create size graphs = {Size=size; Graphs=graphs}
+        
+        // Create a 'Vector' from an array of 'Graph's. 'Size' of the 'Vector' is the length of the given array. 
         let createFrom (graphs:Graph[]) = create graphs.Length graphs
 
         let graphs (v:Vector) = v.Graphs
@@ -43,6 +45,7 @@ module Node =
 
         let equal (v1:Vector) (v2:Vector) = Array.forall2 Graph.equal v1.Graphs v2.Graphs
 
+        // Create a new 'Graph' by summing 'Graph's in the 'Vector'
         let sum = graphs >> Array.reduce Graph.add
 
         let add (v1:Vector) (v2:Vector) = { v1 with Graphs=Array.map2 Graph.add v1.Graphs v2.Graphs } |> returnIfEqualSize (v1,v2) 
@@ -75,8 +78,7 @@ module Node =
         let vectors (m:Matrix) = m.Vectors
         let size (m:Matrix) = m.Size
         let size1 = size >> fst
-        //let size2 = size >> snd
-        let size2 (m:Matrix) = snd m.Size
+        let size2 = size >> snd
 
         let inline private returnIfEqualSize ((m1,m2):Matrix*Matrix) result = if m1.Size = m2.Size then result else invalidArg "Matrix" "Cannot return the result, 'Matrix' don't have the same size."
 
@@ -110,6 +112,7 @@ module Node =
                 m |> (vectors >> Array.map (fun vm -> Vector.dotProduct vm v) >> Vector.create (size2 m) ) 
             else invalidArg (nameof m) "Cannot dotproduct matrix and vector of different dimensions."
                   
+        // Create a 'Vector' by the dot product of a 'Matrix' and a 'Vector'.
         let rightVectorProduct (m:Matrix) (v:Vector) = m |> (transpose >> leftVectorProduct v)
 
         // Create a 'Matrix' by the dot product of two 'Matrix'.

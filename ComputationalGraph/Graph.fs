@@ -16,6 +16,8 @@ module Graph =
     let add g1 g2 = Addition(g1,g2)
     let multiply g1 g2 = Multiplication(g1,g2)
 
+    // Check equality between two graphs.
+    // Graphs are considered equal if all their nodes are equal
     let equal g1 g2 = 
         let opCont l1 r1 l2 r2 f : Cont<'a,bool> = monad { let! xl = f l1 l2
                                                            let! xr = f r1 r2
@@ -29,6 +31,8 @@ module Graph =
         }
         Cont.run (loop g1 g2) id
     
+    // Catamorphism for folding over a graph tree. 
+    // Each function takes the current node as first input. 
     let inline cataFoldX constF addF multF inputF (x:Graph) = 
         let opCont opF x lg rg f : Cont<'a,'b> = monad { let! xl = f lg
                                                          let! xr = f rg
@@ -42,6 +46,8 @@ module Graph =
         }
         Cont.run (loop x) id
 
+    // Catamorphism for folding over a graph tree. 
+    // Functions DON'T take the current node as input. 
     let inline cataFold constF addF multF inputF = 
         cataFoldX (fun _ -> constF) (fun _ -> addF) (fun _ -> multF) (fun _ -> inputF)
 
@@ -107,6 +113,8 @@ module Graph =
         }
         loop >> ContT.eval  
 
+    // Get the default 'S' for a given graph.
+    // This function makes sure to not take 'BasicInput's with same indices twice.
     let defaultState : (Graph -> S) = 
         collectInputs
           >> Array.groupBy (function | Parameter(_,_) -> 0 | Variable(_,_) -> 1 | Innovation(_,_) -> 2)
@@ -117,6 +125,38 @@ module Graph =
                             >> Array.map (snd >> Array.distinct >> Array.length >> Array.zeroCreate)
                             >> Utils.Array2D.ofArray)
           >> (fun a -> S(a.[0],a.[1],a.[2]))
+
+    let simplify = 
+        cataFoldX (fun x _ -> x)
+                  (fun x l r -> match l,r with
+                                | Constant(0.0f),_ -> r 
+                                | _,Constant(0.0f) -> l
+                                | _ -> l + r)
+                  (fun x l r -> match l,r with
+                                | Constant(0.0f),_ -> Constant(0.0f)
+                                | _,Constant(0.0f) -> Constant(0.0f)
+                                | Constant(1.0f),_ -> r 
+                                | _,Constant(1.0f) -> l
+                                | _ -> l * r)
+                  (fun x _ -> x)
+
+    // Create a graph representing the gradient of a given graph for a given parameter.
+    let gradientForParameter grpIdx idx = 
+        cataFoldX (fun g _ -> Constant(0.0f),g)
+                  (fun g l r -> fst l + fst r |> simplify, g)
+                  (fun g l r -> (fst l * snd r) + (fst r * snd l) |> simplify,g)
+                  (fun g -> function | Parameter(grp,i) -> if (grp=grpIdx && idx=i) then Constant(1.0f),g else Constant(0.0f),g
+                                     | Variable(_,_) -> Constant(0.0f),g
+                                     | Innovation(_,_) -> Constant(0.0f),g)
+                  >> fst
+
+    // Create an 'Array' of 'Graph's representing the gradient for 'Parameter's of a given group. 
+    let gradientForGroup grpIdx (x:Graph) = 
+        (groupSizes >> Array.choose (function | Parameter(grp,idx) -> if grpIdx=grp then Some idx else None
+                                              | _ -> None)
+                    >> Array.item 0
+                    >> flip Array.init id) x
+                    |>  Array.map (fun i -> gradientForParameter grpIdx i x)
 
 
 
