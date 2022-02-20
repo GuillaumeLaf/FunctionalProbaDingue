@@ -23,6 +23,7 @@ module ModelType =
     // Discriminated Union for grouping model types.
     type DGP = 
         | VAR of VAR 
+        | ErrorModel of DGP
 
     // Record Type representing a model.
     // Contains all information required for using a model.

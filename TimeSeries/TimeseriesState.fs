@@ -30,6 +30,7 @@ module TimeseriesState =
 
     // Extract the current cross-section
     let currentElements = TS.atTime <!> currentTime <*> timeseries
+    let currentElementsDefault = Option.defaultValue <!> (Array.zeroCreate <!> size) <*> currentElements
 
     // Set the current elements of the cross-section
     let setCurrentElements e = State.modify (fun (idx,ts) -> (idx,TS.modifyAtTime idx e ts))      : State<(int * TS),unit> 

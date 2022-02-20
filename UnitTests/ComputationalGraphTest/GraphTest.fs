@@ -34,11 +34,19 @@
         Assert.Equal<float32>(expected, actual)
 
     [<Fact>]
-    // 'groupSizes'
+    // 'count'
     let ``Count the number of Input nodes in a graph by group`` () = 
         let graph = [| Input(Parameter(0,0));Input(Variable(1,0)); Graph.multiply (Input(Parameter(0,1))) (Input(Variable(0,1))) |] |> Array.reduce Graph.add
         let expected = [|Parameter(0,2); Variable(0,1); Variable(1,1)|]
-        let actual = Graph.groupSizes graph
+        let actual = Graph.count graph
+        Assert.Equal<BasicInput[]>(expected,actual)
+
+    [<Fact>]
+    // 'countUnique'
+    let ``Count unique the number of Input nodes in a graph by group`` () = 
+        let graph = [| Input(Parameter(0,0));Input(Variable(1,0)); Graph.multiply (Input(Parameter(0,1))) (Input(Variable(0,1))) |] |> Array.reduce Graph.add
+        let expected = [|Parameter(0,2); Variable(0,1); Variable(1,1)|]
+        let actual = Graph.count graph
         Assert.Equal<BasicInput[]>(expected,actual)
 
     [<Fact>]

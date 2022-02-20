@@ -20,6 +20,11 @@ module Optimizers =
         | Classic of Classic
         | Momentum of Momentum
 
+(*module ErrorTypes = 
+    type Error =
+        | Raw
+        | Squared*)
+
 module Optimisation = 
 
     type Optimizer = 
@@ -28,7 +33,21 @@ module Optimisation =
 
     type S = S of ModelType.S * Optimizers.Method
 
-    
+
+    let getModelState (S(ms,_)) = ms 
+
+    let modelState () = getModelState <!> State.get
+
+    let evalM (modelM:State<ModelType.S,'a>) = State.eval modelM <!> modelState()
+    let modifyM modelM = State.exec modelM <!> modelState() >>= (fun newM -> State.modify (fun (S(_,oldMethod)) -> S(newM,oldMethod)))
+
+    // Fit the model with the given optimizer.
+    // Model should already contain the data.
+    let fit (errModel:Model) (opt:Optimizer) = 
+        
+        
+
+        
 
 
 

@@ -26,6 +26,7 @@ module Graph =
             match g1,g2 with
             | Input(i1),Input(i2) -> return i1 = i2
             | Addition(l1,r1),Addition(l2,r2) -> return! opCont l1 r1 l2 r2 loop
+            | Substraction(l1,r1),Substraction(l2,r2) -> return! opCont l1 r1 l2 r2 loop
             | Multiplication(l1,r1),Multiplication(l2,r2) -> return! opCont l1 r1 l2 r2 loop
             | _ -> return false         // !!!
         }
@@ -33,7 +34,7 @@ module Graph =
     
     // Catamorphism for folding over a graph tree. 
     // Each function takes the current node as first input. 
-    let inline cataFoldX constF addF multF inputF (x:Graph) = 
+    let inline cataFoldX constF addF subF multF inputF (x:Graph) = 
         let opCont opF x lg rg f : Cont<'a,'b> = monad { let! xl = f lg
                                                          let! xr = f rg
                                                          return opF x xl xr }
@@ -41,6 +42,7 @@ module Graph =
             match g with
             | Constant(value) as x -> return constF x value
             | Addition(lg,rg) as x -> return! opCont addF x lg rg loop
+            | Substraction(lg,rg) as x -> return! opCont subF x lg rg loop
             | Multiplication(lg,rg) as x -> return! opCont multF x lg rg loop
             | Input(i) as x -> return inputF x i
         }
@@ -48,12 +50,13 @@ module Graph =
 
     // Catamorphism for folding over a graph tree. 
     // Functions DON'T take the current node as input. 
-    let inline cataFold constF addF multF inputF = 
-        cataFoldX (fun _ -> constF) (fun _ -> addF) (fun _ -> multF) (fun _ -> inputF)
+    let inline cataFold constF addF subF multF inputF = 
+        cataFoldX (fun _ -> constF) (fun _ -> addF) (fun _ -> subF) (fun _ -> multF) (fun _ -> inputF)
 
     // Collect in an array all the subgraphs from the graph 'x'
     let collectSubGraphs (x:Graph) = 
         cataFoldX (fun x _ acc -> x::acc)
+                  (fun x lacc racc acc -> x::(racc >> lacc) acc)
                   (fun x lacc racc acc -> x::(racc >> lacc) acc)
                   (fun x lacc racc acc -> x::(racc >> lacc) acc)
                   (fun x _ acc -> x::acc)
@@ -64,35 +67,57 @@ module Graph =
         cataFold (fun _ acc -> acc)
                  (fun lacc racc acc -> lacc (racc acc))
                  (fun lacc racc acc -> lacc (racc acc))
+                 (fun lacc racc acc -> lacc (racc acc))
                  (fun i acc -> i::acc)
                  x [] |> Array.ofList
 
-    // Get the 'Input's contained in the graph as an array.
-    // There is only one 'Input' type -e.g. Parameter(_,_), Variable(_,_)- for each group of 'Input'.
-    // For instance if the output array is of the form : [|Parameter(0,2);Variable(1,3)|], 
+    // From an 'Array' of 'BasicInput's count the number of 'BasicInput's for each group.
+    // For instance, the output array is of the form : [|Parameter(0,2);Variable(1,3)|], 
     // It translates into a graph with 2 'Parameter's in group 0,
     // and 3 'Variable's in group 1.
-    let groupSizes = 
-        collectInputs >> Array.countBy (function | Parameter(grpidx,_) -> Parameter(grpidx,0)
-                                                 | Variable(grpidx,_) -> Variable(grpidx,0)
-                                                 | Innovation(grpidx,_) -> Innovation(grpidx,0))
-                      >> Array.map (function | Parameter(grpidx,_),c -> Parameter(grpidx,c)
-                                             | Variable(grpidx,_),c -> Variable(grpidx,c)
-                                             | Innovation(grpidx,_),c -> Innovation(grpidx,c))
-                      >> Array.sortBy (function | Parameter(grpidx,_) | Variable(grpidx,_) | Innovation(grpidx,_) -> grpidx)
+    // DOESN'T count unique 'BasicInput's.
+    let private countInputByGroup = 
+        Array.countBy (function | Parameter(grpidx,_) -> Parameter(grpidx,0)
+                                | Variable(grpidx,_) -> Variable(grpidx,0)
+                                | Innovation(grpidx,_) -> Innovation(grpidx,0))
+        >> Array.map (function | Parameter(grpidx,_),c -> Parameter(grpidx,c)
+                                | Variable(grpidx,_),c -> Variable(grpidx,c)
+                                | Innovation(grpidx,_),c -> Innovation(grpidx,c))
+        >> Array.sortBy (function | Parameter(grpidx,_) | Variable(grpidx,_) | Innovation(grpidx,_) -> grpidx)
 
+    // Count the 'BasicInput's contained in the 'Graph' as an array.
+    let count = collectInputs >> countInputByGroup
+        
+    // Count the UNIQUE 'BasicInput's contained in the 'Graph' as an array.
+    let countUnique = collectInputs >> Array.countBy id >> Array.map fst >> countInputByGroup
+
+    let countGroups = count >> Array.collect (function | Parameter(grp,_) -> [|grp|]
+                                                       | Variable(grp,_) -> [|grp|]
+                                                       | Innovation(grp,_) -> [|grp|])
+        
     // Change the 'Group Index' of some 'BasicInput' from 'oldGrp' to 'newGrp'.
     let changeGroup (oldGrp:int) (newGrp:int) =
         cataFold (fun v -> Constant(v))
                  (fun l r -> Addition(l,r))
+                 (fun l r -> Substraction(l,r))
                  (fun l r -> Multiplication(l,r))
                  (function | Parameter(grpidx,idx) as x -> if grpidx=oldGrp then Input(Parameter(newGrp,idx)) else Input(x)
                            | Variable(grpidx,idx) as x -> if grpidx=oldGrp then Input(Variable(newGrp,idx)) else Input(x)
                            | Innovation(grpidx,idx) as x -> if grpidx=oldGrp then Input(Innovation(newGrp,idx)) else Input(x))
+
+    let shift (t:int*int->BasicInput) i = 
+        cataFoldX (fun x _ -> x)
+                  (fun _ -> ( + ))
+                  (fun _ -> ( - ))
+                  (fun _ -> ( * )) 
+                  (fun x -> function | Parameter(grpIdx,idx) when (t(0,0)) = (Parameter(0,0)) -> Input(Parameter(grpIdx,idx+i))
+                                     | Variable(grpIdx,idx) when (t(0,0)) = (Variable(0,0)) -> Input(Variable(grpIdx,idx+i)) 
+                                     | Innovation(grpIdx,idx) when (t(0,0)) = (Innovation(0,0)) -> Input(Innovation(grpIdx,idx+i))
+                                     | _ -> x)  
     
     // Run the graph with the indices of the Inputs as data.
     // This method was primarily to test the graph's computations.
-    let run = cataFold id (+) (*) (function Parameter(_,idx) | Variable(_,idx) | Innovation(_,idx) -> float32 idx)
+    let run = cataFold id ( + ) ( - ) ( * ) (function Parameter(_,idx) | Variable(_,idx) | Innovation(_,idx) -> float32 idx)
         
     // Create a State Monad from the Graph
     // Working with monads makes composing computations easier and,
@@ -105,6 +130,7 @@ module Graph =
             match g with
             | Constant(value) -> return! lift (result value)
             | Addition(l,r) -> return! (+) <!> (loop l) <*> (loop r)
+            | Substraction(l,r) -> return! (-) <!> (loop l) <*> (loop r)
             | Multiplication(l,r) -> return! (*) <!> (loop l) <*> (loop r)
             | Input(i) -> match i with
                               | Parameter(grpidx,idx) -> return! lift (GraphState.parameterM grpidx idx)
@@ -128,11 +154,15 @@ module Graph =
 
     let simplify = 
         cataFoldX (fun x _ -> x)
-                  (fun x l r -> match l,r with
+                  (fun _ l r -> match l,r with
                                 | Constant(0.0f),_ -> r 
                                 | _,Constant(0.0f) -> l
                                 | _ -> l + r)
-                  (fun x l r -> match l,r with
+                  (fun _ l r -> match l,r with
+                                | Constant(0.0f),_ -> r 
+                                | _,Constant(0.0f) -> l
+                                | _ -> l - r)
+                  (fun _ l r -> match l,r with
                                 | Constant(0.0f),_ -> Constant(0.0f)
                                 | _,Constant(0.0f) -> Constant(0.0f)
                                 | Constant(1.0f),_ -> r 
@@ -144,6 +174,7 @@ module Graph =
     let gradientForParameter grpIdx idx = 
         cataFoldX (fun g _ -> Constant(0.0f),g)
                   (fun g l r -> fst l + fst r |> simplify, g)
+                  (fun g l r -> fst l - fst r |> simplify, g)
                   (fun g l r -> (fst l * snd r) + (fst r * snd l) |> simplify,g)
                   (fun g -> function | Parameter(grp,i) -> if (grp=grpIdx && idx=i) then Constant(1.0f),g else Constant(0.0f),g
                                      | Variable(_,_) -> Constant(0.0f),g
@@ -152,11 +183,11 @@ module Graph =
 
     // Create an 'Array' of 'Graph's representing the gradient for 'Parameter's of a given group. 
     let gradientForGroup grpIdx (x:Graph) = 
-        (groupSizes >> Array.choose (function | Parameter(grp,idx) -> if grpIdx=grp then Some idx else None
-                                              | _ -> None)
-                    >> Array.item 0
-                    >> flip Array.init id) x
-                    |>  Array.map (fun i -> gradientForParameter grpIdx i x)
+        (countUnique >> Array.choose (function | Parameter(grp,idx) -> if grpIdx=grp then Some idx else None
+                                               | _ -> None)
+                     >> Array.item 0
+                     >> flip Array.init id) x
+                     |>  Array.map (fun i -> gradientForParameter grpIdx i x)
 
 
 
