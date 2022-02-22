@@ -15,7 +15,8 @@ let main argv =
     let dgp = (VAR({n=1; order=1; parameters=Some([|Array2D.ofArray [|[|0.7f|]|]|]); covariance=Some(Array2D.ofArray [|[|1.0f|]|])}))
     let m = Model.create dgp
     let sampleModel = Model.sample 100 m
-    printfn "%A" (Model.fit sampleModel (Optimisation.Optimizer.Classic(0.9f)))
+    let fitted = Model.fit sampleModel (Optimisation.Optimizer.Classic(0.9f))
+    printfn "%A" fitted
     
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)

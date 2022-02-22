@@ -44,17 +44,27 @@ module Utils
     module Array2D = 
         let length (array:'T[,]) = Array2D.length1 array * Array2D.length2 array
         let row idx (array:'T[,]) = array.[idx,*]
-        let setRow idx values (array:'T[,]) = array.[idx,*] <- values; array
         let col idx (array:'T[,]) = array.[*,idx]
-        let setCol idx values (array:'T[,]) = array.[*,idx] <- values; array
 
+        let setRow idx (values:'T[]) (array:'T[,]) = 
+            if values.Length = Array2D.length2 array then 
+                Array2D.init (Array2D.length1 array) (Array2D.length2 array) (fun i j -> if i=idx then values.[j] else array.[i,j])
+            else invalidArg (nameof values) "Lenght of new row doesn't match second dimension of 'Array2D'"
+
+        let setColumn idx (values:'T[]) (array:'T[,]) = 
+            if values.Length = Array2D.length1 array then 
+                Array2D.init (Array2D.length1 array) (Array2D.length2 array) (fun i j -> if j=idx then values.[i] else array.[i,j])
+            else invalidArg (nameof values) "Lenght of new row doesn't match first dimension of 'Array2D'"
+
+        // Apply the given function to each Row/Column and concatenate the result in a new 'Array'.
         let collectByRow f (array:'T[,]) = Array.mapi (fun i _ -> f array.[i,*]) array.[*,0]
         let collectByCol f (array:'T[,]) = Array.mapi (fun i _ -> f array.[*,i]) array.[0,*]
 
+        // ~> column-vector
         let singleton (array:'T[]) = Array2D.init array.Length 1 (fun i _ -> array.[i])
 
         let ofSingleArray (i,j) (array:'T[]) = 
-            if array.Length % j = i then 
+            if array.Length % j = 0 && array.Length / j = i then 
                 Array2D.init i j (fun m n -> array.[m*j+n])
             else invalidArg (nameof array) "Array cannot be casted into Array2D. The dimensions must exactly match."
 
@@ -92,11 +102,12 @@ module Utils
             if (Array2D.length1 arr1 = Array2D.length1 arr2) && (Array2D.length2 arr1 = Array2D.length2 arr2) then 
                 let out = Array2D.zeroCreate (Array2D.length1 arr1) (Array2D.length2 arr1)
                 for i in 0..Array2D.length1 arr1-1 do 
-                    for j in 0..Array2D.length2 arr2-1 do 
+                    for j in 0..Array2D.length2 arr1-1 do 
                         out.[i,j] <- mapping i j arr1.[i,j] arr2.[i,j]
                 out     
             else invalidArg (nameof arr1) "'Array2D's don't have same dimensions"
 
+        // Combine two 'Array2D's into a new one by applying the given function to each pair of elements.
         let map2 (mapping:'a -> 'b -> 'c) = mapi2 (fun _ _ -> mapping)
             
 

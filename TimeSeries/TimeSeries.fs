@@ -16,7 +16,7 @@ module TS =
 
     let get idx = TS.data >> Utils.Array2D.row idx 
     let atTime t ts = if (0 <= t) && (t < ts.Length) then Some ts.Data.[*,t] else None 
-    let modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setCol t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
+    let modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
     
     // Function to set a given statistic to the 'TS'.
     // 'statsFunc' is a function which output a 'Stats' from a given value and 'Stats'.

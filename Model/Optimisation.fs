@@ -68,10 +68,11 @@ module Optimisation =
 
         // Updating of the parameters during optimization according to the chosen Optimizer.
         // Will compute the gradient at the current timestep. 
-        let updateParameters = monad {
+        let updateParameters () = monad {
             let! p = (ModelState.evalG >> evalM) ComputationalGraph.GraphState.parametersM
             let! gradients = (ModelState.evalG >> evalM) errModel.GraphGradient
             let! newOpt, newParams = Optimizers.update p gradients <!> optimizerState()
+            // do! printfn "%A" <!> ((ModelState.evalT >> evalM) Timeseries.TimeseriesState.currentTime)
             do! State.modify (fun (S(ms,_)) -> S(ms,newOpt))
             do! (ComputationalGraph.GraphState.updateParameters >> ModelState.evalG >> modifyM) newParams
         }
@@ -81,16 +82,16 @@ module Optimisation =
             do! (ModelState.updateVariables >> modifyM) errModel.UpdateRule
             let! errors = (ModelState.evalG >> evalM) errModel.GraphMonad
             do! (Timeseries.TimeseriesState.setCurrentElements >> ModelState.modifyI >> modifyM) errors
-            do! updateParameters
+            do! updateParameters()
         }
         
-        Array.init errModel.T (fun idx -> errModel.T-idx) |> Array.map fitOnIdx
-                                                          |> State.traverseBack
-                                                          |> flip State.exec initState
+        Array.init errModel.T (fun idx -> errModel.T-idx-1) |> Array.map fitOnIdx
+                                                            |> State.traverseBack
+                                                            |> flip State.exec initState
         
 
         
-
+        
 
 
 
