@@ -93,7 +93,7 @@ module Graph =
 
     let countGroups = count >> Array.collect (function | Parameter(grp,_) -> [|grp|]
                                                        | Variable(grp,_) -> [|grp|]
-                                                       | Innovation(grp,_) -> [|grp|])
+                                                       | Innovation(grp,_) -> [|grp|]) >> Array.sort
         
     // Change the 'Group Index' of some 'BasicInput' from 'oldGrp' to 'newGrp'.
     let changeGroup (oldGrp:int) (newGrp:int) =
@@ -188,6 +188,8 @@ module Graph =
                      >> Array.item 0
                      >> flip Array.init id) x
                      |>  Array.map (fun i -> gradientForParameter grpIdx i x)
+
+    let gradient = Array.mapi gradientForGroup >> Array2D.ofArray
 
 
 

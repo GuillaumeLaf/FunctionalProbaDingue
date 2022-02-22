@@ -12,8 +12,10 @@ let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
     // let g = Input(Parameter(0,0)) + Input(Parameter(0,1)) * (Input(Parameter(0,1))*Input(Parameter(0,2)) + Input(Parameter(1,2)))
-    let g = Model.ModelGraph.create (VAR({n=2; order=2; parameters=None; covariance=None}))
-    printfn "%A" (Array.map (Graph.shift Variable 1) g)
+    let dgp = (VAR({n=1; order=1; parameters=Some([|Array2D.ofArray [|[|0.7f|]|]|]); covariance=Some(Array2D.ofArray [|[|1.0f|]|])}))
+    let m = Model.create dgp
+    let sampleModel = Model.sample 100 m
+    printfn "%A" (Model.fit sampleModel (Optimisation.Optimizer.Classic(0.9f)))
     
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)

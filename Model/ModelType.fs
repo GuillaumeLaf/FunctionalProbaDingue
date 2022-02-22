@@ -28,16 +28,19 @@ module ModelType =
     // Record Type representing a model.
     // Contains all information required for using a model.
     type Model = 
-        { N:int;
+        { N:int;    // number of cross-section
+          T:int;  
           Ts:TS option ;
           Innovations:TS option;
           Model:DGP;
           Graphs:Graph[];
-          GraphMonad:State<GraphType.S, float32[]>
+          GraphMonad:State<GraphType.S, float32[]>;
+          GraphGradient:State<GraphType.S, float32[,]>;
           UpdateRule:State<(int*TimeseriesType.TS), float32[,]>
           }
 
-        static member n m = m.n
+        static member n m = m.N
+        static member t m = m.T
         static member ts m = m.Ts
         static member innovations m = m.Innovations
         static member model m = m.Model
@@ -46,7 +49,7 @@ module ModelType =
         static member updateRule m = m.UpdateRule
 
         static member setN x m = { m with N=x }
-        static member setTs x m = { m with Ts=x }
+        static member setTs x m = { m with N=(Option.get >> TS.size) x; T= (Option.get >> TS.length) x; Ts=x }
         static member setInnovations x m = { m with Innovations=x }
         static member setModel x m = { m with Model=x }
         static member setGraphMonad x m = { m with GraphMonad=x }

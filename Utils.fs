@@ -51,7 +51,12 @@ module Utils
         let collectByRow f (array:'T[,]) = Array.mapi (fun i _ -> f array.[i,*]) array.[*,0]
         let collectByCol f (array:'T[,]) = Array.mapi (fun i _ -> f array.[*,i]) array.[0,*]
 
-        let ofSingleArray (array:'T[]) = Array2D.init array.Length 1 (fun i _ -> array.[i])
+        let singleton (array:'T[]) = Array2D.init array.Length 1 (fun i _ -> array.[i])
+
+        let ofSingleArray (i,j) (array:'T[]) = 
+            if array.Length % j = i then 
+                Array2D.init i j (fun m n -> array.[m*j+n])
+            else invalidArg (nameof array) "Array cannot be casted into Array2D. The dimensions must exactly match."
 
         // Fst : outer array
         // Snd : inner array
@@ -60,6 +65,7 @@ module Utils
                 Array2D.init array.Length array.[0].Length (fun i j -> array.[i].[j])
             else invalidArg "array" "Jagged array cannot be casted into Array2D. At least one inner array hasn't the right size."
 
+        // Flatten the 'Array2D' by concatenating the rows into an 'Array'.
         let flatten (array:'T[,]) = Array.init (length array) (fun idx -> array.[(idx/Array2D.length2 array),(idx%Array2D.length2 array)])
 
         // Stack two 'Array2D' columnwise.
@@ -82,13 +88,30 @@ module Utils
                 out
             else invalidArg "Array2D" "Second dimension of first and second array2d doesn't match for rowwise stack."
             
+        let mapi2 (mapping: int -> int -> 'a -> 'b -> 'c) (arr1:'a[,]) (arr2:'b[,]) = 
+            if (Array2D.length1 arr1 = Array2D.length1 arr2) && (Array2D.length2 arr1 = Array2D.length2 arr2) then 
+                let out = Array2D.zeroCreate (Array2D.length1 arr1) (Array2D.length2 arr1)
+                for i in 0..Array2D.length1 arr1-1 do 
+                    for j in 0..Array2D.length2 arr2-1 do 
+                        out.[i,j] <- mapping i j arr1.[i,j] arr2.[i,j]
+                out     
+            else invalidArg (nameof arr1) "'Array2D's don't have same dimensions"
+
+        let map2 (mapping:'a -> 'b -> 'c) = mapi2 (fun _ _ -> mapping)
+            
 
     module State =  
         open FSharpPlus
         open FSharpPlus.Data
 
         // Transform an array of 'State Monad' to into a 'State Monad' with an array.
-        // Note : the state monad MUST NOT modify the state. 
+        // Note : the monad MUST NOT modify the state. 
         let inline traverseBack (arrM:State<'a,'b>[]) = fst <!> (Array.mapFoldBack State.run arrM) <!> State.get
+
+        // Transform an 'Array2D' of 'State Monad' into a 'State Monad with an 'Array2D'.
+        // May be slow ! (boxing and unboxing in and out of 'Array' and 'Array2D'.) 
+        // Could be Parallized. 
+        let inline traverseBack2D (arr2M:State<'a,'b>[,]) = 
+            Array2D.flatten arr2M |> traverseBack |> map (Array2D.ofSingleArray (Array2D.length1 arr2M, Array2D.length2 arr2M))
 
 
