@@ -23,6 +23,7 @@ module GraphType =
     type Graph = 
         | Input of BasicInput
         | Constant of float32
+        | Polynomial of Graph * int
         | Addition of Graph * Graph
         | Substraction of Graph * Graph
         | Multiplication of Graph * Graph
@@ -30,6 +31,7 @@ module GraphType =
         static member ( + ) (g1:Graph, g2:Graph) = Addition(g1,g2)
         static member ( - ) (g1:Graph, g2:Graph) = Substraction(g1,g2)
         static member ( * ) (g1:Graph, g2:Graph) = Multiplication(g1,g2)
+        static member Pow (g:Graph, e:int) = Polynomial(g,e)
 
 
 

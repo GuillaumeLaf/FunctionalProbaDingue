@@ -59,6 +59,8 @@ module ModelState =
     let zeroCreate (m:Model) = ModelType.S(zeroGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
     let defaultState (m:Model) = ModelType.S(defaultGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
 
+    let parameterShape = zeroParameters >> Array2D.shape
+
 
     // Draw a random vector from 'rndVectorFunc' and update GraphState and TimeseriesState. 
     let updateInnovations rndVectorFunc = monad {

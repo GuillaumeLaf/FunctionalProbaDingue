@@ -12,10 +12,10 @@ let main argv =
     let stopWatch = System.Diagnostics.Stopwatch.StartNew()
 
     // let g = Input(Parameter(0,0)) + Input(Parameter(0,1)) * (Input(Parameter(0,1))*Input(Parameter(0,2)) + Input(Parameter(1,2)))
-    let dgp = (VAR({n=1; order=1; parameters=Some([|Array2D.ofArray [|[|0.7f|]|]|]); covariance=Some(Array2D.ofArray [|[|1.0f|]|])}))
+    let dgp = (VAR({n=2; order=1; parameters=Some([|Array2D.ofArray [|[|0.7f;-0.2f|];[|0.1f;-0.5f|]|]|]); covariance=Some(Array2D.ofArray [|[|1.0f;0.0f|];[|0.0f;1.0f|]|])}))
     let m = Model.create dgp
     let sampleModel = Model.sample 1000 m
-    let fitted = Model.fit sampleModel (Optimisation.Optimizer.Classic(0.01f))
+    let fitted = Model.fit sampleModel (Optimisation.Optimizer.Momentum(0.005f, 0.9f))
     printfn "%A" fitted
     
     stopWatch.Stop()

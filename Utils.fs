@@ -43,6 +43,7 @@ module Utils
 
     module Array2D = 
         let length (array:'T[,]) = Array2D.length1 array * Array2D.length2 array
+        let shape (array:'T[,]) = Array2D.length1 array, Array2D.length2 array
         let row idx (array:'T[,]) = array.[idx,*]
         let col idx (array:'T[,]) = array.[*,idx]
 

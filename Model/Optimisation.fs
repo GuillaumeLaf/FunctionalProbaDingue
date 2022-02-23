@@ -29,8 +29,8 @@ module Optimizers =
 
     let update parameters gradient = function
         | Method.Classic(opt) as x -> x, Array2D.map2 (fun p g -> p - opt.LearningRate * g) parameters gradient
-        | Method.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> opt.MomentumRate*mom + opt.LearningRate*g ) opt.MomentumValue gradient
-                                  Method.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 ( - ) parameters newMomentum
+        | Method.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> - opt.MomentumRate*mom - opt.LearningRate*g ) opt.MomentumValue gradient
+                                  Method.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 ( + ) parameters newMomentum
         
 (*module ErrorTypes = 
     type Error =
@@ -45,9 +45,9 @@ module Optimisation =
     type Optimizer = 
         | Classic of learnRate:float32
         | Momentum of learnRate:float32 * momentumRate:float32
-        static member convert (N,T) = function
+        static member convert dgp = function
             | Classic(r) -> Optimizers.Classic.create r |> Optimizers.Method.Classic
-            | Momentum(r,mom) -> Optimizers.Momentum.create r mom (N,T) |> Optimizers.Method.Momentum
+            | Momentum(r,mom) -> ModelState.parameterShape dgp |> Optimizers.Momentum.create r mom |> Optimizers.Method.Momentum
 
 
     let getModelState (S(ms,_)) = ms 
@@ -62,7 +62,7 @@ module Optimisation =
     // Fit the model with the given optimizer.
     // Model should already contain the data.
     let fit (errModel:Model) (opt:Optimizer) =
-        let initStateOptimizer = Optimizer.convert (errModel.N,errModel.T) opt
+        let initStateOptimizer = Optimizer.convert errModel.Model opt
         let initStateModel = ModelState.zeroCreate errModel
         let initState = S(initStateModel, initStateOptimizer)
 
@@ -71,9 +71,8 @@ module Optimisation =
         let updateParameters = monad {
             let! p = (ModelState.evalG >> evalM) ComputationalGraph.GraphState.parametersM
             let! gradients = (ModelState.evalG >> evalM) errModel.GraphGradient
-            printfn "%A" p
+            //printfn "%A" p
             let! newOpt, newParams = Optimizers.update p gradients <!> optimizerState()
-            //do! printfn "%A" <!> ((ModelState.evalG >> evalM) ComputationalGraph.GraphState.parametersM)
             do! State.modify (fun (S(ms,_)) -> S(ms,newOpt))
             do! (ComputationalGraph.GraphState.updateParameters >> ModelState.modifyG >> modifyM) newParams
         }

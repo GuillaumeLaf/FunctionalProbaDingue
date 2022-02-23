@@ -25,6 +25,8 @@ module Graph =
         let rec loop g1 g2 = monad {
             match g1,g2 with
             | Input(i1),Input(i2) -> return i1 = i2
+            | Polynomial(g1,e1), Polynomial(g2,e2) -> let! x = loop g1 g2
+                                                      return e1 = e2 && x
             | Addition(l1,r1),Addition(l2,r2) -> return! opCont l1 r1 l2 r2 loop
             | Substraction(l1,r1),Substraction(l2,r2) -> return! opCont l1 r1 l2 r2 loop
             | Multiplication(l1,r1),Multiplication(l2,r2) -> return! opCont l1 r1 l2 r2 loop
@@ -34,13 +36,15 @@ module Graph =
     
     // Catamorphism for folding over a graph tree. 
     // Each function takes the current node as first input. 
-    let inline cataFoldX constF addF subF multF inputF (x:Graph) = 
+    let inline cataFoldX constF polyF addF subF multF inputF (x:Graph) = 
         let opCont opF x lg rg f : Cont<'a,'b> = monad { let! xl = f lg
                                                          let! xr = f rg
                                                          return opF x xl xr }
         let rec loop g = monad {
             match g with
             | Constant(value) as x -> return constF x value
+            | Polynomial(g,e) as x -> let! r = loop g
+                                      return polyF x r e
             | Addition(lg,rg) as x -> return! opCont addF x lg rg loop
             | Substraction(lg,rg) as x -> return! opCont subF x lg rg loop
             | Multiplication(lg,rg) as x -> return! opCont multF x lg rg loop
@@ -50,12 +54,13 @@ module Graph =
 
     // Catamorphism for folding over a graph tree. 
     // Functions DON'T take the current node as input. 
-    let inline cataFold constF addF subF multF inputF = 
-        cataFoldX (fun _ -> constF) (fun _ -> addF) (fun _ -> subF) (fun _ -> multF) (fun _ -> inputF)
+    let inline cataFold constF polyF addF subF multF inputF = 
+        cataFoldX (fun _ -> constF) (fun _ -> polyF) (fun _ -> addF) (fun _ -> subF) (fun _ -> multF) (fun _ -> inputF)
 
     // Collect in an array all the subgraphs from the graph 'x'
     let collectSubGraphs (x:Graph) = 
         cataFoldX (fun x _ acc -> x::acc)
+                  (fun x g _ acc -> x::(g acc))
                   (fun x lacc racc acc -> x::(racc >> lacc) acc)
                   (fun x lacc racc acc -> x::(racc >> lacc) acc)
                   (fun x lacc racc acc -> x::(racc >> lacc) acc)
@@ -65,6 +70,7 @@ module Graph =
     // Concatenate in an array all the 'Input' nodes of the graph 'x'. 
     let collectInputs (x:Graph) = 
         cataFold (fun _ acc -> acc)
+                 (fun g _ acc -> g acc)
                  (fun lacc racc acc -> lacc (racc acc))
                  (fun lacc racc acc -> lacc (racc acc))
                  (fun lacc racc acc -> lacc (racc acc))
@@ -98,6 +104,7 @@ module Graph =
     // Change the 'Group Index' of some 'BasicInput' from 'oldGrp' to 'newGrp'.
     let changeGroup (oldGrp:int) (newGrp:int) =
         cataFold (fun v -> Constant(v))
+                 (fun g e -> Polynomial(g,e))
                  (fun l r -> Addition(l,r))
                  (fun l r -> Substraction(l,r))
                  (fun l r -> Multiplication(l,r))
@@ -107,6 +114,7 @@ module Graph =
 
     let shift (t:int*int->BasicInput) i = 
         cataFoldX (fun x _ -> x)
+                  (fun _ -> ( ** ))
                   (fun _ -> ( + ))
                   (fun _ -> ( - ))
                   (fun _ -> ( * )) 
@@ -117,7 +125,7 @@ module Graph =
     
     // Run the graph with the indices of the Inputs as data.
     // This method was primarily to test the graph's computations.
-    let run = cataFold id ( + ) ( - ) ( * ) (function Parameter(_,idx) | Variable(_,idx) | Innovation(_,idx) -> float32 idx)
+    let run = cataFold id (fun g e -> g ** (float32 e)) ( + ) ( - ) ( * ) (function Parameter(_,idx) | Variable(_,idx) | Innovation(_,idx) -> float32 idx)
         
     // Create a State Monad from the Graph
     // Working with monads makes composing computations easier and,
@@ -129,6 +137,13 @@ module Graph =
         let rec loop g : ContT<State<S,'b>,float32> = monad {
             match g with
             | Constant(value) -> return! lift (result value)
+            | Polynomial(g,1) -> return! loop g
+            | Polynomial(g,2) -> let! x = loop g
+                                 return x*x
+            | Polynomial(g,3) -> let! x = loop g
+                                 return x*x*x
+            | Polynomial(g,4) -> let! x = loop g
+                                 return x*x*x*x
             | Addition(l,r) -> return! (+) <!> (loop l) <*> (loop r)
             | Substraction(l,r) -> return! (-) <!> (loop l) <*> (loop r)
             | Multiplication(l,r) -> return! (*) <!> (loop l) <*> (loop r)
@@ -154,6 +169,13 @@ module Graph =
 
     let simplify = 
         cataFoldX (fun x _ -> x)
+                  (fun _ g e -> match g,e with
+                                | _,0 -> Constant(1.0f)
+                                | _,1 -> g
+                                | Constant(0.0f),_ -> Constant(0.0f)
+                                | Constant(1.0f),_ -> Constant(1.0f)
+                                | Polynomial(g,e2),e1 -> Polynomial(g,e1*e2)
+                                | _ -> g ** e)
                   (fun _ l r -> match l,r with
                                 | Constant(0.0f),_ -> r 
                                 | _,Constant(0.0f) -> l
@@ -171,15 +193,18 @@ module Graph =
                   (fun x _ -> x)
 
     // Create a graph representing the gradient of a given graph for a given parameter.
+    // Fst : current gradient
+    // Snd : current value
     let gradientForParameter grpIdx idx = 
-        cataFoldX (fun g _ -> Constant(0.0f),g)
-                  (fun g l r -> fst l + fst r |> simplify, g)
-                  (fun g l r -> fst l - fst r |> simplify, g)
-                  (fun g l r -> (fst l * snd r) + (fst r * snd l) |> simplify,g)
-                  (fun g -> function | Parameter(grp,i) -> if (grp=grpIdx && idx=i) then Constant(1.0f),g else Constant(0.0f),g
-                                     | Variable(_,_) -> Constant(0.0f),g
-                                     | Innovation(_,_) -> Constant(0.0f),g)
-                  >> fst
+        cataFoldX (fun x _ -> Constant(0.0f),x)
+                  (fun x g e -> fst g * Constant(float32 e) * Polynomial(snd g,e-1) |> simplify ,x)
+                  (fun x l r -> fst l + fst r |> simplify, x)
+                  (fun x l r -> fst l - fst r |> simplify, x)
+                  (fun x l r -> (fst l * snd r) + (fst r * snd l) |> simplify,x)
+                  (fun x -> function | Parameter(grp,i) -> if (grp=grpIdx && idx=i) then Constant(1.0f),x else Constant(0.0f),x
+                                     | Variable(_,_) -> Constant(0.0f),x
+                                     | Innovation(_,_) -> Constant(0.0f),x)
+                  >> fst // retrieve gradient
 
     // Create an 'Array' of 'Graph's representing the gradient for 'Parameter's of a given group. 
     let gradientForGroup grpIdx (x:Graph) = 
