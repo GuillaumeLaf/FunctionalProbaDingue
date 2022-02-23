@@ -39,20 +39,25 @@ module ModelState =
         | VAR(var) -> var.parameters |> Option.get |> Array.reduce Utils.Array2D.stackColumn
         | ErrorModel(inner) -> parameters inner
 
-    let rec defaultVariables = function
+    let rec zeroParameters = function
+        | VAR(var) -> Array2D.zeroCreate var.n (var.n*var.order)
+        | ErrorModel(inner) -> zeroParameters inner
+
+    let rec zeroVariables = function
         | VAR(var) -> Array2D.zeroCreate var.n var.order
-        | ErrorModel(inner) -> let tmp = defaultVariables inner
+        | ErrorModel(inner) -> let tmp = zeroVariables inner
                                Array2D.zeroCreate (Array2D.length1 tmp) (Array2D.length2 tmp + 1)
 
-    let rec defaultInnovations = function
+    let rec zeroInnovations = function
         | VAR(var) -> Array2D.zeroCreate var.n 1
-        | ErrorModel(inner) -> defaultInnovations inner
+        | ErrorModel(inner) -> zeroInnovations inner
 
-    let defaultGraphState dgp = GraphType.S(parameters dgp, defaultVariables dgp, defaultInnovations dgp) 
+    // Get 'Graph' state initiated with zeros
+    let zeroGraphState dgp = GraphType.S(zeroParameters dgp, zeroVariables dgp, zeroInnovations dgp) 
+    let defaultGraphState dgp = GraphType.S(parameters dgp, zeroVariables dgp, zeroInnovations dgp) 
 
+    let zeroCreate (m:Model) = ModelType.S(zeroGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
     let defaultState (m:Model) = ModelType.S(defaultGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
-
-
 
 
     // Draw a random vector from 'rndVectorFunc' and update GraphState and TimeseriesState. 

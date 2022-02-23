@@ -39,7 +39,7 @@ module Utils
 
     let autocorrelation (max_lag:int) (array: float array) = 
         let a = autocovariance max_lag array
-        a |> Array.map (fun x -> x / a.[0])*)
+        a |> Array.map (fun x -> x / a.[0])*)    
 
     module Array2D = 
         let length (array:'T[,]) = Array2D.length1 array * Array2D.length2 array
@@ -116,7 +116,7 @@ module Utils
         open FSharpPlus.Data
 
         // Transform an array of 'State Monad' to into a 'State Monad' with an array.
-        // Note : the monad MUST NOT modify the state. 
+        // Note : If the monad modify the state, the modifications won't carry through the array.
         let inline traverseBack (arrM:State<'a,'b>[]) = fst <!> (Array.mapFoldBack State.run arrM) <!> State.get
 
         // Transform an 'Array2D' of 'State Monad' into a 'State Monad with an 'Array2D'.
@@ -124,5 +124,15 @@ module Utils
         // Could be Parallized. 
         let inline traverseBack2D (arr2M:State<'a,'b>[,]) = 
             Array2D.flatten arr2M |> traverseBack |> map (Array2D.ofSingleArray (Array2D.length1 arr2M, Array2D.length2 arr2M))
+
+        // Transform an array of 'State Monad' to into a 'State Monad' with an array.
+        // Note : If the monad modify the state, the modifications WILL carry through the array.
+        let inline accumulate (arrM:State<'a,'b>[]) = monad {
+            let out = Array.zeroCreate arrM.Length
+            for i = 0 to arrM.Length-1 do
+                let! r = arrM.[i]
+                out.[i] <- r
+            return out
+        }
 
 

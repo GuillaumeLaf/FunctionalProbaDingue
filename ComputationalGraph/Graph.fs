@@ -159,7 +159,7 @@ module Graph =
                                 | _,Constant(0.0f) -> l
                                 | _ -> l + r)
                   (fun _ l r -> match l,r with
-                                | Constant(0.0f),_ -> r 
+                                | Constant(0.0f),_ -> Constant(-1.0f) * r 
                                 | _,Constant(0.0f) -> l
                                 | _ -> l - r)
                   (fun _ l r -> match l,r with

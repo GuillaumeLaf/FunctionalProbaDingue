@@ -63,18 +63,19 @@ module Optimisation =
     // Model should already contain the data.
     let fit (errModel:Model) (opt:Optimizer) =
         let initStateOptimizer = Optimizer.convert (errModel.N,errModel.T) opt
-        let initStateModel = ModelState.defaultState errModel
+        let initStateModel = ModelState.zeroCreate errModel
         let initState = S(initStateModel, initStateOptimizer)
 
         // Updating of the parameters during optimization according to the chosen Optimizer.
         // Will compute the gradient at the current timestep. 
-        let updateParameters () = monad {
+        let updateParameters = monad {
             let! p = (ModelState.evalG >> evalM) ComputationalGraph.GraphState.parametersM
             let! gradients = (ModelState.evalG >> evalM) errModel.GraphGradient
+            printfn "%A" p
             let! newOpt, newParams = Optimizers.update p gradients <!> optimizerState()
-            // do! printfn "%A" <!> ((ModelState.evalT >> evalM) Timeseries.TimeseriesState.currentTime)
+            //do! printfn "%A" <!> ((ModelState.evalG >> evalM) ComputationalGraph.GraphState.parametersM)
             do! State.modify (fun (S(ms,_)) -> S(ms,newOpt))
-            do! (ComputationalGraph.GraphState.updateParameters >> ModelState.evalG >> modifyM) newParams
+            do! (ComputationalGraph.GraphState.updateParameters >> ModelState.modifyG >> modifyM) newParams
         }
 
         let fitOnIdx idx = monad {
@@ -82,12 +83,12 @@ module Optimisation =
             do! (ModelState.updateVariables >> modifyM) errModel.UpdateRule
             let! errors = (ModelState.evalG >> evalM) errModel.GraphMonad
             do! (Timeseries.TimeseriesState.setCurrentElements >> ModelState.modifyI >> modifyM) errors
-            do! updateParameters()
+            do! updateParameters
         }
         
-        Array.init errModel.T (fun idx -> errModel.T-idx-1) |> Array.map fitOnIdx
-                                                            |> State.traverseBack
-                                                            |> flip State.exec initState
+        Array.init errModel.T id |> Array.map fitOnIdx
+                                 |> State.accumulate
+                                 |> flip State.exec initState
         
 
         
