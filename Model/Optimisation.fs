@@ -61,7 +61,7 @@ module Optimisation =
 
     // Fit the model with the given optimizer.
     // Model should already contain the data.
-    let fit (errModel:Model) (opt:Optimizer) =
+    let fit (errModel:Model) (opt:Optimizer) (epochs:int) =
         let initStateOptimizer = Optimizer.convert errModel.Model opt
         let initStateModel = ModelState.zeroCreate errModel
         let initState = S(initStateModel, initStateOptimizer)
@@ -85,9 +85,10 @@ module Optimisation =
             do! updateParameters
         }
         
-        Array.init errModel.T id |> Array.map fitOnIdx
-                                 |> State.accumulate
-                                 |> flip State.exec initState
+        Seq.randomIndices 0 errModel.T |> Seq.repeat epochs
+                                       |> Seq.map fitOnIdx
+                                       |> State.Seq.accumulate
+                                       |> flip State.exec initState
         
 
         

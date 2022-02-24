@@ -31,9 +31,8 @@ module Model =
         let rec create = function
             | VAR(var) -> Node.multivariateLinearCombinaison 0 (var.order-1) var.n 
                            |> Array.mapi (fun idxG g -> Graph.add g (Input(Innovation(idxG,0)))) 
-            | ErrorModel(inner) -> let err i = (Graph.shift Variable 1) >> (-) (Input(Variable(i,0)))
-                                   let errSquared i g = err i g * err i g
-                                   create inner |> Array.mapi errSquared
+            | ErrorModel(inner) -> let err i = (Graph.shift Variable 1) >> (-) (Input(Variable(i,0))) 
+                                   create inner |> Array.mapi (fun i x -> Polynomial(err i x, 2))
 
         let rec covariance = function
             | VAR(var) -> var.covariance 

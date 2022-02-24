@@ -41,6 +41,27 @@ module Utils
         let a = autocovariance max_lag array
         a |> Array.map (fun x -> x / a.[0])*)    
 
+    module Array = 
+
+        let rand = new System.Random()
+
+        let private swapInPlace i j (array: 'T[]) = 
+            let tmp = array.[i]
+            array.[i] <- array.[j]
+            array.[j] <- tmp
+
+        let shuffleInPlace array = Array.iteri (fun i _ -> array |> swapInPlace i (rand.Next(i,array.Length))) array; array
+
+    module Seq = 
+        
+        let randomIndices minValue maxValue = Array.init (maxValue-minValue) (fun i -> i+minValue) |> Array.shuffleInPlace |> Seq.ofArray
+
+        let inline repeat count s = seq {
+            for i=0 to count-1 do
+                yield! s
+        }
+        
+
     module Array2D = 
         let length (array:'T[,]) = Array2D.length1 array * Array2D.length2 array
         let shape (array:'T[,]) = Array2D.length1 array, Array2D.length2 array
@@ -135,5 +156,8 @@ module Utils
                 out.[i] <- r
             return out
         }
+
+        module Seq = 
+            let inline accumulate (arrM:seq<State<'a,'b>>) = arrM |> Array.ofSeq |> accumulate
 
 
