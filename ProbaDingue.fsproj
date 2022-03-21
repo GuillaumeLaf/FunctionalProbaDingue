@@ -29,6 +29,7 @@
 
   <ItemGroup>
 	<Compile Include="Utils.fs" />
+	<Compile Include="DataBase\Utils.fs" />
 	<Compile Include="DataBase\Database.fs" />
 	<Compile Include="ComputationalGraph\GraphType.fs" />
 	<Compile Include="ComputationalGraph\BasicInput.fs" />

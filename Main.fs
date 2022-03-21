@@ -19,9 +19,13 @@ let main argv =
     let fitted = Model.fit sampleModel (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) 100
     printfn "%A" fitted*)
 
-    Database.DB.Table.Timeseries.closePrices [|"1INCHBTC";"1INCHBUSD";"1INCHDOWNUSDT"|] (new DateTime(2021,9,1)) (new DateTime(2021,9,5)) |> printfn "%A"
-    
-    
+    //Database.DB.Table.Timeseries.Query.closePrices [|"1INCHBTC";"1INCHBUSD";"1INCHDOWNUSDT"|] (new DateTime(2021,1,1)) (new DateTime(2021,11,5)) |> printfn "%A"
+    //Database.DB.Table.Timeseries.Query.closePrices [|"1INCHBTC";"1INCHBUSD";"1INCHDOWNUSDT"|] (new DateTime(2021,1,1)) (new DateTime(2021,11,5)) |> (Seq.toArray >> printfn "%A")    
+  
+    Database.DB.Table.Timeseries.closePrices [|"1INCHBTC";"1INCHBUSD";"1INCHDOWNUSDT"|] (new DateTime(2021,1,1)|> Some) (new DateTime(2021,11,5)|> Some)
+
+
+
     stopWatch.Stop()
     printfn "%f seconds elapsed" (stopWatch.Elapsed.TotalMilliseconds / 1000.0)
 

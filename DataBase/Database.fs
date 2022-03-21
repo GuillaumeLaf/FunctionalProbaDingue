@@ -7,9 +7,16 @@ open System.IO
 open System.Linq
 
 module DB = 
+
+    [<Literal>]
     let path = "C:\Users\Guillaume\OneDrive\Trading\FSharp\Data\Binance"
 
-    type sqlReal = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, "Server=localhost;Database=BinanceDB;User Id=sa;Password=123">
+    [<Literal>]
+    let connectionString = "Server=localhost;Database=BinanceDB;User Id=sa;Password=123"
+
+    type sqlReal = SqlDataProvider<Common.DatabaseProviderTypes.MSSQLSERVER, 
+                                   connectionString,
+                                   UseOptionTypes=true>
 
     let ctxReal = sqlReal.GetDataContext()
 
@@ -20,19 +27,19 @@ module DB =
         module Timeseries = 
             
             [<Struct>]
-            type Key = Key of string * DateTime
+            type Key = Key of ticker:string * openTime:DateTime
 
             type Data = 
-                { Ticker:string;
-                  CloseTime:DateTime;
-                  OpenPrice:float;
-                  HighPrice:float;
-                  LowPrice:float;
-                  ClosePrice:float;
-                  QuoteVolume:float;
-                  BaseVolume:float;
-                  TradeCount:int;
-                  OpenTime:DateTime }
+                { Ticker:string;                // Key
+                  CloseTime:DateTime option;
+                  OpenPrice:float option;
+                  HighPrice:float option;
+                  LowPrice:float option;
+                  ClosePrice:float option;
+                  QuoteVolume:float option;
+                  BaseVolume:float option;
+                  TradeCount:int option;
+                  OpenTime:DateTime }           // Key
 
             let context = ctxReal.Dbo.TTimeSeries
 
@@ -54,44 +61,70 @@ module DB =
             module Query = 
 
                 let get ticker from_ to_ = 
+                    
                     query {
                         for p in context do 
-                        where (p.Ticker=ticker && p.OpenTime>=from_ && p.OpenTime<to_)
+                        where (p.Ticker=ticker && 
+                               p.OpenTime >= Option.defaultValue DateTime.MinValue.Date from_ && 
+                               p.OpenTime < Option.defaultValue DateTime.MaxValue.Date to_)
                         select p
                     } 
+
+                let closeTime ticker from_ to_ = 
+                    query {
+                        for p in context do
+                        where (p.Ticker=ticker && 
+                               p.OpenTime >= Option.defaultValue DateTime.MinValue.Date from_ && 
+                               p.OpenTime < Option.defaultValue DateTime.MaxValue.Date to_)
+                        select p.CloseTime
+                    }
+
+                // Get the union of the closetime for all given tickers.
+                // The final query is not sorted !
+                let datetimeUnions (tickers:string[]) from_ to_ =
+                    let foldUnion = Array.tail >> Array.fold (fun (s:IQueryable<DateTime option>) x -> (closeTime x from_ to_).Union(s)) (closeTime tickers.[0] from_ to_)
+                    query {
+                        for t in foldUnion tickers do 
+                        select t
+                    }
 
                 let closePrice ticker from_ to_ = 
                     query {
                         for p in context do
-                        where (p.Ticker=ticker && p.OpenTime>=from_ && p.OpenTime<to_)
-                        select (p.CloseTime, [|p.ClosePrice|])
+                        where (p.Ticker=ticker && 
+                               p.OpenTime >= Option.defaultValue DateTime.MinValue.Date from_ && 
+                               p.OpenTime < Option.defaultValue DateTime.MaxValue.Date to_)
+                        select (p.CloseTime, p.ClosePrice)
                     }
-                    
-                // Time is given by the first ticker ! should change to get the maximum time available for the given tickers. 
-                let closePrices (tickers:string[]) from_ to_ =
-                    let mutable tmp = closePrice tickers.[0] from_ to_
-                    for t in Array.tail tickers do 
-                        tmp <- query {
-                                for (t1,arr) in tmp do
-                                join (t2,p2) in closePrice t from_ to_ on (t1=t2)
-                                select (t1,Array.append arr p2)
-                               }
-                    tmp
+
+            let closePrices (tickers:string[]) from_ to_ = 
+                let dts = Query.datetimeUnions tickers from_ to_ |> Seq.sort 
+                                                                 |> Seq.map (fun x -> String.concat " " [|x.Value.ToString("yyyy/MM/dd HH:mm:ss")|]) 
+                                                                 |> Seq.toArray
+
+                Utils.createTemporaryDatetimeTable
+                Utils.populateColumn "tmpDatetime" dts
+
+                Utils.createTemporaryTableFor tickers.[0] from_ to_
+                Utils.joinTemporaryTablesOnce tickers.[0]
+
+                for ticker in Array.tail tickers do 
+                    Utils.createTemporaryTableFor ticker from_ to_
+                    Utils.joinTemporaryTables ticker
+
+
                         
-                
-
-            let closePrices tickers from_ to_ = Query.closePrices tickers from_ to_ |> Seq.toArray
-
-            let multipleGet ticker1 ticker2 from_ to_ = 
-                query {
-                    for (t1,p1) in Query.closePrice ticker1 from_ to_ do
-                    join (t2,p2) in Query.closePrice ticker2 from_ to_ on (t1 = t2)
-                    select (t1,[|p1;p2|])
-                } |> Seq.toArray
+            // let closePrices tickers from_ to_ = Query.closePrices tickers from_ to_ |> Seq.toArray
 
             let get ticker from_ to_ = Query.get ticker from_ to_ |>Seq.map (fun x -> x.MapTo<Data>())
                 
             let getClosePrice ticker from_ to_ = Query.closePrice ticker from_ to_ |> Seq.toArray
+
+            let datetimeUnions (tickers:string[]) from_ to_ = Query.datetimeUnions tickers from_ to_ |> Seq.sort |> Seq.toArray
+
+(*            let closePrices (tickers:string[]) from_ to_ = 
+                let time = datetimeUnions tickers from_ to_*)
+
 
         [<RequireQualifiedAccess>]
         module Tickers = 
