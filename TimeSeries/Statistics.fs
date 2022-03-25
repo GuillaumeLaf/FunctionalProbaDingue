@@ -16,13 +16,13 @@ module Stats =
         // Module for computing statistics. 
 
         let Mean = Utils.Array2D.collectByRow Array.average
-        let Std = Utils.Array2D.collectByRow (Statistics.StandardDeviation >> float32)        : (float32[,] -> float32[])
+        let Std = Utils.Array2D.collectByRow (Statistics.StandardDeviation >> float32 >> Some)        : (float32 option[,] -> float32 option[])
         let Cov (data:float32[,]) = Array2D.zeroCreate (Array2D.length1 data) (Array2D.length1 data) |> Array2D.mapi (fun i j _ -> Statistics.Covariance(data.[i,*],data.[j,*]) |> float32)
         
     module private StatsState =     
         // Module for managing a timeseries monad 
 
-        let data = TS.data <!> State.get        : State<TS,float32[,]>
+        let data = TS.data <!> State.get        : State<TS,float32 option[,]>
         let stats = TS.stats <!> State.get      : State<TS,Stats>
 
         // Memoization function for statistics computations

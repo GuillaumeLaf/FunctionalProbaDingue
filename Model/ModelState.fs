@@ -64,7 +64,7 @@ module ModelState =
 
     // Draw a random vector from 'rndVectorFunc' and update GraphState and TimeseriesState. 
     let updateInnovations rndVectorFunc = monad {
-        let rndSampleVector = rndVectorFunc ()
+        let rndSampleVector = (rndVectorFunc >> Array2D.toOption) ()
         do! (GraphState.updateInnovations >> modifyG) rndSampleVector
         do! (TimeseriesState.setCurrentElements >> modifyI) rndSampleVector.[*,0] 
     }

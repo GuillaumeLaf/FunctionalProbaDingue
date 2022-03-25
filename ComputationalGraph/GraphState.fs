@@ -12,9 +12,9 @@ module GraphState =
     let getInnovations (S(_,_,i)) = i
 
     // Convert the extracted 'S' arrays into monad to be further composed.
-    let parametersM = State.gets getParameters              : State<S,float32[,]>
-    let variablesM = State.gets getVariables                : State<S,float32[,]>
-    let innovationsM = State.gets getInnovations            : State<S,float32[,]>
+    let parametersM = State.gets getParameters              : State<S,float32 option[,]>
+    let variablesM = State.gets getVariables                : State<S,float32 option[,]>
+    let innovationsM = State.gets getInnovations            : State<S,float32 option[,]>
 
     // Get the individual 'Input' data in 'S'.
     // Fst : which Group/timeseries

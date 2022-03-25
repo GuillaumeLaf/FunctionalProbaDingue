@@ -131,6 +131,8 @@ module Utils
 
         // Combine two 'Array2D's into a new one by applying the given function to each pair of elements.
         let map2 (mapping:'a -> 'b -> 'c) = mapi2 (fun _ _ -> mapping)
+
+        let toOption array = Array2D.map Some array
             
 
     module State =  

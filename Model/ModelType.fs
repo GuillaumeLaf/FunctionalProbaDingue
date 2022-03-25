@@ -18,7 +18,7 @@ module ModelType =
     // 'parameters' -> Fst : which timeseries
     //              -> Snd : which parameter
     //              -> Third : which lag
-    type VAR = {n:int; order:int; parameters:float32[,][] option; covariance:float32[,] option }
+    type VAR = {n:int; order:int; parameters:float32 option[,][] option; covariance:float32[,] option }
 
     // Discriminated Union for grouping model types.
     type DGP = 
@@ -36,7 +36,7 @@ module ModelType =
           Graphs:Graph[];
           GraphMonad:State<GraphType.S, float32[]>;
           GraphGradient:State<GraphType.S, float32[,]>;
-          UpdateRule:State<(int*TimeseriesType.TS), float32[,]>
+          UpdateRule:State<(int*TimeseriesType.TS), float32 option[,]>
           }
 
         static member n m = m.N

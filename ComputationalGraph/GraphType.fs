@@ -15,7 +15,8 @@ module GraphType =
     // Fst : 'n'th timeseries
     // Snd : number of paramters for the 'n'th timeseries
     // Note : there is a unique innovation for each unique timeseries model.
-    type S = S of parameters:float32[,] * variables:float32[,] * innovations:float32[,]
+    // They could be missing.
+    type S = S of parameters:float32 option[,] * variables:float32 option[,] * innovations:float32 option[,]
 
     // The most important part of this project.
     // Creating a computational graph eases creation of complex computations. 

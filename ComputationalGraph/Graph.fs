@@ -134,19 +134,19 @@ module Graph =
     // In the far end, one should create a compiler with faster than light compiled Monad operations.
     // But for now, I trust 'FSharpPlus' to efficiently compile my Monads.
     let toMonad = 
-        let rec loop g : ContT<State<S,'b>,float32> = monad {
+        let rec loop g : ContT<State<S,'b>,float32 option> = monad {
             match g with
-            | Constant(value) -> return! lift (result value)
+            | Constant(value) -> return! lift (result (Some value))
             | Polynomial(g,1) -> return! loop g
             | Polynomial(g,2) -> let! x = loop g
-                                 return x*x
+                                 return Option.map2 ( * ) x x
             | Polynomial(g,3) -> let! x = loop g
-                                 return x*x*x
+                                 return (Option.map2 ( * ) x >> Option.map2 ( * ) x) x
             | Polynomial(g,4) -> let! x = loop g
-                                 return x*x*x*x
-            | Addition(l,r) -> return! (+) <!> (loop l) <*> (loop r)
-            | Substraction(l,r) -> return! (-) <!> (loop l) <*> (loop r)
-            | Multiplication(l,r) -> return! (*) <!> (loop l) <*> (loop r)
+                                 return (Option.map2 ( * ) x >> Option.map2 ( * ) x >> Option.map2 ( * ) x) x
+            | Addition(l,r) -> return! Option.map2 (+) <!> (loop l) <*> (loop r)
+            | Substraction(l,r) -> return! Option.map2 (-) <!> (loop l) <*> (loop r)
+            | Multiplication(l,r) -> return! Option.map2 (*) <!> (loop l) <*> (loop r)
             | Input(i) -> match i with
                               | Parameter(grpidx,idx) -> return! lift (GraphState.parameterM grpidx idx)
                               | Variable(grpidx,idx) -> return! lift (GraphState.variableM grpidx idx)
