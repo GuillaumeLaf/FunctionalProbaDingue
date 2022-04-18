@@ -27,11 +27,11 @@ module Optimizers =
         | Classic of Classic
         | Momentum of Momentum
 
-    let update parameters gradient = function
-        | Method.Classic(opt) as x -> x, Array2D.map2 (fun p g -> p - opt.LearningRate * g) parameters gradient
-        | Method.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> - opt.MomentumRate*mom - opt.LearningRate*g ) opt.MomentumValue gradient
-                                  Method.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 ( + ) parameters newMomentum
-        
+    let update (parameters:float32 option[,]) (gradient:float32 option[,]) = function
+        | Method.Classic(opt) as x -> x, Array2D.map2 (fun p g -> Option.map2 (-) p (( * ) opt.LearningRate <!> g)) parameters gradient
+        | Method.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> - opt.MomentumRate*mom - opt.LearningRate*(Option.defaultValue 0f g) ) opt.MomentumValue gradient
+                                  Method.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 ((+) >> (<!>)) newMomentum parameters 
+
 (*module ErrorTypes = 
     type Error =
         | Raw
@@ -71,7 +71,6 @@ module Optimisation =
         let updateParameters = monad {
             let! p = (ModelState.evalG >> evalM) ComputationalGraph.GraphState.parametersM
             let! gradients = (ModelState.evalG >> evalM) errModel.GraphGradient
-            //printfn "%A" p
             let! newOpt, newParams = Optimizers.update p gradients <!> optimizerState()
             do! State.modify (fun (S(ms,_)) -> S(ms,newOpt))
             do! (ComputationalGraph.GraphState.updateParameters >> ModelState.modifyG >> modifyM) newParams

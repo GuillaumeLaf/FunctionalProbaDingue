@@ -7,7 +7,7 @@
 
     // P0 + P2 + (P2 * P3)
     let graph = Graph.add (Input(Parameter(0,0))) (Input(Parameter(0,1))) |> Graph.add (Graph.multiply (Input(Parameter(0,2))) (Input(Parameter(0,3))))
-    let initialState = S(Array2D.ofArray [|[|0f;1f;2f;3f|]|], Array2D.ofArray [|[|0f|]|], Array2D.ofArray [|[|0f|]|])
+    let initialState = S((Array2D.ofArray >> Array2D.toOption) [|[|0f;1f;2f;3f|]|], Array2D.ofArray [|[| Some 0f|]|], Array2D.ofArray [|[|Some 0f|]|])
 
     [<Fact>]
     // 'run'
@@ -20,18 +20,18 @@
     // 'ToMonad'
     let ``Create State monad with graph and runs it`` () = 
         let m = Graph.toMonad graph
-        let expected = 7f
+        let expected = Some 7f
         let actual = State.eval m initialState
-        Assert.Equal<float32>(expected, actual)
+        Assert.Equal<float32 option>(expected, actual)
 
     [<Fact>]
     let ``Humongous graph to check StackOverflow`` () = 
         let g = Array.init 10000 (fun _ -> Input(Parameter(0,0))) |> Array.reduce Graph.add
-        let initialState = S(Array2D.ofArray [|[|0f|]|], Array2D.ofArray [|[|0f|]|], Array2D.ofArray [|[|0f|]|])        
+        let initialState = S(Array2D.ofArray [|[|Some 0f|]|], Array2D.ofArray [|[|Some 0f|]|], Array2D.ofArray [|[|Some 0f|]|])        
         let m = Graph.toMonad g
-        let expected = 0f
+        let expected = Some 0f
         let actual = State.eval m initialState
-        Assert.Equal<float32>(expected, actual)
+        Assert.Equal<float32 option>(expected, actual)
 
     [<Fact>]
     // 'count'

@@ -13,56 +13,22 @@ module Stats =
     // Module to create descriptive - and other - statistics about a timeseries. 
 
     module Computations = 
-        // Module for computing statistics. 
+        let crossSum f array1 array2 = Array.foldBack2 (Option.foldBack2 (fun x1 x2 s -> f x1 x2 + s)) array1 array2 0f
+        let sum f array = crossSum (fun _ -> f) array array
+        let countSome array = Array.foldBack (Option.count >> (+)) array 0 |> float32
+    
+        let mean array = flip (/) (countSome array) (sum id array)
+        let cov array1 array2 = (fun mean1 mean2 -> crossSum (fun x1 x2 -> (x1-mean1)*(x2-mean2)) array1 array2) (mean array1) (mean array2) |> ( * ) (1.0f/(countSome array1-1.0f))
+        let var array = (fun mean -> sum (fun x -> (x-mean)*(x-mean)) array) (mean array) |> ( * ) (1.0f/(countSome array-1.0f))
+        let std = var >> sqrt
 
-        let Mean = Utils.Array2D.collectByRow Array.average
-        let Std = Utils.Array2D.collectByRow (Statistics.StandardDeviation >> float32 >> Some)        : (float32 option[,] -> float32 option[])
-        let Cov (data:float32[,]) = Array2D.zeroCreate (Array2D.length1 data) (Array2D.length1 data) |> Array2D.mapi (fun i j _ -> Statistics.Covariance(data.[i,*],data.[j,*]) |> float32)
-        
-    module private StatsState =     
-        // Module for managing a timeseries monad 
+    let mean (ts:TS) = Array2D.collectByRow Computations.mean ts.Data
+    let var (ts:TS) = Array2D.collectByRow Computations.var ts.Data
+    let std (ts:TS) = Array2D.collectByRow Computations.std ts.Data
+    let cov (ts:TS) = Array2D.zeroCreate (ts.Size) (ts.Size) |> Array2D.mapi (fun i j _ -> Computations.cov ts.Data.[i,*] ts.Data.[j,*])
+    let cholesky = cov >> Utils.cholesky 
 
-        let data = TS.data <!> State.get        : State<TS,float32 option[,]>
-        let stats = TS.stats <!> State.get      : State<TS,Stats>
-
-        // Memoization function for statistics computations
-        // If the 'TS' monad state already has the computation then returns it, 
-        // otherwise compute it and update the state with it. 
-        let inline memoize statistic compute set = monad {
-            let! s = stats
-            let! d = data
-            if (statistic s) = None then
-                let result = compute d
-                do! State.modify (fun t -> { t with Stats=set result s })
-                return result
-            else return (statistic >> Option.get) s
-        }
-
-        // Memoization function which takes a monad computation as argument and
-        // base its computation based on the inner result of the given monad.
-        // For instance, allows use of standard devation monad to compute the variance monad, 
-        // and memoize the result of the variance monad in the 'TS' monad state. 
-        // 'TS' state must have the possibility to memoize variance !. 
-        let inline memoizeFromArg arg statistics compute set = arg >>= (fun a -> memoize statistics (flip compute a) set)
-                                  
-        let mean = memoize Stats.mean Computations.Mean Stats.setMean
-        let std = memoize Stats.std Computations.Std Stats.setStd
-        let var = std >>= (Array.map (fun x -> x*x)  >> result)
-        let cov = memoize Stats.cov Computations.Cov Stats.setCov
-        let lowerCholeskyCov = memoizeFromArg cov Stats.lowerCholeskyCov (fun _ -> Utils.cholesky) Stats.setLowerCholeskyCov
-                                     
-    let mean = State.run StatsState.mean 
-    let std = State.run StatsState.std
-    let var = State.run StatsState.var
-    let cov = State.run StatsState.cov
-    let lowerCholeskyCov = State.run StatsState.lowerCholeskyCov
-
-    let onlyMean = mean >> fst
-    let onlyStd = std >> fst
-    let onlyVar = var >> fst
-    let onlyCov = cov >> fst
-    let onlyLowerCholeskyCov = lowerCholeskyCov >> fst
-       
+   
 
             
 

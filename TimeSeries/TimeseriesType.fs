@@ -7,21 +7,22 @@ module TimeseriesType =
     // Record Type representing available statistics.
     // 'Stats' does not contain the data only statistics about some data.
     // Therefore the data holder must have a 'Stats' object. 
+    // General option type indicates if the given statistic has already been computed
     type Stats = 
         { Mean:float32[] option;
-          Std:float32[] option;
+          Var:float32[] option;
           Cov:float32[,] option;
           LowerCholeskyCov:float32[,] option }
 
         static member create = 
-            { Mean=None; Std=None; Cov=None; LowerCholeskyCov=None }
+            { Mean=None; Var=None; Cov=None; LowerCholeskyCov=None }
         static member mean s = s.Mean
-        static member std s = s.Std
+        static member var s = s.Var
         static member cov s = s.Cov
         static member lowerCholeskyCov s = s.LowerCholeskyCov
 
         static member setMean x s = { s with Mean=Some x }
-        static member setStd x s = { s with Std=Some x }
+        static member setVar x s = { s with Var=Some x }
         static member setCov x s = { s with Cov=Some x }
         static member setLowerCholeskyCov x s = { s with LowerCholeskyCov=Some x } 
 

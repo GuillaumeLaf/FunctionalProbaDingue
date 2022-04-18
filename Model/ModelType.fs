@@ -34,8 +34,8 @@ module ModelType =
           Innovations:TS option;
           Model:DGP;
           Graphs:Graph[];
-          GraphMonad:State<GraphType.S, float32[]>;
-          GraphGradient:State<GraphType.S, float32[,]>;
+          GraphMonad:State<GraphType.S, float32 option[]>;
+          GraphGradient:State<GraphType.S, float32 option[,]>;
           UpdateRule:State<(int*TimeseriesType.TS), float32 option[,]>
           }
 

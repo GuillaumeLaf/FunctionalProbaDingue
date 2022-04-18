@@ -4,8 +4,9 @@ module Utils
     open MathNet.Numerics.LinearAlgebra
     open MathNet.Numerics.Distributions
 
-    let mapTuple f (x,y) = (f x, f y)
-
+(*    let mapTuple f (x,y) = (f x, f y)*)
+    
+    // This function unbox Option types unsafely - i.e. Option.get
     let randomNormalVector length lowerCholesky = ( * ) (Matrix<float32>.Build.DenseOfArray(lowerCholesky))
                                                         (Vector<float32>.Build.Random(length, new Normal())) |> Vector.toArray
 
@@ -13,7 +14,7 @@ module Utils
     let cholesky a =
         let calc (a: float32[,]) (l: float32[,]) i j =
             let c1 j =
-                let sum = List.sumBy (fun k -> l.[j, k] ** 2.0f) [0..j - 1]
+                let sum = List.sumBy (fun k -> l.[j, k] * l.[j, k]) [0..j - 1]
                 sqrt (a.[j, j] - sum)
             let c2 i j = 
                 let sum = List.sumBy (fun k -> l.[i, k] * l.[j, k]) [0..j - 1]
@@ -60,6 +61,14 @@ module Utils
             for i=0 to count-1 do
                 yield! s
         }
+
+    module Option =
+        
+        let inline foldBack2 (folder:'T -> 'U -> 'State -> 'State) (option1:'T option) (option2:'U option) (state:'State) : 'State = 
+            match option1,option2 with
+            | None,_ -> state
+            | _,None -> state
+            | Some x1,Some x2 -> folder x1 x2 state
         
 
     module Array2D = 

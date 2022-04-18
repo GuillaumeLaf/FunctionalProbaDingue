@@ -53,11 +53,9 @@ module Model =
           GraphGradient=ModelState.graphToMonad2D (Graph.gradient tmp)
           UpdateRule=ModelTimeseries.updateRule m } 
 
-    
-
     // Sample an 'Array' from a multivariate normal
     // Note : Covariance matrix must be already initialized in the 'innovations' 'TS'.
-    let randomNormalInnovations (m:Model) () = Utils.randomNormalVector ((Model.ts >> Option.get >> TS.size) m) ((Model.innovations >> Option.get >> Stats.lowerCholeskyCov >> fst) m)
+    let randomNormalInnovations (m:Model) () = Utils.randomNormalVector ((Model.ts >> Option.get >> TS.size) m) ((Model.innovations >> Option.get >> Stats.cholesky) m)
                                                  |> (Array.map Array.singleton >> Utils.Array2D.ofArray)
 
     let sample n (m:Model) = 
