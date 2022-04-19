@@ -30,14 +30,12 @@ module TimeseriesState =
 
     // Extract the current cross-section
     let currentElements = TS.atTime <!> currentTime <*> timeseries
-    let currentElementsDefault = Option.defaultValue <!> (Array.zeroCreate <!> size) <*> currentElements
 
     // Set the current elements of the cross-section
     let setCurrentElements e = State.modify (fun (idx,ts) -> (idx,TS.modifyAtTime idx e ts))      : State<(int * TS),unit> 
 
     // Extract the cross-sections at a given lag (from the current time)
     let lagElements lag = TS.atTime <!> ((+) -lag <!> currentTime) <*> timeseries
-    let lagElementsDefault lag = Option.defaultValue <!> (Array.zeroCreate <!> size) <*> lagElements lag
 
     // Extract the cross-sections at a given lead in the future (from the current time)
     let leadElements lead = lagElements (-lead)

@@ -19,8 +19,8 @@ module Model =
         let rec updateRule = 
             let rec loop g = 
                 match g with
-                | VAR(var) -> [| for i in 1..var.order do lagElementsDefault i |]
-                | ErrorModel(inner) -> Array.append [|currentElementsDefault|] (loop inner)
+                | VAR(var) -> [| for i in 1..var.order do lagElements i |]
+                | ErrorModel(inner) -> Array.append [|currentElements|] (loop inner)
             loop >> Utils.State.traverseBack >> map Array.transpose >> map Utils.Array2D.ofArray
             
     // Module grouping function for creating/managing graphs of a given model.
@@ -55,16 +55,17 @@ module Model =
 
     // Sample an 'Array' from a multivariate normal
     // Note : Covariance matrix must be already initialized in the 'innovations' 'TS'.
-    let randomNormalInnovations (m:Model) () = Utils.randomNormalVector ((Model.ts >> Option.get >> TS.size) m) ((Model.innovations >> Option.get >> Stats.cholesky) m)
+    let randomNormalInnovations (m:Model) () = Utils.randomNormalVector ((Model.ts >> Option.get >> TS.size) m) ((Model.innovations >> Option.get >> TS.stats >> Stats.lowerCholeskyCov >> Option.get) m)
                                                  |> (Array.map Array.singleton >> Utils.Array2D.ofArray)
 
     let sample n (m:Model) = 
         if (ModelGraph.covariance m.Model) <> None then 
             let corrInnov = TS.addLowerCholeskyCov (ModelGraph.cholesky m.Model) (TS.zeroCreate m.N n)
             let reInitModel = { m with Ts=Some (TS.zeroCreate m.N n); Innovations=Some corrInnov } 
-
+            
             let defaultState = defaultState reInitModel
             let newInnovFunc = randomNormalInnovations reInitModel
+
             let (S(_,(_,ts,innov))) = State.exec (ModelState.sample n newInnovFunc reInitModel) defaultState      
             { reInitModel with T=ts.Length; Ts=Some ts; Innovations=Some innov }
         else invalidArg "Innovations" "Innovations and its Covariance Matrix must be instantiated before sampling."

@@ -44,7 +44,7 @@ module ModelState =
         | ErrorModel(inner) -> zeroParameters inner
 
     let rec zeroVariables = function
-        | VAR(var) -> Array2D.zeroCreate var.n var.order
+        | VAR(var) -> Array2D.zeroCreate var.n var.order 
         | ErrorModel(inner) -> let tmp = zeroVariables inner
                                Array2D.zeroCreate (Array2D.length1 tmp) (Array2D.length2 tmp + 1)
 
@@ -53,8 +53,8 @@ module ModelState =
         | ErrorModel(inner) -> zeroInnovations inner
 
     // Get 'Graph' state initiated with zeros
-    let zeroGraphState dgp = GraphType.S(zeroParameters dgp, zeroVariables dgp, zeroInnovations dgp) 
-    let defaultGraphState dgp = GraphType.S(parameters dgp, zeroVariables dgp, zeroInnovations dgp) 
+    let zeroGraphState dgp = GraphType.S(zeroParameters dgp |> Array2D.toOption, zeroVariables dgp |> Array2D.toOption, zeroInnovations dgp |> Array2D.toOption) 
+    let defaultGraphState dgp = GraphType.S(parameters dgp, zeroVariables dgp |> Array2D.toOption, zeroInnovations dgp |> Array2D.toOption) 
 
     let zeroCreate (m:Model) = ModelType.S(zeroGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
     let defaultState (m:Model) = ModelType.S(defaultGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
