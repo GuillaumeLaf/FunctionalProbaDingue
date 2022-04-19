@@ -40,3 +40,6 @@ module TimeseriesState =
     // Extract the cross-sections at a given lead in the future (from the current time)
     let leadElements lead = lagElements (-lead)
 
+    // Extract a subrange of the 'idxTS'th timeseries with the current element along with 'lags' numbers of previous elements.
+    let multipleLagElementsFor lags idxTS = Array.sub <!> (TS.get idxTS <!> timeseries) <*> (lift2 ( - ) currentTime (result lags)) <*> result (lags+1)
+

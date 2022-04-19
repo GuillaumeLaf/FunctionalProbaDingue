@@ -14,8 +14,11 @@ module TS =
     
     let zeroCreate i j = (Array2D.zeroCreate i >> TS.create) j
 
+    // Get the 'idx'th timeseries
     let get idx = TS.data >> Utils.Array2D.row idx 
+
     let atTime t ts = if (0 <= t) && (t < ts.Length) then ts.Data.[*,t] else (Array.create ts.Size (Some 0.0f)) // 'Array.zeroCreate ts.Size' gives an array of 'None'
+    
     let modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
     
     // Function to set a given statistic to the 'TS'.
