@@ -37,9 +37,9 @@
 	<Compile Include="ComputationalGraph\Graph.fs" />
 	<Compile Include="ComputationalGraph\Node.fs" />
 	<Compile Include="TimeSeries\TimeseriesType.fs" />
-	<Compile Include="TimeSeries\Statistics.fs" />
 	<Compile Include="TimeSeries\TimeSeries.fs" />
 	<Compile Include="TimeSeries\TimeseriesState.fs" />
+	<Compile Include="TimeSeries\Statistics.fs" />
 	<Compile Include="TimeSeries\Transformations.fs" />
 	<Compile Include="TimeSeries\Plot.fs" />
 	<Compile Include="Model\ModelType.fs" />

@@ -7,6 +7,7 @@ open FSharpPlus.Data
 open FSharpPlus.Control
 
 open TimeseriesType
+open TimeseriesState
 
 [<RequireQualifiedAccess>]
 module Stats = 
@@ -29,7 +30,12 @@ module Stats =
     let cholesky = cov >> Utils.cholesky 
 
    
+    module Monad = 
+        // Monad form of statistics 
 
-            
+        let mean = (mean >> Array.map Some) <!> timeseries
+        let var = (var >> Array.map Some) <!> timeseries
+        let std = (std >> Array.map Some) <!> timeseries
+        let cov = (cov  >> Array2D.toOption) <!> timeseries
 
 

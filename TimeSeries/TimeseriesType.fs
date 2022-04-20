@@ -26,9 +26,13 @@ module TimeseriesType =
         static member setCov x s = { s with Cov=Some x }
         static member setLowerCholeskyCov x s = { s with LowerCholeskyCov=Some x } 
 
-    // Type of possible 'Transformation' for a 'TS'
+    // Type of possible 'Transformation' for a 'TS'.
+    // Keep relevant information to - possibly - inverse the transform.
     type Transformation = 
-        | FracDifference of float32
+        | FracDifference of ds:float32[] option * thresh:float32
+        | Center of means:float32 option[] option
+        | Standardize of stds:float32 option[] option
+        | TotalDifference
                     
     // Record Type representing a MULTIVARIATE timeseries. 
     type TS = 
@@ -48,7 +52,9 @@ module TimeseriesType =
         static member size ts = ts.Size
         static member data ts = ts.Data
         static member stats ts = ts.Stats
+        static member transformation ts = ts.Transformation
 
         static member setData x ts = { ts with Data=x }
         static member setStats x ts = { ts with Stats=x }
+        static member addTransformation x ts = { ts with Transformation=x::ts.Transformation }
 
