@@ -32,7 +32,7 @@ module TimeseriesType =
         | FracDifference of ds:float32[] option * thresh:float32
         | Center of means:float32 option[] option
         | Standardize of stds:float32 option[] option
-        | TotalDifference
+        | TotalDifference of first:float32 option[] option
                     
     // Record Type representing a MULTIVARIATE timeseries. 
     type TS = 
