@@ -54,7 +54,7 @@ module TimeseriesType =
         static member stats ts = ts.Stats
         static member transformation ts = ts.Transformation
 
-        static member setData x ts = { ts with Data=x }
+        static member setData x ts = { ts with Data=x; Length=x.[0,*].Length; Size=x.[*,0].Length }
         static member setStats x ts = { ts with Stats=x }
         static member addTransformation x ts = { ts with Transformation=x::ts.Transformation }
 

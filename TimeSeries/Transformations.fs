@@ -5,6 +5,7 @@ open FSharpPlus.Data
 open TimeseriesType
 open TimeseriesState
 
+[<RequireQualifiedAccess>]
 module Transformations = 
     // Module to perform transformations on timeseries.
     // Should also update the 'Stats' object in the 'TS'.
@@ -65,16 +66,17 @@ module Transformations =
                                (Some >> Center)
 
         let standardize = traverse1 Single.standardize 
-                                          Stats.Monad.std 
-                                          (Some >> Standardize)
+                                    Stats.Monad.std 
+                                    (Some >> Standardize)
 
         let totalDifference = traverse1 (fun _ -> Single.totalDifference)
-                                              (TS.atTime 0 <!> timeseries)
-                                              (Some >> TotalDifference)
+                                        (TS.atTime 0 <!> timeseries)
+                                        (Some >> TotalDifference)
+                                >>= (fun ts -> TS.setData (ts.Data.[*,1..]) ts |> result)
 
         let fractionalDifference ds thresh = traverse1 Single.fractionalDifference 
-                                                             ((Utils.fractionalDiffCoeffs >> Array.map) thresh ds |> result) 
-                                                             (fun _ -> FracDifference(Some ds,thresh))
+                                                       ((Utils.fractionalDiffCoeffs >> Array.map) thresh ds |> result) 
+                                                       (fun _ -> FracDifference(Some ds,thresh))
 
     [<RequireQualifiedAccess>]
     module Backward = 
@@ -94,6 +96,18 @@ module Transformations =
         let traverse1 compute arg = traverse2 (fun a _ -> compute a) arg ()
         let traverse compute = traverse1 (fun _ -> compute) ()
 
+        // The main difference with 'traverse' is that the provided monad directly modifies the data of the state.
+        // 'compute' monad computation can depend on previously computed values (and not only on the original provided state).
+        let inline accumulate compute = 
+            monad {
+                let! len = length
+                for i in 0..len-1 do
+                    do! setTime i
+                    let! c = compute
+                    do! setCurrentElements c
+                return! timeseries
+            }
+
         module Single =
             // Reverse the transformation for a single observation (given the whole TS). 
             let totalDifference = (( + ) |> (Option.map2 >> Array.map2)) <!> currentElements <*> lagElements 1  
@@ -111,11 +125,24 @@ module Transformations =
         let totalDifference firsts = 
             monad {
                 let! t = currentTime
-                if t = 0 then 
-                    return firsts
-                else 
-                    return! Single.totalDifference
-            } |> traverse
+                let! len = length
+                match t with
+                | 0 -> let! (out:float32 option [,]) = Array2D.zeroCreate <!> size <*> (( + ) 1 <!> length)         
+                       let! (data:float32 option [,]) = TS.data <!> timeseries                                
+                       out.[*,0] <- firsts
+                       out.[*,1..] <- data
+                       do! setData out
+                       return firsts
+
+                // Special treatment of the last element of array (since array was lengthened).
+                | x when x=len-2 -> let! c = Single.totalDifference   
+                                    do! setCurrentElements c
+                                    do! setTime (len-1) 
+                                    do! Single.totalDifference >>= setCurrentElements 
+                                    do! setTime (len-2) 
+                                    return c
+                | _ -> return! Single.totalDifference  
+            } |> accumulate
 
         // To allow inverse transfo. 'd' should be in (0, 0.5). 
         // Get inverse from negating 'd'.
@@ -144,5 +171,5 @@ module Transformations =
             | Standardize(stds)::xs -> (State.eval (Backward.standardize stds.Value) (0,ts)) |> loop xs     // unboxed unsafely
             | TotalDifference(firsts)::xs -> (State.eval (Backward.totalDifference firsts.Value) (0,ts)) |> loop xs     // unboxed unsafely
             | FracDifference(ds,thresh)::xs -> (State.eval (Backward.fractionalDifference ds.Value thresh) (0,ts)) |> loop xs // 'ds' is unboxed unsafely
-        loop ts
+        loop ts.Transformation ts
 

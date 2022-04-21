@@ -28,6 +28,9 @@ module TimeseriesState =
     let size = TS.size <!> timeseries
     let length = TS.length <!> timeseries
 
+    // Set the current data
+    let setData newData = State.modify (fun (idx,ts) -> (idx, TS.setData newData ts))
+
     // Extract the current cross-section
     let currentElements = TS.atTime <!> currentTime <*> timeseries
 
