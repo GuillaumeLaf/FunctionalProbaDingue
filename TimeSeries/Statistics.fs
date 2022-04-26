@@ -29,7 +29,7 @@ module Stats =
     let cov (ts:TS) = Array2D.zeroCreate (ts.Size) (ts.Size) |> Array2D.mapi (fun i j _ -> Computations.cov ts.Data.[i,*] ts.Data.[j,*])
     let cholesky = cov >> Utils.cholesky 
 
-   
+
     module Monad = 
         // Monad form of statistics 
 
@@ -37,5 +37,8 @@ module Stats =
         let var = (var >> Array.map Some) <!> timeseries
         let std = (std >> Array.map Some) <!> timeseries
         let cov = (cov  >> Array2D.toOption) <!> timeseries
+        
+
+
 
 

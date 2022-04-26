@@ -33,6 +33,7 @@ module TimeseriesType =
         | Center of means:float32 option[] option
         | Standardize of stds:float32 option[] option
         | TotalDifference of first:float32 option[] option
+        | DefaultWith of value:float32 * indices:int list[] option       // replace 'None' by some constant and save idx where that happened
                     
     // Record Type representing a MULTIVARIATE timeseries. 
     type TS = 
@@ -51,6 +52,7 @@ module TimeseriesType =
         static member length ts = ts.Length
         static member size ts = ts.Size
         static member data ts = ts.Data
+        static member dataDefault ts = Array2D.map (Option.defaultValue 0.0f) ts.Data
         static member stats ts = ts.Stats
         static member transformation ts = ts.Transformation
 

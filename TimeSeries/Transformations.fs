@@ -51,6 +51,18 @@ module Transformations =
 
             let standardize stds = (( / ) |> (Option.map2 >> Array.map2)) <!> currentElements <*> result stds
 
+            // Append idx to array list if changed with default
+            // Use Inplace Array modification
+            let defaultWith value (array:int list[]) = 
+                let tmp currentIdx i = function
+                    | Some _ as x -> x
+                    | None -> array.[i] <- currentIdx::array.[i]
+                              Some value
+                monad {
+                    let! idx = currentTime
+                    return! Array.mapi (tmp idx) <!> currentElements
+                }
+
             // Take the fractional difference with the given exponents
             let fractionalDifference (coeffs:float32[][]) = 
                 monad {
@@ -77,6 +89,11 @@ module Transformations =
         let fractionalDifference ds thresh = traverse1 Single.fractionalDifference 
                                                        ((Utils.fractionalDiffCoeffs >> Array.map) thresh ds |> result) 
                                                        (fun _ -> FracDifference(Some ds,thresh))
+
+        let defaultWith value = traverse1 (Single.defaultWith value)
+                                          (Array.create <!> size <*> result [])
+                                          (fun indices -> DefaultWith(value, Some indices))
+                                          
 
     [<RequireQualifiedAccess>]
     module Backward = 
@@ -136,7 +153,7 @@ module Transformations =
 
                 // Special treatment of the last element of array (since array was lengthened).
                 | x when x=len-2 -> let! c = Single.totalDifference   
-                                    do! setCurrentElements c
+                                    do! setCurrentElements c 
                                     do! setTime (len-1) 
                                     do! Single.totalDifference >>= setCurrentElements 
                                     do! setTime (len-2) 
@@ -153,23 +170,26 @@ module Transformations =
     // Transfrom a timeseries, then save the transformation made in 'TS',
     // such that, the transformation reversible
     let forward transforms ts = 
+        let inline apply loop ts xs m = State.eval m (0,ts) |> loop xs
         let rec loop remaining ts = 
             match remaining with
             | [] -> ts
-            | Center(_)::xs -> (State.eval Forward.center (0,ts)) |> loop xs
-            | Standardize(_)::xs -> (State.eval Forward.standardize (0,ts)) |> loop xs
-            | TotalDifference(_)::xs -> (State.eval Forward.totalDifference (0,ts)) |> loop xs
-            | FracDifference(ds,thresh)::xs -> (State.eval (Forward.fractionalDifference ds.Value thresh) (0,ts)) |> loop xs // 'ds' is unboxed unsafely
+            | Center(_)::xs -> apply loop ts xs Forward.center
+            | Standardize(_)::xs -> apply loop ts xs Forward.standardize
+            | TotalDifference(_)::xs -> apply loop ts xs Forward.totalDifference
+            | FracDifference(ds,thresh)::xs -> apply loop ts xs (Forward.fractionalDifference ds.Value thresh) // 'ds' is unboxed unsafely
+            | DefaultWith(value,_)::xs -> apply loop ts xs (Forward.defaultWith value)
         loop transforms ts
 
     // Reverse the transformation through the list saved in 'TS'
     let backward ts = 
+        let apply loop ts xs m = State.eval m (0,ts) |> loop xs
         let rec loop remaining ts = 
             match remaining with
             | [] -> ts
-            | Center(means)::xs -> (State.eval (Backward.center means.Value) (0,ts)) |> loop xs         // unboxed unsafely
-            | Standardize(stds)::xs -> (State.eval (Backward.standardize stds.Value) (0,ts)) |> loop xs     // unboxed unsafely
-            | TotalDifference(firsts)::xs -> (State.eval (Backward.totalDifference firsts.Value) (0,ts)) |> loop xs     // unboxed unsafely
-            | FracDifference(ds,thresh)::xs -> (State.eval (Backward.fractionalDifference ds.Value thresh) (0,ts)) |> loop xs // 'ds' is unboxed unsafely
+            | Center(means)::xs -> apply loop ts xs (Backward.center means.Value)        // unboxed unsafely
+            | Standardize(stds)::xs -> apply loop ts xs (Backward.standardize stds.Value)     // unboxed unsafely
+            | TotalDifference(firsts)::xs -> apply loop ts xs (Backward.totalDifference firsts.Value)    // unboxed unsafely
+            | FracDifference(ds,thresh)::xs -> apply loop ts xs (Backward.fractionalDifference ds.Value thresh) // 'ds' is unboxed unsafely
         loop ts.Transformation ts
 
