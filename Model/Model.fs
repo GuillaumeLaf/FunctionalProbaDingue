@@ -20,29 +20,35 @@ module Model =
             let rec loop g = 
                 match g with
                 | VAR(var) -> [| for i in 1..var.order do lagElements i |]
-                | ErrorModel(inner) -> Array.append [|currentElements|] (loop inner)
+                | ErrorModel(inner,_) -> Array.append [|currentElements|] (loop inner)
             loop >> Utils.State.traverseBack >> map Array.transpose >> map Utils.Array2D.ofArray
             
     // Module grouping function for creating/managing graphs of a given model.
     [<RequireQualifiedAccess>]
     module ModelGraph = 
+
+        let errorGraph errorType errorsG = 
+            match errorType with
+            | SquaredError -> Array.map (fun e -> Polynomial(e,2)) errorsG
+            | L2Regu(lambda) -> Array.map (fun e -> Polynomial(e,2) + Constant(lambda)) errorsG 
         
         // Build Graph
+        // First element of array for first TS.
         let rec create = function
             | VAR(var) -> Node.multivariateLinearCombinaison 0 (var.order-1) var.n 
                            |> Array.mapi (fun idxG g -> Graph.add g (Input(Innovation(idxG,0)))) 
-            | ErrorModel(inner) -> let err i = (Graph.shift Variable 1) >> (-) (Input(Variable(i,0))) 
-                                   create inner |> Array.mapi (fun i x -> Polynomial(err i x, 2))
+            | ErrorModel(inner,errType) -> let err i = (Graph.shift Variable 1) >> (-) (Input(Variable(i,0))) 
+                                           (create >> Array.mapi err >> errorGraph errType) inner
 
         let rec covariance = function
             | VAR(var) -> var.covariance 
-            | ErrorModel(inner) -> covariance inner
+            | ErrorModel(inner,_) -> covariance inner
 
         let cholesky = covariance >> Option.get >> Utils.cholesky
 
         let rec addCovariance cov = function
             | VAR(var) -> VAR({var with covariance=Some cov})
-            | ErrorModel(inner) -> addCovariance cov inner
+            | ErrorModel(inner,_) -> addCovariance cov inner
         
         
 
@@ -72,9 +78,9 @@ module Model =
 
     // Fit the model with the given optimizer.
     // Model should already contain the data.
-    let fit (m:Model) (opt:Optimisation.Optimizer) = 
+    let fit (m:Model) (opt:Optimisation.Optimizer) (errorType:ErrorType) = 
         let innovations = TS.zeroCreate m.N m.T |> Some
-        let errModel = create (ErrorModel(m.Model)) |> Model.setTs m.Ts |> Model.setInnovations innovations
+        let errModel = create (ErrorModel(m.Model,errorType)) |> Model.setTs m.Ts |> Model.setInnovations innovations
         Optimisation.fit errModel opt
         
         

@@ -69,6 +69,8 @@ module Node =
         // Specialized version of 'initShifted' function where
         // the shift is set to 0.
         let init basicInput idxType n  = initShifted basicInput idxType 0 n
+
+        let normL2 =
         
     [<RequireQualifiedAccess>]
     module Matrix = 
@@ -136,4 +138,4 @@ module Node =
                                |> Array.reduce Vector.add
                                |> Vector.graphs
 
-
+    

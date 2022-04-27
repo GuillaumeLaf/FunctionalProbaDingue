@@ -37,20 +37,20 @@ module ModelState =
 
     let rec parameters = function
         | VAR(var) -> var.parameters |> Option.get |> Array.reduce Utils.Array2D.stackColumn
-        | ErrorModel(inner) -> parameters inner
+        | ErrorModel(inner,_) -> parameters inner
 
     let rec zeroParameters = function
         | VAR(var) -> Array2D.zeroCreate var.n (var.n*var.order)
-        | ErrorModel(inner) -> zeroParameters inner
+        | ErrorModel(inner,_) -> zeroParameters inner
 
     let rec zeroVariables = function
         | VAR(var) -> Array2D.zeroCreate var.n var.order 
-        | ErrorModel(inner) -> let tmp = zeroVariables inner
-                               Array2D.zeroCreate (Array2D.length1 tmp) (Array2D.length2 tmp + 1)
+        | ErrorModel(inner,_) -> let tmp = zeroVariables inner
+                                 Array2D.zeroCreate (Array2D.length1 tmp) (Array2D.length2 tmp + 1)
 
     let rec zeroInnovations = function
         | VAR(var) -> Array2D.zeroCreate var.n 1
-        | ErrorModel(inner) -> zeroInnovations inner
+        | ErrorModel(inner,_) -> zeroInnovations inner
 
     // Get 'Graph' state initiated with zeros
     let zeroGraphState dgp = GraphType.S(zeroParameters dgp |> Array2D.toOption, zeroVariables dgp |> Array2D.toOption, zeroInnovations dgp |> Array2D.toOption) 

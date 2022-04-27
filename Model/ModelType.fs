@@ -20,10 +20,14 @@ module ModelType =
     //              -> Third : which lag
     type VAR = {n:int; order:int; parameters:float32 option[,][] option; covariance:float32[,] option }
 
+    type ErrorType = 
+        | SquaredError
+        | L2Regu of lambda:float32
+
     // Discriminated Union for grouping model types.
     type DGP = 
         | VAR of VAR 
-        | ErrorModel of DGP
+        | ErrorModel of DGP * ErrorType
 
     // Record Type representing a model.
     // Contains all information required for using a model.

@@ -34,6 +34,7 @@ module TimeseriesType =
         | Standardize of stds:float32 option[] option
         | TotalDifference of first:float32 option[] option
         | DefaultWith of value:float32 * indices:int list[] option       // replace 'None' by some constant and save idx where that happened
+        | Apply of f:(float32 -> float32) * invf:(float32 -> float32)
                     
     // Record Type representing a MULTIVARIATE timeseries. 
     type TS = 
@@ -59,4 +60,5 @@ module TimeseriesType =
         static member setData x ts = { ts with Data=x; Length=x.[0,*].Length; Size=x.[*,0].Length }
         static member setStats x ts = { ts with Stats=x }
         static member addTransformation x ts = { ts with Transformation=x::ts.Transformation }
+        static member popTransformation ts = { ts with Transformation=List.tail ts.Transformation }
 

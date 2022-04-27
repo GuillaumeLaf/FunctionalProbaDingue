@@ -63,6 +63,8 @@ module Transformations =
                     return! Array.mapi (tmp idx) <!> currentElements
                 }
 
+            let inline apply f = (Option.map >> Array.map) f <!> currentElements
+
             // Take the fractional difference with the given exponents
             let fractionalDifference (coeffs:float32[][]) = 
                 monad {
@@ -93,6 +95,9 @@ module Transformations =
         let defaultWith value = traverse1 (Single.defaultWith value)
                                           (Array.create <!> size <*> result [])
                                           (fun indices -> DefaultWith(value, Some indices))
+
+        let apply f invf = traverse (Single.apply f)
+                                    (Apply(f,invf))
                                           
 
     [<RequireQualifiedAccess>]
@@ -107,7 +112,7 @@ module Transformations =
                     do! setTime i
                     let! c = compute arg1 arg2
                     out.[*,i] <- c
-                return! TS.setData out <!> timeseries
+                return! (TS.setData out >> TS.popTransformation) <!> timeseries
             }
 
         let traverse1 compute arg = traverse2 (fun a _ -> compute a) arg ()
@@ -122,7 +127,7 @@ module Transformations =
                     do! setTime i
                     let! c = compute
                     do! setCurrentElements c
-                return! timeseries
+                return! TS.popTransformation <!> timeseries
             }
 
         module Single =
@@ -134,6 +139,8 @@ module Transformations =
             let standardize stds = (( * ) |> (Option.map2 >> Array.map2)) <!> currentElements <*> result stds
 
             let fractionalDifference = Forward.Single.fractionalDifference
+
+            let apply invf = (Option.map >> Array.map) invf <!> currentElements
 
         let center = traverse1 Single.center 
 
@@ -165,7 +172,16 @@ module Transformations =
         // Get inverse from negating 'd'.
         let fractionalDifference ds thresh = traverse1 Single.fractionalDifference 
                                                        ((( * ) -1f >> Utils.fractionalDiffCoeffs >> Array.map) thresh ds) 
-                                   
+                          
+        // Replace the given lists of indices with 'None'
+        let defaultWith (indices:int list[]) = 
+            monad {
+                let! (data:float32 option [,]) = TS.data <!> timeseries
+                Array.iteri (fun i _ -> List.iter (fun y -> data.[i,y] <- None) indices.[i]) indices 
+                return! (TS.setData data >> TS.popTransformation) <!> timeseries
+            }
+
+        let apply = Single.apply >> traverse
     
     // Transfrom a timeseries, then save the transformation made in 'TS',
     // such that, the transformation reversible
@@ -179,6 +195,7 @@ module Transformations =
             | TotalDifference(_)::xs -> apply loop ts xs Forward.totalDifference
             | FracDifference(ds,thresh)::xs -> apply loop ts xs (Forward.fractionalDifference ds.Value thresh) // 'ds' is unboxed unsafely
             | DefaultWith(value,_)::xs -> apply loop ts xs (Forward.defaultWith value)
+            | Apply(f,invf)::xs -> apply loop ts xs (Forward.apply f invf)
         loop transforms ts
 
     // Reverse the transformation through the list saved in 'TS'
@@ -191,5 +208,7 @@ module Transformations =
             | Standardize(stds)::xs -> apply loop ts xs (Backward.standardize stds.Value)     // unboxed unsafely
             | TotalDifference(firsts)::xs -> apply loop ts xs (Backward.totalDifference firsts.Value)    // unboxed unsafely
             | FracDifference(ds,thresh)::xs -> apply loop ts xs (Backward.fractionalDifference ds.Value thresh) // 'ds' is unboxed unsafely
+            | DefaultWith(_,indices)::xs -> apply loop ts xs (Backward.defaultWith indices.Value)   // unboxed unsafely
+            | Apply(_,invf)::xs -> apply loop ts xs (Backward.apply invf)
         loop ts.Transformation ts
 

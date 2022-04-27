@@ -23,31 +23,28 @@ module Optimizers =
         static member create learn mom (i,j) = { LearningRate=learn; MomentumRate=mom; MomentumValue=Array2D.zeroCreate i j }
 
     [<RequireQualifiedAccess>]
-    type Method = 
+    type State = 
         | Classic of Classic
         | Momentum of Momentum
 
     let update (parameters:float32 option[,]) (gradient:float32 option[,]) = function
-        | Method.Classic(opt) as x -> x, Array2D.map2 (fun p g -> Option.map2 (-) p (( * ) opt.LearningRate <!> g)) parameters gradient
-        | Method.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> - opt.MomentumRate*mom - opt.LearningRate*(Option.defaultValue 0f g) ) opt.MomentumValue gradient
-                                  Method.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 ((+) >> (<!>)) newMomentum parameters 
+        | State.Classic(opt) as x -> x, Array2D.map2 (fun p g -> Option.map2 (-) p (( * ) opt.LearningRate <!> g)) parameters gradient
+        | State.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> - opt.MomentumRate*mom - opt.LearningRate*(Option.defaultValue 0f g) ) opt.MomentumValue gradient
+                                 State.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 ((+) >> (<!>)) newMomentum parameters 
 
-(*module ErrorTypes = 
-    type Error =
-        | Raw
-        | Squared*)
 
 module Optimisation = 
-
-    type S = S of ModelType.S * Optimizers.Method
+    
+    // Optimizer.Method keeps tracks of the updated momentum values. 
+    type S = S of ModelType.S * Optimizers.State
 
     [<RequireQualifiedAccess>]
     type Optimizer = 
         | Classic of learnRate:float32
         | Momentum of learnRate:float32 * momentumRate:float32
         static member convert dgp = function
-            | Classic(r) -> Optimizers.Classic.create r |> Optimizers.Method.Classic
-            | Momentum(r,mom) -> ModelState.parameterShape dgp |> Optimizers.Momentum.create r mom |> Optimizers.Method.Momentum
+            | Classic(r) -> Optimizers.Classic.create r |> Optimizers.State.Classic
+            | Momentum(r,mom) -> ModelState.parameterShape dgp |> Optimizers.Momentum.create r mom |> Optimizers.State.Momentum
 
 
     let getModelState (S(ms,_)) = ms 
@@ -60,7 +57,7 @@ module Optimisation =
     let modifyM modelM = State.exec modelM <!> modelState() >>= (fun newM -> State.modify (fun (S(_,oldMethod)) -> S(newM,oldMethod)))
 
     // Fit the model with the given optimizer.
-    // Model should already contain the data.
+    // Model should already contain the data and be a kind of 'ErrorModel'. 
     let fit (errModel:Model) (opt:Optimizer) (epochs:int) =
         let initStateOptimizer = Optimizer.convert errModel.Model opt
         let initStateModel = ModelState.zeroCreate errModel
