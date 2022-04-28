@@ -25,7 +25,9 @@ let main argv =
     let transfoTS = Transformations.backward transfoTS
     printfn "%A" transfoTS*)
 
-    // let g = Input(Parameter(0,0)) + Input(Parameter(0,1)) * (Input(Parameter(0,1))*Input(Parameter(0,2)) + Input(Parameter(1,2)))
+(*    let g = Input(Parameter(0,0)) + Input(Parameter(0,1)) * (Input(Parameter(0,1))*Input(Parameter(0,2)) + Input(Parameter(1,2)))
+    printfn "%A" (Graph.collectInputs g)*)
+
 (*    let dgp = VAR({n=2; order=1; parameters=Some([|(Array2D.ofArray >> Array2D.toOption) [|[|0.7f;-0.2f|];[|0.1f;-0.5f|]|]|]); covariance=Some(Array2D.ofArray [|[|1.0f;0.0f|];[|0.0f;1.0f|]|])})
     let m = Model.create dgp
     let sampleModel = Model.sample 1000 m
@@ -43,16 +45,16 @@ let main argv =
     let ts = Timeseries.TS.zeroCreate 1 1
     let ts = Timeseries.TimeseriesType.TS.setData data ts
 
-    Plot.allSeries ts
+    // Plot.allSeries ts
 
     let transfo = [Apply(log, exp); TotalDifference(None); Center(None); Standardize(None)]
     let transfoTS = Transformations.forward transfo ts
     printfn "%A" transfoTS
 
-    Plot.allSeries transfoTS
+    // Plot.allSeries transfoTS
 
     let model = (Model.create >> Model.setTs (Some transfoTS)) dgp
-    let fitted = Model.fit model (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) SquaredError 100
+    let fitted = Model.fit model (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) (L2Regu(0f)) 100
     printfn "%A" fitted
   
     //Database.DB.Table.Timeseries.closePrices [|"1INCHBTC";"1INCHBUSD";"1INCHDOWNUSDT"|] (new DateTime(2021,1,1)|> Some) (new DateTime(2021,11,5)|> Some) |> printfn "%A"

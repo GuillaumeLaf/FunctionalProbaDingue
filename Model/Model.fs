@@ -30,7 +30,8 @@ module Model =
         let errorGraph errorType errorsG = 
             match errorType with
             | SquaredError -> Array.map (fun e -> Polynomial(e,2)) errorsG
-            | L2Regu(lambda) -> Array.map (fun e -> Polynomial(e,2) + Constant(lambda)) errorsG 
+            | L2Regu(lambda) -> let regu = Graph.collectUniqueParameters >> Array.map Input >> Node.Vector.createFrom >> Node.Vector.normL2
+                                Array.map (fun e -> Polynomial(e,2) + Constant(lambda) * regu e) errorsG 
         
         // Build Graph
         // First element of array for first TS.

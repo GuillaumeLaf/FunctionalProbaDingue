@@ -77,6 +77,9 @@ module Graph =
                  (fun i acc -> i::acc)
                  x [] |> Array.ofList
 
+    let collectUniqueInputs = collectInputs >> Array.distinct
+    let collectUniqueParameters = collectUniqueInputs >> Array.filter (function | Parameter(_,_) -> true | _ -> false)
+
     // From an 'Array' of 'BasicInput's count the number of 'BasicInput's for each group.
     // For instance, the output array is of the form : [|Parameter(0,2);Variable(1,3)|], 
     // It translates into a graph with 2 'Parameter's in group 0,

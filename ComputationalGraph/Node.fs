@@ -61,16 +61,16 @@ module Node =
         // n : length of the 'Vector'
         // For instance, if 'Group' is the fixed type then the 'Standard' index will
         // vary over 'shift'...'n'+'shift'.
-        let initShifted basicInput idxType shift n = 
-            match idxType with
+        let initShifted basicInput fixedType shift n = 
+            match fixedType with
             | Standard(idx) -> { Size=n; Graphs=[| for i in 0..n-1 do Input(basicInput(i+shift,idx)) |] }
             | Group(idx) -> { Size=n; Graphs=[| for i in 0..n-1 do Input(basicInput(idx,i+shift)) |] }
 
         // Specialized version of 'initShifted' function where
         // the shift is set to 0.
         let init basicInput idxType n  = initShifted basicInput idxType 0 n
-
-        let normL2 =
+        
+        let normL2 = graphs >> Array.map (fun g -> Polynomial(g,2)) >> createFrom >> sum
         
     [<RequireQualifiedAccess>]
     module Matrix = 
