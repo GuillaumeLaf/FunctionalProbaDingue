@@ -49,13 +49,6 @@ module ModelType =
         static member setGraphMonad x m = { m with GraphMonad=x }
         static member setUpdateRule x m = { m with UpdateRule=x }
 
-        // Unsafe unboxing -> parameters should be already be defined in 'DGP'
-        static member parameters m =
-            let rec loop = function
-                | VAR(var) -> var.parameters |> Option.get |> Array.reduce Utils.Array2D.stackColumn
-                | ErrorModel(inner,_) -> loop inner
-            loop m.Model
-
         static member parameterShape m = 
             let rec loop = function
                 | VAR(var) -> var.n, var.n*var.order
@@ -80,6 +73,17 @@ module ModelType =
                 | ErrorModel(inner,_) -> loop inner
             loop m.Model
 
+        // Unsafe unboxing -> parameters should be already be defined in 'DGP'
+        static member parameters m =
+            let rec loop = function
+                | VAR(var) -> var.parameters |> Option.get |> Array.reduce Utils.Array2D.stackColumn
+                | ErrorModel(inner,_) -> loop inner
+            loop m.Model
+
+        static member defaultParameters m = (Model.parameterShape >> (fun (i,j) -> Array2D.create i j (Some 0f))) m
+        static member defaultVariables m = (Model.variableShape >> (fun (i,j) -> Array2D.create i j (Some 0f))) m
+        static member defaultInnovations m = (Model.innovationShape >> (fun (i,j) -> Array2D.create i j (Some 0f))) m
+
         // Covariance between innovations
         static member covariance m =
             let rec loop = function
@@ -94,4 +98,20 @@ module ModelType =
             loop m.Model |> flip Model.setModel m
 
         static member cholesky m = (Model.covariance >> Option.get >> Utils.cholesky) m
+
+        // State Innovations are always initiated to zero. 
+        static member defaultState ts m = S(GraphType.S(Model.parameters m, Model.defaultVariables m, Model.defaultInnovations m), (0,ts, TS.zero_like ts))
+
+        // Everything is set to zero (even parameters).
+        static member defaultEmptyState ts m = S(GraphType.S(Model.defaultParameters m, Model.defaultVariables m, Model.defaultInnovations m), (0,ts, TS.zero_like ts))
+
+
+
+
+
+
+
+
+
+
 

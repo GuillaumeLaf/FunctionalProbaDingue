@@ -38,8 +38,8 @@ module TimeseriesType =
                     
     // Record Type representing a MULTIVARIATE timeseries. 
     type TS = 
-        { Length:int;
-          Size:int;
+        { Length:int;   // T
+          Size:int;     // N
           Data:float32 option[,];
           Stats:Stats;
           Transformation:Transformation list }
@@ -62,3 +62,10 @@ module TimeseriesType =
         static member addTransformation x ts = { ts with Transformation=x::ts.Transformation }
         static member popTransformation ts = { ts with Transformation=List.tail ts.Transformation }
 
+        static member zeroCreate i j = Array2D.zeroCreate i j |> TS.create
+        static member zero_like ts = TS.zeroCreate (TS.size ts) (TS.length ts)
+
+        // Get the 'idx'th timeseries
+        static member get idx ts = ts.Data[idx,*]
+        static member atTime t ts = if (0 <= t) && (t < ts.Length) then ts.Data.[*,t] else (Array.create ts.Size (Some 0.0f)) // 'Array.zeroCreate ts.Size' gives an array of 'None'
+        static member modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."

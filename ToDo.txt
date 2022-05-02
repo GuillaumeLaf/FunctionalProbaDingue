@@ -3,7 +3,8 @@
 To Do or Ideas : 
 
 1) Add specific type for Hyperparameters (?)
-2) Bayes hyperparameter tuning vs GridSearch
+	answer : no, hyperparameters must all be included in 'DGP'.
+2) Bayes hyperparameter tuning vs GridSearch vs PSO
 
 
 
@@ -15,3 +16,10 @@ Potential Refactoring :
 
 	=> This would makes model selection easier by passing the desired 'TS' object (e.g. splitted 'TS') to the data for isolated fitting.
 	=> 'Model' type would then be only responsible to hold the inner functioning of the true model. 
+
+	done.
+
+2) Possible inlining of functions
+	-> makes code faster
+
+3) FsharpPlus Applicative Generic Math operators e.g. .+. which is equivalent to (+) <!> _ <*> _

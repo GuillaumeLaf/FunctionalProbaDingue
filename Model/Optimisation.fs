@@ -42,9 +42,9 @@ module Optimisation =
     type Optimizer = 
         | Classic of learnRate:float32
         | Momentum of learnRate:float32 * momentumRate:float32
-        static member convert dgp = function
+        static member convert m = function
             | Classic(r) -> Optimizers.Classic.create r |> Optimizers.State.Classic
-            | Momentum(r,mom) -> ModelState.parameterShape dgp |> Optimizers.Momentum.create r mom |> Optimizers.State.Momentum
+            | Momentum(r,mom) -> Model.parameterShape m |> Optimizers.Momentum.create r mom |> Optimizers.State.Momentum
 
 
     let getModelState (S(ms,_)) = ms 
@@ -59,8 +59,8 @@ module Optimisation =
     // Fit the model with the given optimizer.
     // Model should already contain the data and be a kind of 'ErrorModel'. 
     let fit (errModel:Model) (opt:Optimizer) (epochs:int) (ts:TS) =
-        let initStateOptimizer = Optimizer.convert errModel.Model opt
-        let initStateModel = ModelState.zeroCreate errModel
+        let initStateOptimizer = Optimizer.convert errModel opt
+        let initStateModel = Model.defaultEmptyState ts errModel
         let initState = S(initStateModel, initStateOptimizer)
 
         // Updating of the parameters during optimization according to the chosen Optimizer.
@@ -81,10 +81,10 @@ module Optimisation =
             do! updateParameters
         }
         
-        Seq.randomIndices 0 errModel.T |> Seq.repeat epochs
-                                       |> Seq.map fitOnIdx
-                                       |> State.Seq.accumulate
-                                       |> flip State.exec initState
+        Seq.randomIndices 0 ts.Length |> Seq.repeat epochs
+                                      |> Seq.map fitOnIdx
+                                      |> State.Seq.accumulate
+                                      |> flip State.exec initState
         
 
         

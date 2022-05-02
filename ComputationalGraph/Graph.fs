@@ -37,9 +37,9 @@ module Graph =
     // Catamorphism for folding over a graph tree. 
     // Each function takes the current node as first input. 
     let inline cataFoldX constF polyF addF subF multF inputF (x:Graph) = 
-        let opCont opF x lg rg f : Cont<'a,'b> = monad { let! xl = f lg
-                                                         let! xr = f rg
-                                                         return opF x xl xr }
+        let inline opCont opF x lg rg f : Cont<'a,'b> = monad { let! xl = f lg
+                                                                let! xr = f rg
+                                                                return opF x xl xr }
         let rec loop g = monad {
             match g with
             | Constant(value) as x -> return constF x value
@@ -198,7 +198,7 @@ module Graph =
     // Create a graph representing the gradient of a given graph for a given parameter.
     // Fst : current gradient
     // Snd : current value
-    let gradientForParameter grpIdx idx = 
+    let inline gradientForParameter grpIdx idx = 
         cataFoldX (fun x _ -> Constant(0.0f),x)
                   (fun x g e -> fst g * Constant(float32 e) * Polynomial(snd g,e-1) |> simplify ,x)
                   (fun x l r -> fst l + fst r |> simplify, x)
@@ -210,14 +210,14 @@ module Graph =
                   >> fst // retrieve gradient
 
     // Create an 'Array' of 'Graph's representing the gradient for 'Parameter's of a given group. 
-    let gradientForGroup grpIdx (x:Graph) = 
+    let inline gradientForGroup grpIdx (x:Graph) = 
         (countUnique >> Array.choose (function | Parameter(grp,idx) -> if grpIdx=grp then Some idx else None
                                                | _ -> None)
                      >> Array.item 0
                      >> flip Array.init id) x
                      |>  Array.map (fun i -> gradientForParameter grpIdx i x)
 
-    let gradient = Array.mapi gradientForGroup >> Array2D.ofArray
+    let inline gradient graph = (Array.mapi gradientForGroup >> Array2D.ofArray) graph
 
 
 

@@ -40,13 +40,6 @@ module Model =
                            |> Array.mapi (fun idxG g -> Graph.add g (Input(Innovation(idxG,0)))) 
             | ErrorModel(inner,errType) -> let err i = (Graph.shift Variable 1) >> (-) (Input(Variable(i,0))) 
                                            (create >> Array.mapi err >> errorGraph errType) inner
-
-        // Get 'Graph' state initiated with zeros
-(*        let zeroGraphState dgp = GraphType.S(zeroParameters dgp |> Array2D.toOption, zeroVariables dgp |> Array2D.toOption, zeroInnovations dgp |> Array2D.toOption) 
-        let defaultGraphState dgp = GraphType.S(parameters dgp, zeroVariables dgp |> Array2D.toOption, zeroInnovations dgp |> Array2D.toOption) *)
-
-(*    let zeroCreate (m:Model) = ModelType.S(zeroGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations)) *)
-        
         
     let create (m:DGP) = 
         let tmp = ModelGraph.create m
@@ -60,9 +53,8 @@ module Model =
     let sample n (m:Model) = 
         if (Model.covariance m) <> None then 
             let ts = Array2D.zeroCreate (Model.crossSection m) n |> TS.create
-            let innov = Array2D.zeroCreate (Model.crossSection m) n |> TS.create
-            
-            let defaultState = ModelType.S(ModelGraph.defaultGraphState m.Model, (0,ts, innov))
+            let defaultState = Model.defaultState ts m
+
             let newInnovFunc = randomNormalInnovations (Model.cholesky m) (Model.crossSection m)
 
             let (S(_,(_,ts,innov))) = State.exec (ModelState.sample n newInnovFunc m) defaultState      
@@ -71,10 +63,11 @@ module Model =
 
     // Fit the model with the given optimizer.
     // Model should already contain the data.
-    let fit (m:Model) (opt:Optimisation.Optimizer) (errorType:ErrorType) (ts:TS) = // Add 'TS' object containing the data -> check number of timeseries matched 'Model'-'DGP'
-        let innovations = TS.zero_like ts
-        let errModel = create (ErrorModel(m.Model,errorType)) 
-        Optimisation.fit errModel opt
+    let fit (m:Model) (opt:Optimisation.Optimizer) (errorType:ErrorType) (epochs:int) (ts:TS) = 
+        if Model.crossSection m = TS.size ts then
+            let errModel = create (ErrorModel(m.Model,errorType)) 
+            Optimisation.fit errModel opt epochs ts
+        else invalidArg "TS" "Timeseries cross-section dimension doesnt match given model cross-section dimension."
         
         
 
