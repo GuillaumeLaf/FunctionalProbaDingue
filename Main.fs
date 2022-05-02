@@ -51,10 +51,10 @@ let main argv =
     let transfoTS = Transformations.forward transfo ts
     printfn "%A" transfoTS
 
-    // Plot.allSeries transfoTS
+    Plot.allSeries transfoTS
 
     let model = (Model.create >> Model.setTs (Some transfoTS)) dgp
-    let fitted = Model.fit model (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) (L2Regu(0f)) 100
+    let fitted = Model.fit model (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) (L2Regu(0.2f)) 100
     printfn "%A" fitted
   
     //Database.DB.Table.Timeseries.closePrices [|"1INCHBTC";"1INCHBUSD";"1INCHDOWNUSDT"|] (new DateTime(2021,1,1)|> Some) (new DateTime(2021,11,5)|> Some) |> printfn "%A"

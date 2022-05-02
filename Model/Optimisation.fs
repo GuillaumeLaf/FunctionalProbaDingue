@@ -58,7 +58,7 @@ module Optimisation =
 
     // Fit the model with the given optimizer.
     // Model should already contain the data and be a kind of 'ErrorModel'. 
-    let fit (errModel:Model) (opt:Optimizer) (epochs:int) =
+    let fit (errModel:Model) (opt:Optimizer) (epochs:int) (ts:TS) =
         let initStateOptimizer = Optimizer.convert errModel.Model opt
         let initStateModel = ModelState.zeroCreate errModel
         let initState = S(initStateModel, initStateOptimizer)

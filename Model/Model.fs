@@ -41,47 +41,39 @@ module Model =
             | ErrorModel(inner,errType) -> let err i = (Graph.shift Variable 1) >> (-) (Input(Variable(i,0))) 
                                            (create >> Array.mapi err >> errorGraph errType) inner
 
-        let rec covariance = function
-            | VAR(var) -> var.covariance 
-            | ErrorModel(inner,_) -> covariance inner
+        // Get 'Graph' state initiated with zeros
+(*        let zeroGraphState dgp = GraphType.S(zeroParameters dgp |> Array2D.toOption, zeroVariables dgp |> Array2D.toOption, zeroInnovations dgp |> Array2D.toOption) 
+        let defaultGraphState dgp = GraphType.S(parameters dgp, zeroVariables dgp |> Array2D.toOption, zeroInnovations dgp |> Array2D.toOption) *)
 
-        let cholesky = covariance >> Option.get >> Utils.cholesky
-
-        let rec addCovariance cov = function
-            | VAR(var) -> VAR({var with covariance=Some cov})
-            | ErrorModel(inner,_) -> addCovariance cov inner
+(*    let zeroCreate (m:Model) = ModelType.S(zeroGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations)) *)
         
         
-
     let create (m:DGP) = 
         let tmp = ModelGraph.create m
-        { N=tmp.Length; T=0; Ts=None; Innovations=None; Model=m; 
-          Graphs=tmp; GraphMonad=ModelState.graphToMonad tmp; 
-          GraphGradient=ModelState.graphToMonad2D (Graph.gradient tmp)
-          UpdateRule=ModelTimeseries.updateRule m } 
+        { Model=m; Graphs=tmp; GraphMonad=ModelState.graphToMonad tmp; 
+        GraphGradient=ModelState.graphToMonad2D (Graph.gradient tmp);
+        UpdateRule=ModelTimeseries.updateRule m } 
 
     // Sample an 'Array' from a multivariate normal
-    // Note : Covariance matrix must be already initialized in the 'innovations' 'TS'.
-    let randomNormalInnovations (m:Model) () = Utils.randomNormalVector ((Model.ts >> Option.get >> TS.size) m) ((Model.innovations >> Option.get >> TS.stats >> Stats.lowerCholeskyCov >> Option.get) m)
-                                                 |> (Array.map Array.singleton >> Utils.Array2D.ofArray)
+    let randomNormalInnovations cholesky N () = Utils.randomNormalVector N cholesky |> (Array.map Array.singleton >> array2D)
 
     let sample n (m:Model) = 
-        if (ModelGraph.covariance m.Model) <> None then 
-            let corrInnov = TS.addLowerCholeskyCov (ModelGraph.cholesky m.Model) (TS.zeroCreate m.N n)
-            let reInitModel = { m with Ts=Some (TS.zeroCreate m.N n); Innovations=Some corrInnov } 
+        if (Model.covariance m) <> None then 
+            let ts = Array2D.zeroCreate (Model.crossSection m) n |> TS.create
+            let innov = Array2D.zeroCreate (Model.crossSection m) n |> TS.create
             
-            let defaultState = defaultState reInitModel
-            let newInnovFunc = randomNormalInnovations reInitModel
+            let defaultState = ModelType.S(ModelGraph.defaultGraphState m.Model, (0,ts, innov))
+            let newInnovFunc = randomNormalInnovations (Model.cholesky m) (Model.crossSection m)
 
-            let (S(_,(_,ts,innov))) = State.exec (ModelState.sample n newInnovFunc reInitModel) defaultState      
-            { reInitModel with T=ts.Length; Ts=Some ts; Innovations=Some innov }
+            let (S(_,(_,ts,innov))) = State.exec (ModelState.sample n newInnovFunc m) defaultState      
+            m, ts, innov
         else invalidArg "Innovations" "Innovations and its Covariance Matrix must be instantiated before sampling."
 
     // Fit the model with the given optimizer.
     // Model should already contain the data.
-    let fit (m:Model) (opt:Optimisation.Optimizer) (errorType:ErrorType) = 
-        let innovations = TS.zeroCreate m.N m.T |> Some
-        let errModel = create (ErrorModel(m.Model,errorType)) |> Model.setTs m.Ts |> Model.setInnovations innovations
+    let fit (m:Model) (opt:Optimisation.Optimizer) (errorType:ErrorType) (ts:TS) = // Add 'TS' object containing the data -> check number of timeseries matched 'Model'-'DGP'
+        let innovations = TS.zero_like ts
+        let errModel = create (ErrorModel(m.Model,errorType)) 
         Optimisation.fit errModel opt
         
         

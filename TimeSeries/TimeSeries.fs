@@ -14,6 +14,8 @@ module TS =
     
     let zeroCreate i j = (Array2D.zeroCreate i >> TS.create) j
 
+    let zero_like (ts:TS) = Array2D.zeroCreate ts.Size ts.Length |> TS.create
+
     // Get the 'idx'th timeseries
     let get idx = TS.data >> Utils.Array2D.row idx 
 

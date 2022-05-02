@@ -1,0 +1,17 @@
+﻿
+
+To Do or Ideas : 
+
+1) Add specific type for Hyperparameters (?)
+2) Bayes hyperparameter tuning vs GridSearch
+
+
+
+Potential Refactoring : 
+
+1) Separate the "data" from the 'Model'
+	-> 'N', 'T', 'Ts', 'Innovations' are considered as data -> the only relevant one is 'Ts' since the other can be derived from it.
+	-> Everything related to 'DGP', 'Graphs' (gradient, updaterule, ...) are considered as the real 'Model'.
+
+	=> This would makes model selection easier by passing the desired 'TS' object (e.g. splitted 'TS') to the data for isolated fitting.
+	=> 'Model' type would then be only responsible to hold the inner functioning of the true model. 

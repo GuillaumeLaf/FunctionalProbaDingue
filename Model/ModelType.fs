@@ -25,6 +25,7 @@ module ModelType =
         | L2Regu of lambda:float32
 
     // Discriminated Union for grouping model types.
+    // Contains the hyperparameters -> important for model selection
     type DGP = 
         | VAR of VAR 
         | ErrorModel of DGP * ErrorType
@@ -32,29 +33,65 @@ module ModelType =
     // Record Type representing a model.
     // Contains all information required for using a model.
     type Model = 
-        { N:int;    // number of cross-section
-          T:int;  
-          Ts:TS option ;
-          Innovations:TS option;
-          Model:DGP;
+        { Model:DGP;
           Graphs:Graph[];
           GraphMonad:State<GraphType.S, float32 option[]>;
           GraphGradient:State<GraphType.S, float32 option[,]>;
-          UpdateRule:State<(int*TimeseriesType.TS), float32 option[,]>
-          }
-
-        static member n m = m.N
-        static member t m = m.T
-        static member ts m = m.Ts
-        static member innovations m = m.Innovations
+          UpdateRule:State<(int*TimeseriesType.TS), float32 option[,]>;
+        }
+          
         static member model m = m.Model
         static member graphs m = m.Graphs
         static member graphMonad m = m.GraphMonad
         static member updateRule m = m.UpdateRule
 
-        static member setN x m = { m with N=x }
-        static member setTs x m = { m with N=(Option.get >> TS.size) x; T= (Option.get >> TS.length) x; Ts=x }
-        static member setInnovations x m = { m with Innovations=x }
         static member setModel x m = { m with Model=x }
         static member setGraphMonad x m = { m with GraphMonad=x }
         static member setUpdateRule x m = { m with UpdateRule=x }
+
+        // Unsafe unboxing -> parameters should be already be defined in 'DGP'
+        static member parameters m =
+            let rec loop = function
+                | VAR(var) -> var.parameters |> Option.get |> Array.reduce Utils.Array2D.stackColumn
+                | ErrorModel(inner,_) -> loop inner
+            loop m.Model
+
+        static member parameterShape m = 
+            let rec loop = function
+                | VAR(var) -> var.n, var.n*var.order
+                | ErrorModel(inner,_) -> loop inner
+            loop m.Model
+
+        static member variableShape m = 
+            let rec loop = function
+                | VAR(var) -> var.n, var.order
+                | ErrorModel(inner,_) -> loop inner |> (fun (i,j) -> (i,j+1))
+            loop m.Model
+
+        static member innovationShape m = 
+            let rec loop = function
+                | VAR(var) -> var.n, 1
+                | ErrorModel(inner,_) -> loop inner 
+            loop m.Model
+
+        static member crossSection m = 
+            let rec loop = function
+                | VAR(var) -> var.n
+                | ErrorModel(inner,_) -> loop inner
+            loop m.Model
+
+        // Covariance between innovations
+        static member covariance m =
+            let rec loop = function
+                | VAR(var) -> var.covariance 
+                | ErrorModel(inner,_) -> loop inner
+            loop m.Model
+
+        static member setCovariance cov m = 
+            let rec loop = function
+                | VAR(var) -> VAR({var with covariance=Some cov})
+                | ErrorModel(inner,_) -> loop inner
+            loop m.Model |> flip Model.setModel m
+
+        static member cholesky m = (Model.covariance >> Option.get >> Utils.cholesky) m
+

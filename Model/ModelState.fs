@@ -35,33 +35,6 @@ module ModelState =
     let modifyI innovationM = State.exec innovationM <!> innovationState() >>= (fun (idx,innov) -> State.modify (fun (S(oldG,(_,ts,_))) -> S(oldG,(idx,ts,innov))))
 
 
-    let rec parameters = function
-        | VAR(var) -> var.parameters |> Option.get |> Array.reduce Utils.Array2D.stackColumn
-        | ErrorModel(inner,_) -> parameters inner
-
-    let rec zeroParameters = function
-        | VAR(var) -> Array2D.zeroCreate var.n (var.n*var.order)
-        | ErrorModel(inner,_) -> zeroParameters inner
-
-    let rec zeroVariables = function
-        | VAR(var) -> Array2D.zeroCreate var.n var.order 
-        | ErrorModel(inner,_) -> let tmp = zeroVariables inner
-                                 Array2D.zeroCreate (Array2D.length1 tmp) (Array2D.length2 tmp + 1)
-
-    let rec zeroInnovations = function
-        | VAR(var) -> Array2D.zeroCreate var.n 1
-        | ErrorModel(inner,_) -> zeroInnovations inner
-
-    // Get 'Graph' state initiated with zeros
-    let zeroGraphState dgp = GraphType.S(zeroParameters dgp |> Array2D.toOption, zeroVariables dgp |> Array2D.toOption, zeroInnovations dgp |> Array2D.toOption) 
-    let defaultGraphState dgp = GraphType.S(parameters dgp, zeroVariables dgp |> Array2D.toOption, zeroInnovations dgp |> Array2D.toOption) 
-
-    let zeroCreate (m:Model) = ModelType.S(zeroGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
-    let defaultState (m:Model) = ModelType.S(defaultGraphState m.Model, (0,Option.get m.Ts, Option.get m.Innovations))
-
-    let parameterShape = zeroParameters >> Array2D.shape
-
-
     // Draw a random vector from 'rndVectorFunc' and update GraphState and TimeseriesState. 
     let updateInnovations rndVectorFunc = monad {
         let rndSampleVector = (rndVectorFunc >> Array2D.toOption) ()

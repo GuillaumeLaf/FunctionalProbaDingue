@@ -28,6 +28,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+	<Content Include="ToDo.txt" />
 	<Compile Include="Utils.fs" />
 	<Compile Include="DataBase\Utils.fs" />
 	<Compile Include="DataBase\Database.fs" />
@@ -46,6 +47,7 @@
 	<Compile Include="Model\ModelState.fs" />
 	<Compile Include="Model\Optimisation.fs" />
 	<Compile Include="Model\Model.fs" />
+	<Compile Include="Model\Model_Selection\CrossValidation.fs" />
 	<Compile Include="UnitTests\UtilsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\StatisticsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\TimeSeriesTest.fs" />
