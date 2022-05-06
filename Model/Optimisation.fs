@@ -73,11 +73,12 @@ module Optimisation =
             do! (ComputationalGraph.GraphState.updateParameters >> ModelState.modifyG >> modifyM) newParams
         }
 
+        // The value of the objective function is given in the innovation/errors 'TS'. NOT the in-sample errors !
         let fitOnIdx idx = monad {
             do! (Timeseries.TimeseriesState.setTime >> ModelState.modifyT >> modifyM) idx
             do! (ModelState.updateVariables >> modifyM) errModel.UpdateRule
-            let! errors = (ModelState.evalG >> evalM) errModel.GraphMonad
-            do! (Timeseries.TimeseriesState.setCurrentElements >> ModelState.modifyI >> modifyM) errors
+            let! objFunc = (ModelState.evalG >> evalM) errModel.GraphMonad
+            do! (Timeseries.TimeseriesState.setCurrentElements >> ModelState.modifyI >> modifyM) objFunc
             do! updateParameters
         }
         

@@ -6,7 +6,8 @@ open TimeseriesType
 module Timeseries = 
     // Module including utility functions to treat 'TS' objects
 
-    let split (ts:TS) = 0
+    let split (pct_test:int) (ts:TS) = 
+        0
     
 
 module CrossValidation = 

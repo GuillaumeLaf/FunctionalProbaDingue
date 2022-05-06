@@ -2,9 +2,11 @@
 
 open FSharpPlus
 open FSharpPlus.Data
+open FSharpPlus.Math
 open ComputationalGraph
 open ComputationalGraph.GraphState
 open Timeseries
+open Timeseries.TimeseriesType
 open Timeseries.TimeseriesState
 open ModelType
 
@@ -19,20 +21,20 @@ module ModelState =
     let getInnovationState (S(_,(idx,_,innov))) = (idx,innov)   : (int*TimeseriesType.TS)
 
     // Monad extension of 'getGraphState', 'getTimeSeriesState' and 'getInnovationState' functions
-    let graphState () = getGraphState <!> State.get                  : State<S, GraphType.S>
-    let timeseriesState () = getTimeseriesState <!> State.get        : State<S, (int*TimeseriesType.TS)>
-    let innovationState () = getInnovationState <!> State.get        : State<S, (int*TimeseriesType.TS)>
+    let graphState = getGraphState <!> State.get                  : State<S, GraphType.S>
+    let timeseriesState = getTimeseriesState <!> State.get        : State<S, (int*TimeseriesType.TS)>
+    let innovationState = getInnovationState <!> State.get        : State<S, (int*TimeseriesType.TS)>
 
     // Evaluate a 'Graph Monad' or 'Timeseries Monad' with the corresponding state of the 'State Model'.
-    let evalG (graphM:State<GraphType.S,'a>) = State.eval graphM <!> graphState()
-    let evalT (timeseriesM:State<(int*TimeseriesType.TS),'a>) = State.eval timeseriesM <!> timeseriesState()
-    let evalI (innovationM:State<(int*TimeseriesType.TS),'a>) = State.eval innovationM <!> innovationState()
+    let evalG (graphM:State<GraphType.S,'a>) = State.eval graphM <!> graphState
+    let evalT (timeseriesM:State<(int*TimeseriesType.TS),'a>) = State.eval timeseriesM <!> timeseriesState
+    let evalI (innovationM:State<(int*TimeseriesType.TS),'a>) = State.eval innovationM <!> innovationState
 
     // Evaluate a 'Graph Monad' or 'Timeseries Monad' which modify their corresponding state
     // with the corresponding state of the 'State Model'.
-    let modifyG graphM = State.exec graphM <!> graphState() >>= (fun newG -> State.modify (fun (S(_,oldT)) -> S(newG,oldT)))
-    let modifyT timeseriesM = State.exec timeseriesM <!> timeseriesState() >>= (fun (idx,ts) -> State.modify (fun (S(oldG,(_,_,innov))) -> S(oldG,(idx,ts,innov))))
-    let modifyI innovationM = State.exec innovationM <!> innovationState() >>= (fun (idx,innov) -> State.modify (fun (S(oldG,(_,ts,_))) -> S(oldG,(idx,ts,innov))))
+    let modifyG graphM = State.exec graphM <!> graphState >>= (fun newG -> State.modify (fun (S(_,oldT)) -> S(newG,oldT)))
+    let modifyT timeseriesM = State.exec timeseriesM <!> timeseriesState >>= (fun (idx,ts) -> State.modify (fun (S(oldG,(_,_,innov))) -> S(oldG,(idx,ts,innov))))
+    let modifyI innovationM = State.exec innovationM <!> innovationState >>= (fun (idx,innov) -> State.modify (fun (S(oldG,(_,ts,_))) -> S(oldG,(idx,ts,innov))))
 
 
     // Draw a random vector from 'rndVectorFunc' and update GraphState and TimeseriesState. 
@@ -60,6 +62,51 @@ module ModelState =
                 let! currentResult = evalG m.GraphMonad
                 do! modifyT (TimeseriesState.setCurrentElements currentResult)
         } 
+
+    let predictFor (idx:int) (m:Model) = 
+        monad {
+            do! modifyT (TimeseriesState.setTime idx)
+            do! updateVariables m.UpdateRule
+            return! evalG m.GraphMonad
+        }
+
+    let predict m = evalT TimeseriesState.length >>= flip predictFor m
+
+    let multiPredictFor (idx:int) (steps:int) (m:Model) = 
+        monad {
+            let maxL = Model.maxLag m
+            do! modifyT (TimeseriesState.setTime idx)
+
+            let! lags = evalT (TimeseriesState.multipleLagElements maxL) 
+            let! (S(g,(t,ts,innov))) = State.get
+            let! (tmpState:float32 option[,]) = flip Array2D.zeroCreate (maxL+steps) <!> (evalT size)
+            do! result (printfn "%A" lags)
+            tmpState.[*,0..maxL-1] <- lags
+            do! result (printfn "%A" tmpState)
+            let ts = TS.setData tmpState ts
+
+            let predictM i = 
+                monad {
+                    let! p = predictFor (i+maxL) m
+                    do! modifyT (TimeseriesState.setCurrentElements p)
+                    return p
+                }
+            
+            let tmpM = Array.init steps predictM |> (State.accumulate >> map (Array.transpose >> array2D))
+            return State.exec tmpM (S(g,(t,ts,innov)))
+        }
+
+    let multiPredict steps m = evalT TimeseriesState.length >>= (fun idx -> multiPredictFor idx steps m) 
+
+
+
+
+
+
+
+
+
+
 
 
 

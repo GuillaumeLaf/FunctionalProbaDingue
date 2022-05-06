@@ -50,22 +50,22 @@ module TimeseriesType =
               Data=Array2D.toOption data;
               Stats=Stats.create;
               Transformation=[] }
-        static member length ts = ts.Length
-        static member size ts = ts.Size
-        static member data ts = ts.Data
-        static member dataDefault ts = Array2D.map (Option.defaultValue 0.0f) ts.Data
-        static member stats ts = ts.Stats
-        static member transformation ts = ts.Transformation
+        static member inline length ts = ts.Length
+        static member inline size ts = ts.Size
+        static member inline data ts = ts.Data
+        static member inline dataDefault ts = Array2D.map (Option.defaultValue 0.0f) ts.Data
+        static member inline stats ts = ts.Stats
+        static member inline transformation ts = ts.Transformation
 
-        static member setData x ts = { ts with Data=x; Length=x.[0,*].Length; Size=x.[*,0].Length }
-        static member setStats x ts = { ts with Stats=x }
-        static member addTransformation x ts = { ts with Transformation=x::ts.Transformation }
-        static member popTransformation ts = { ts with Transformation=List.tail ts.Transformation }
+        static member inline setData x ts = { ts with Data=x; Length=x.[0,*].Length; Size=x.[*,0].Length }
+        static member inline setStats x ts = { ts with Stats=x }
+        static member inline addTransformation x ts = { ts with Transformation=x::ts.Transformation }
+        static member inline popTransformation ts = { ts with Transformation=List.tail ts.Transformation }
 
-        static member zeroCreate i j = Array2D.zeroCreate i j |> TS.create
-        static member zero_like ts = TS.zeroCreate (TS.size ts) (TS.length ts)
+        static member inline zeroCreate i j = Array2D.zeroCreate i j |> TS.create
+        static member inline zero_like ts = TS.zeroCreate (TS.size ts) (TS.length ts)
 
         // Get the 'idx'th timeseries
-        static member get idx ts = ts.Data[idx,*]
+        static member inline get idx ts = ts.Data[idx,*]
         static member atTime t ts = if (0 <= t) && (t < ts.Length) then ts.Data.[*,t] else (Array.create ts.Size (Some 0.0f)) // 'Array.zeroCreate ts.Size' gives an array of 'None'
         static member modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."

@@ -7,9 +7,9 @@ open GraphType
 module GraphState = 
     
     // Extract the whole array of the 'S' type.
-    let getParameters (S(p,_,_)) = p
-    let getVariables (S(_,v,_)) = v
-    let getInnovations (S(_,_,i)) = i
+    let inline getParameters (S(p,_,_)) = p
+    let inline getVariables (S(_,v,_)) = v
+    let inline getInnovations (S(_,_,i)) = i
 
     // Convert the extracted 'S' arrays into monad to be further composed.
     let parametersM = State.gets getParameters              : State<S,float32 option[,]>

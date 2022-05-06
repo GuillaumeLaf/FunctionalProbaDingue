@@ -62,12 +62,18 @@ module Model =
         else invalidArg "Innovations" "Innovations and its Covariance Matrix must be instantiated before sampling."
 
     // Fit the model with the given optimizer.
-    // Model should already contain the data.
+    // Output the final fitted model and optimizer along with original 'TS' and in-sample errors 'TS'. 
     let fit (m:Model) (opt:Optimisation.Optimizer) (errorType:ErrorType) (epochs:int) (ts:TS) = 
         if Model.crossSection m = TS.size ts then
             let errModel = create (ErrorModel(m.Model,errorType)) 
-            Optimisation.fit errModel opt epochs ts
+            let fittedParameters = Optimisation.fit errModel opt epochs ts
+                                        |> (Optimisation.getModelState >> ModelState.getGraphState >> GraphState.getParameters) 
+            Model.setParameters fittedParameters m, opt, errorType, ts
         else invalidArg "TS" "Timeseries cross-section dimension doesnt match given model cross-section dimension."
+        
+    let predict (m:Model) = flip Model.defaultState m >> State.eval (ModelState.predict m) 
+    let multiPredict (m:Model) (steps:int) = flip Model.defaultState m >> State.eval (ModelState.multiPredict steps m) 
+        
         
         
 

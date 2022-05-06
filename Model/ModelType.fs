@@ -18,7 +18,12 @@ module ModelType =
     // 'parameters' -> Fst : which timeseries
     //              -> Snd : which parameter
     //              -> Third : which lag
-    type VAR = {n:int; order:int; parameters:float32 option[,][] option; covariance:float32[,] option }
+    type VAR = 
+        {n:int; order:int; parameters:float32 option[,][] option; covariance:float32[,] option }
+
+        // Convert parameters from shape in GraphState to correct shape in 'VAR'.
+        static member convertParameters (p:float32 option[,]) var = Array.init var.order (fun i -> p.[*,(var.n*i)..(var.n*(i+1)-1)])
+        static member setParameters p var = { var with parameters= VAR.convertParameters p var |> Some }
 
     type ErrorType = 
         | SquaredError
@@ -30,6 +35,10 @@ module ModelType =
         | VAR of VAR 
         | ErrorModel of DGP * ErrorType
 
+        static member setParameters p = function
+            | VAR(var) -> VAR.setParameters p var |> VAR
+            | ErrorModel(inner,errType) -> (DGP.setParameters p inner, errType) |> ErrorModel
+
     // Record Type representing a model.
     // Contains all information required for using a model.
     type Model = 
@@ -40,14 +49,15 @@ module ModelType =
           UpdateRule:State<(int*TimeseriesType.TS), float32 option[,]>;
         }
           
-        static member model m = m.Model
-        static member graphs m = m.Graphs
-        static member graphMonad m = m.GraphMonad
-        static member updateRule m = m.UpdateRule
+        static member inline model m = m.Model
+        static member inline graphs m = m.Graphs
+        static member inline graphMonad m = m.GraphMonad
+        static member inline updateRule m = m.UpdateRule
 
-        static member setModel x m = { m with Model=x }
-        static member setGraphMonad x m = { m with GraphMonad=x }
-        static member setUpdateRule x m = { m with UpdateRule=x }
+        static member inline setModel x m = { m with Model=x }
+        static member inline setGraphMonad x m = { m with GraphMonad=x }
+        static member inline setUpdateRule x m = { m with UpdateRule=x }
+        static member setParameters p m = { m with Model=(Model.model >> DGP.setParameters p) m }
 
         static member parameterShape m = 
             let rec loop = function
@@ -70,6 +80,12 @@ module ModelType =
         static member crossSection m = 
             let rec loop = function
                 | VAR(var) -> var.n
+                | ErrorModel(inner,_) -> loop inner
+            loop m.Model
+
+        static member maxLag m = 
+            let rec loop = function
+                | VAR(var) -> var.order
                 | ErrorModel(inner,_) -> loop inner
             loop m.Model
 

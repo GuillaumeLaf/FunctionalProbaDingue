@@ -29,10 +29,10 @@ module GraphType =
         | Substraction of Graph * Graph
         | Multiplication of Graph * Graph
 
-        static member ( + ) (g1:Graph, g2:Graph) = Addition(g1,g2)
-        static member ( - ) (g1:Graph, g2:Graph) = Substraction(g1,g2)
-        static member ( * ) (g1:Graph, g2:Graph) = Multiplication(g1,g2)
-        static member Pow (g:Graph, e:int) = Polynomial(g,e)
+        static member inline ( + ) (g1:Graph, g2:Graph) = Addition(g1,g2)
+        static member inline ( - ) (g1:Graph, g2:Graph) = Substraction(g1,g2)
+        static member inline ( * ) (g1:Graph, g2:Graph) = Multiplication(g1,g2)
+        static member inline Pow (g:Graph, e:int) = Polynomial(g,e)
 
 
 

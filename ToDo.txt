@@ -6,7 +6,7 @@ To Do or Ideas :
 	answer : no, hyperparameters must all be included in 'DGP'.
 2) Bayes hyperparameter tuning vs GridSearch vs PSO
 
-
+3) (Multistep) predictions and prediction standard errors. 
 
 Potential Refactoring : 
 

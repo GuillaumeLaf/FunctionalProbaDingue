@@ -13,8 +13,8 @@ open GraphType
 [<RequireQualifiedAccess>]
 module Graph =   
     
-    let add g1 g2 = Addition(g1,g2)
-    let multiply g1 g2 = Multiplication(g1,g2)
+    let inline add g1 g2 = Addition(g1,g2)
+    let inline multiply g1 g2 = Multiplication(g1,g2)
 
     // Check equality between two graphs.
     // Graphs are considered equal if all their nodes are equal
