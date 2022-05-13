@@ -78,12 +78,9 @@ module ModelState =
             do! modifyT (TimeseriesState.setTime idx)
 
             let! lags = evalT (TimeseriesState.multipleLagElements maxL) 
-            let! (S(g,(t,ts,innov))) = State.get
-            let! (tmpState:float32 option[,]) = flip Array2D.zeroCreate (maxL+steps) <!> (evalT size)
-            do! result (printfn "%A" lags)
-            tmpState.[*,0..maxL-1] <- lags
-            do! result (printfn "%A" tmpState)
-            let ts = TS.setData tmpState ts
+            let! (tmpData:float32 option[,]) = flip Array2D.zeroCreate (maxL+steps) <!> (evalT size)
+            tmpData.[*,0..maxL-1] <- lags
+            do! modifyT (TimeseriesState.setData tmpData)
 
             let predictM i = 
                 monad {
@@ -92,9 +89,9 @@ module ModelState =
                     return p
                 }
             
-            let tmpM = Array.init steps predictM |> (State.accumulate >> map (Array.transpose >> array2D))
-            return State.exec tmpM (S(g,(t,ts,innov)))
-        }
+            let multiPredM = Array.init steps predictM |> (State.accumulate >> map (Array.transpose >> array2D))
+            return! State.exec multiPredM <!> State.get
+        } |> State.ignoreStateModif
 
     let multiPredict steps m = evalT TimeseriesState.length >>= (fun idx -> multiPredictFor idx steps m) 
 

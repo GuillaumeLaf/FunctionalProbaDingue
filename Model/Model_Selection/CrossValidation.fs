@@ -2,12 +2,29 @@
 
 open Timeseries
 open TimeseriesType
+open FSharpPlus
 
 module Timeseries = 
     // Module including utility functions to treat 'TS' objects
 
-    let split (pct_test:int) (ts:TS) = 
-        0
+    type FoldingType = Rolling | Fixed
+
+    // 'Leave-P-Out' bounds computation
+    // Output an 'Seq' of tuples : ((lowerBoundTrain,upperBoundTrain),(lowerBoundTest,upperBoundTest))
+    // The sequence is walking forward by one each time.
+    let rollingBoundsLPO (minLength:int) (p:int) = Seq.initInfinite (fun i -> (0,i+minLength-1),(i+minLength,i+minLength+p))
+    let fixedBoundsLPO (minLength:int) (p:int) = Seq.initInfinite (fun i -> (i,i+minLength-1),(i+minLength,i+minLength+p))
+
+    // 'Leave-One-Out'
+    let rollingBoundsLOO = flip rollingBoundsLPO 0
+    let fixedBoundsLOO = flip fixedBoundsLPO 0
+       
+
+
+    let crossValidationSplit = function
+        | Fixed -> fixedSplit
+        | Rolling -> rollingSplit
+        
     
 
 module CrossValidation = 

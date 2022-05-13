@@ -77,6 +77,8 @@ module Utils
         let row idx (array:'T[,]) = array.[idx,*]
         let col idx (array:'T[,]) = array.[*,idx]
 
+        let inline sub idx1 idx2 (array:'T[,]) = array.[*,idx1..idx2]
+
         let setRow idx (values:'T[]) (array:'T[,]) = 
             if values.Length = Array2D.length2 array then 
                 Array2D.init (Array2D.length1 array) (Array2D.length2 array) (fun i j -> if i=idx then values.[j] else array.[i,j])
@@ -88,8 +90,8 @@ module Utils
             else invalidArg (nameof values) "Lenght of new row doesn't match first dimension of 'Array2D'"
 
         // Apply the given function to each Row/Column and concatenate the result in a new 'Array'.
-        let collectByRow f (array:'T[,]) = Array.mapi (fun i _ -> f array.[i,*]) array.[*,0]
-        let collectByCol f (array:'T[,]) = Array.mapi (fun i _ -> f array.[*,i]) array.[0,*]
+        let inline collectByRow f (array:'T[,]) = Array.mapi (fun i _ -> f array.[i,*]) array.[*,0]
+        let inline collectByCol f (array:'T[,]) = Array.mapi (fun i _ -> f array.[*,i]) array.[0,*]
 
         // ~> column-vector
         let singleton (array:'T[]) = Array2D.init array.Length 1 (fun i _ -> array.[i])
@@ -167,6 +169,16 @@ module Utils
                 out.[i] <- r
             return out
         }
+        
+        // Utility monad which returns the result of monad 'M' but conserves the initial state.
+        // (Used in case 'M' modifies the state but we don't want to conserve the modifs.)
+        let inline ignoreStateModif M = 
+            monad {
+                let! s = State.get
+                let! m = M
+                do! State.put s
+                return m
+            }
 
         module Seq = 
             let inline accumulate (arrM:seq<State<'a,'b>>) = arrM |> Array.ofSeq |> accumulate

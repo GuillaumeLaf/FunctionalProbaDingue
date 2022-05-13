@@ -52,7 +52,7 @@ module Model =
 
     let sample n (m:Model) = 
         if (Model.covariance m) <> None then 
-            let ts = Array2D.zeroCreate (Model.crossSection m) n |> TS.create
+            let ts = Array2D.zeroCreate<float32 option> (Model.crossSection m) n |> TS.create
             let defaultState = Model.defaultState ts m
 
             let newInnovFunc = randomNormalInnovations (Model.cholesky m) (Model.crossSection m)

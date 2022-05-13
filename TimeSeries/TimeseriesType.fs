@@ -44,26 +44,29 @@ module TimeseriesType =
           Stats:Stats;
           Transformation:Transformation list }
 
-        static member create (data:float32[,]) = 
+        static member create (data:float32 option[,]) = 
             { Length=data.[0,*].Length; // T
               Size=data.[*,0].Length;   // N
-              Data=Array2D.toOption data;
+              Data=data;
               Stats=Stats.create;
               Transformation=[] }
+        static member create (data:float32[,]) = (Array2D.toOption >> TS.create) data
         static member inline length ts = ts.Length
         static member inline size ts = ts.Size
         static member inline data ts = ts.Data
         static member inline dataDefault ts = Array2D.map (Option.defaultValue 0.0f) ts.Data
         static member inline stats ts = ts.Stats
         static member inline transformation ts = ts.Transformation
+        static member inline pctLength (pct:float32) ts = (float32 ts.Length) * (pct/100f) |> int
 
         static member inline setData x ts = { ts with Data=x; Length=x.[0,*].Length; Size=x.[*,0].Length }
         static member inline setStats x ts = { ts with Stats=x }
         static member inline addTransformation x ts = { ts with Transformation=x::ts.Transformation }
         static member inline popTransformation ts = { ts with Transformation=List.tail ts.Transformation }
 
-        static member inline zeroCreate i j = Array2D.zeroCreate i j |> TS.create
+        static member inline zeroCreate i j = Array2D.zeroCreate<float32 option> i j |> TS.create 
         static member inline zero_like ts = TS.zeroCreate (TS.size ts) (TS.length ts)
+        static member inline sub idx1 idx2 ts = (TS.data >> Array2D.sub idx1 idx2 >> TS.create) ts
 
         // Get the 'idx'th timeseries
         static member inline get idx ts = ts.Data[idx,*]

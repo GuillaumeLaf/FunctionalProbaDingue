@@ -8,6 +8,15 @@ To Do or Ideas :
 
 3) (Multistep) predictions and prediction standard errors. 
 
+4) Create a monad which saves the current state, does the computation and then reinit the state with the saved one ("state forgetting")
+
+5) Create a monad which modifiy the current state and return the result of the argument monad (instead of 'unit').
+
+6) GPU programming : https://github.com/Sergio0694/ComputeSharp
+
+
+
+
 Potential Refactoring : 
 
 1) Separate the "data" from the 'Model'
@@ -23,3 +32,5 @@ Potential Refactoring :
 	-> makes code faster
 
 3) FsharpPlus Applicative Generic Math operators e.g. .+. which is equivalent to (+) <!> _ <*> _
+
+
