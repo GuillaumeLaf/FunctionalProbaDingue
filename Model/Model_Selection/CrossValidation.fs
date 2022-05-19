@@ -25,9 +25,13 @@ module Timeseries =
     let rollingSplit (foldLength:int) (overlap:int) = rollingBoundsLPO foldLength overlap foldLength
                                                         |> Seq.choose (fun x -> if ((fst >> snd) x - foldLength+1) % foldLength = 0 then Some x else None)
 
-    let crossValidationSplit = function
-        | Fixed -> fixedSplit
-        | Rolling -> rollingSplit
+    let crossValidationSplit foldType kFold overlap ts = 
+        let foldLength = ts.Length / kFold
+        match foldType with
+        | Fixed -> fixedSplit foldLength overlap
+        | Rolling -> rollingSplit foldLength overlap
+        |> Seq.map ( fun ((train1,train2),(test1,test2)) -> (TS.sub train1 train2 ts, TS.sub test1 test2 ts) )
+        |> Seq.take (kFold-1)
         
     
 module CrossValidation = 
