@@ -63,6 +63,7 @@ module ModelState =
                 do! modifyT (TimeseriesState.setCurrentElements currentResult)
         } 
 
+    // Get the prediction for the model 'm' at the given 'idx' time.
     let predictFor (idx:int) (m:Model) = 
         monad {
             do! modifyT (TimeseriesState.setTime idx)
@@ -70,8 +71,11 @@ module ModelState =
             return! evalG m.GraphMonad
         }
 
+    // Shorthand notation for predicting the first out-of-sample forecast value of the timeseries contained in 'm' Model.
     let predict m = evalT TimeseriesState.length >>= flip predictFor m
 
+    // Get multistep prediction starting from 'idx' time for 'steps' steps.
+    // Monad value contains the array of predictions.
     let multiPredictFor (idx:int) (steps:int) (m:Model) = 
         monad {
             let maxL = Model.maxLag m
@@ -93,6 +97,7 @@ module ModelState =
             return! State.exec multiPredM <!> State.get
         } |> State.ignoreStateModif
 
+    // Shorthand notation for multisteps out-of-sample predictions at the end of the current timeseries in 'm' Model.
     let multiPredict steps m = evalT TimeseriesState.length >>= (fun idx -> multiPredictFor idx steps m) 
 
 

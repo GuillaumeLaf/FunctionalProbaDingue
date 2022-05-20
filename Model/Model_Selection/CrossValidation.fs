@@ -19,12 +19,14 @@ module Timeseries =
     let rollingBoundsLOO minLength overlap = rollingBoundsLPO minLength overlap 1
     let fixedBoundsLOO minLength overlap = fixedBoundsLPO minLength overlap 1
        
+    // Sequence of the relevant splits by ignoring some elements of the 'rollingBoundsLPO' sequence.
     let fixedSplit (foldLength:int) (overlap:int) = fixedBoundsLPO foldLength overlap foldLength
                                                         |> Seq.choose (fun x -> if (fst >> fst) x % foldLength = 0 then Some x else None)
         
     let rollingSplit (foldLength:int) (overlap:int) = rollingBoundsLPO foldLength overlap foldLength
                                                         |> Seq.choose (fun x -> if ((fst >> snd) x - foldLength+1) % foldLength = 0 then Some x else None)
 
+    // Get the splitted timeseries
     let crossValidationSplit foldType kFold overlap ts = 
         let foldLength = ts.Length / kFold
         match foldType with
