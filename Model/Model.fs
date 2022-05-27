@@ -63,7 +63,7 @@ module Model =
 
     // Fit the model with the given optimizer.
     // Output the final fitted model and optimizer along with original 'TS' and in-sample errors 'TS'. 
-    let fit (m:Model) (opt:Optimisation.Optimizer) (errorType:ErrorType) (epochs:int) (ts:TS) = 
+    let fit (opt:Optimisation.Optimizer) (errorType:ErrorType) (epochs:int) (m:Model) (ts:TS) = 
         if Model.crossSection m = TS.size ts then
             let errModel = create (ErrorModel(m.Model,errorType)) 
             let fittedParameters = Optimisation.fit errModel opt epochs ts

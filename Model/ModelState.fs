@@ -74,6 +74,9 @@ module ModelState =
     // Shorthand notation for predicting the first out-of-sample forecast value of the timeseries contained in 'm' Model.
     let predict m = evalT TimeseriesState.length >>= flip predictFor m
 
+    let predictForArray (indices:int[]) (m:Model) = Array.map (flip predictFor m) >> State.accumulate >> map (Array.transpose >> array2D) <| indices
+    let predictForAll (m:Model) = (flip Array.init id) <!> evalT TimeseriesState.length >>= flip predictForArray m
+
     // Get multistep prediction starting from 'idx' time for 'steps' steps.
     // Monad value contains the array of predictions.
     let multiPredictFor (idx:int) (steps:int) (m:Model) = 
@@ -100,6 +103,7 @@ module ModelState =
     // Shorthand notation for multisteps out-of-sample predictions at the end of the current timeseries in 'm' Model.
     let multiPredict steps m = evalT TimeseriesState.length >>= (fun idx -> multiPredictFor idx steps m) 
 
+    
 
 
 

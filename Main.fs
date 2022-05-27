@@ -4,9 +4,10 @@ open FSharpPlus
 open ComputationalGraph
 open ComputationalGraph.GraphType
 open Models
-open Models.ModelType
+open ModelType
+open Model_Selection
 open Utils
-open Database
+// open Database
 open Timeseries
 open Timeseries.TimeseriesType
 open Plot
@@ -32,8 +33,14 @@ let main argv =
     let m = Model.create dgp
     let m, sample, _ = Model.sample 1000 m
 
-    let fittedm,_,_,ts = Model.fit m (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) (L2Regu(0.2f)) 100 sample
-    printfn "%A" (Model.multiPredict fittedm 10 ts)
+    //let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) (L2Regu(0.2f)) 5
+    let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) SquaredError 25
+
+    let OOSerrors = CrossValidation.errors (CrossValidation.Rolling) 5 fitFunc sample m
+    printfn "%A" OOSerrors
+
+(*    let fittedm,_,_,ts = Model.fit m (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) (L2Regu(0.2f)) 100 sample
+    printfn "%A" (Model.multiPredict fittedm 10 ts)*)
 
 (*    let data = Database.DB.Table.Timeseries.closePrices [|"1INCHBTC";"1INCHBUSD";"1INCHDOWNUSDT"|] (new DateTime(2021,1,1)|> Some) (new DateTime(2021,11,5)|> Some)
     // let data = data |> Array.removeManyAt 0 (Array.length data-1000) |> Array.transpose |> Array2D.ofArray |> Array2D.map (Option.defaultValue 0.0 >> unbox<float> >> float32)  
