@@ -12,7 +12,7 @@ module ModelType =
     // Type for the 'State' Monad of a model.
     // Fst : state of the graph
     // Snd : state of the timeseries
-    type S = S of GraphType.S * (int*TimeseriesType.TS*TimeseriesType.TS)
+    type S = S of GraphType.S * (int*TimeseriesType.TS<float32 option>*TimeseriesType.TS<float32 option>)
 
     // Vector Autoregressive Model
     // 'parameters' -> Fst : which timeseries
@@ -46,7 +46,7 @@ module ModelType =
           Graphs:Graph[];
           GraphMonad:State<GraphType.S, float32 option[]>;
           GraphGradient:State<GraphType.S, float32 option[,]>;
-          UpdateRule:State<(int*TimeseriesType.TS), float32 option[,]>;
+          UpdateRule:State<(int*TimeseriesType.TS<float32 option>), float32 option[,]>;
         }
           
         static member inline model m = m.Model

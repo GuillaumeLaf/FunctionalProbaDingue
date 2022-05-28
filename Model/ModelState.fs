@@ -17,18 +17,18 @@ module ModelState =
 
     // Get the Graph, Timeseries or Innovation State from the 'State' Model.
     let getGraphState (S(gs,_)) = gs                            : GraphType.S
-    let getTimeseriesState (S(_,(idx,ts,_))) = (idx,ts)         : (int*TimeseriesType.TS)
-    let getInnovationState (S(_,(idx,_,innov))) = (idx,innov)   : (int*TimeseriesType.TS)
+    let getTimeseriesState (S(_,(idx,ts,_))) = (idx,ts)         : (int*TimeseriesType.TS<float32 option>)
+    let getInnovationState (S(_,(idx,_,innov))) = (idx,innov)   : (int*TimeseriesType.TS<float32 option>)
 
     // Monad extension of 'getGraphState', 'getTimeSeriesState' and 'getInnovationState' functions
     let graphState = getGraphState <!> State.get                  : State<S, GraphType.S>
-    let timeseriesState = getTimeseriesState <!> State.get        : State<S, (int*TimeseriesType.TS)>
-    let innovationState = getInnovationState <!> State.get        : State<S, (int*TimeseriesType.TS)>
+    let timeseriesState = getTimeseriesState <!> State.get        : State<S, (int*TimeseriesType.TS<float32 option>)>
+    let innovationState = getInnovationState <!> State.get        : State<S, (int*TimeseriesType.TS<float32 option>)>
 
     // Evaluate a 'Graph Monad' or 'Timeseries Monad' with the corresponding state of the 'State Model'.
     let evalG (graphM:State<GraphType.S,'a>) = State.eval graphM <!> graphState
-    let evalT (timeseriesM:State<(int*TimeseriesType.TS),'a>) = State.eval timeseriesM <!> timeseriesState
-    let evalI (innovationM:State<(int*TimeseriesType.TS),'a>) = State.eval innovationM <!> innovationState
+    let evalT (timeseriesM:State<(int*TimeseriesType.TS<float32 option>),'a>) = State.eval timeseriesM <!> timeseriesState
+    let evalI (innovationM:State<(int*TimeseriesType.TS<float32 option>),'a>) = State.eval innovationM <!> innovationState
 
     // Evaluate a 'Graph Monad' or 'Timeseries Monad' which modify their corresponding state
     // with the corresponding state of the 'State Model'.

@@ -21,7 +21,7 @@ module Model =
                 match g with
                 | VAR(var) -> [| for i in 1..var.order do lagElements i |]
                 | ErrorModel(inner,_) -> Array.append [|currentElements|] (loop inner)
-            loop >> Utils.State.traverseBack >> map Array.transpose >> map Utils.Array2D.ofArray
+            loop >> Utils.State.traverseBack >> map Array.transpose >> map array2D
             
     // Module grouping function for creating/managing graphs of a given model.
     [<RequireQualifiedAccess>]
@@ -63,8 +63,8 @@ module Model =
 
     // Fit the model with the given optimizer.
     // Output the final fitted model and optimizer along with original 'TS' and in-sample errors 'TS'. 
-    let fit (opt:Optimisation.Optimizer) (errorType:ErrorType) (epochs:int) (m:Model) (ts:TS) = 
-        if Model.crossSection m = TS.size ts then
+    let fit (opt:Optimisation.Optimizer) (errorType:ErrorType) (epochs:int) (m:Model) (ts:TS<float32 option>) = 
+        if Model.crossSection m = TS<float32 option>.size ts then
             let errModel = create (ErrorModel(m.Model,errorType)) 
             let fittedParameters = Optimisation.fit errModel opt epochs ts
                                         |> (Optimisation.getModelState >> ModelState.getGraphState >> GraphState.getParameters) 

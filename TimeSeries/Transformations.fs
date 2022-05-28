@@ -32,12 +32,12 @@ module Transformations =
             monad {
                 let! arg1 = arg1M
                 let! arg2 = arg2M
-                let! out = Array2D.zeroCreate <!> size <*> length
+                let! out = Array2D.zeroCreate<'T> <!> size <*> length
                 for i in 0..Array2D.length2 out-1 do
                     do! setTime i
                     let! c = compute arg1 arg2
                     out.[*,i] <- c
-                return! (TS.setData out >> TS.addTransformation (save arg1 arg2)) <!> timeseries
+                return! (TS<'T>.setData out >> TS<'T>.addTransformation (save arg1 arg2)) <!> timeseries
             }
 
         let traverse1 compute argM save = traverse2 (fun a _ -> compute a) argM (result ()) (fun a _ -> save a)
@@ -84,9 +84,9 @@ module Transformations =
                                     (Some >> Standardize)
 
         let totalDifference = traverse1 (fun _ -> Single.totalDifference)
-                                        (TS.atTime 0 <!> timeseries)
+                                        (TS<'T>.atTime 0 <!> timeseries)
                                         (Some >> TotalDifference)
-                                >>= (fun ts -> TS.setData (ts.Data.[*,1..]) ts |> result)
+                                >>= (fun ts -> TS<'T>.setData (ts.Data.[*,1..]) ts |> result)
 
         let fractionalDifference ds thresh = traverse1 Single.fractionalDifference 
                                                        ((Utils.fractionalDiffCoeffs >> Array.map) thresh ds |> result) 
@@ -107,12 +107,12 @@ module Transformations =
         // Possible Parallelization, since isn't carried along.
         let inline traverse2 compute arg1 arg2 = 
             monad {
-                let! out = Array2D.zeroCreate <!> size <*> length
+                let! out = Array2D.zeroCreate<'T> <!> size <*> length
                 for i in 0..Array2D.length2 out-1 do
                     do! setTime i
                     let! c = compute arg1 arg2
                     out.[*,i] <- c
-                return! (TS.setData out >> TS.popTransformation) <!> timeseries
+                return! (TS<'T>.setData out >> TS<'T>.popTransformation) <!> timeseries
             }
 
         let traverse1 compute arg = traverse2 (fun a _ -> compute a) arg ()
@@ -127,7 +127,7 @@ module Transformations =
                     do! setTime i
                     let! c = compute
                     do! setCurrentElements c
-                return! TS.popTransformation <!> timeseries
+                return! TS<'T>.popTransformation <!> timeseries
             }
 
         module Single =
@@ -151,8 +151,8 @@ module Transformations =
                 let! t = currentTime
                 let! len = length
                 match t with
-                | 0 -> let! (out:float32 option [,]) = Array2D.zeroCreate <!> size <*> (( + ) 1 <!> length)         
-                       let! (data:float32 option [,]) = TS.data <!> timeseries                                
+                | 0 -> let! (out:float32 option [,]) = Array2D.zeroCreate<'T> <!> size <*> (( + ) 1 <!> length)         
+                       let! (data:float32 option [,]) = TS<'T>.data <!> timeseries                                
                        out.[*,0] <- firsts
                        out.[*,1..] <- data
                        do! setData out
@@ -173,12 +173,12 @@ module Transformations =
         let fractionalDifference ds thresh = traverse1 Single.fractionalDifference 
                                                        ((( * ) -1f >> Utils.fractionalDiffCoeffs >> Array.map) thresh ds) 
                           
-        // Replace the given lists of indices with 'None'
+        // Replace the given lists of indices with the generic default value
         let defaultWith (indices:int list[]) = 
             monad {
-                let! (data:float32 option [,]) = TS.data <!> timeseries
-                Array.iteri (fun i _ -> List.iter (fun y -> data.[i,y] <- None) indices.[i]) indices 
-                return! (TS.setData data >> TS.popTransformation) <!> timeseries
+                let! (data:'T[,]) = TS<'T>.data <!> timeseries
+                Array.iteri (fun i _ -> List.iter (fun y -> data.[i,y] <- Unchecked.defaultof<'T>) indices.[i]) indices 
+                return! (TS<'T>.setData data >> TS<'T>.popTransformation) <!> timeseries
             }
 
         let apply = Single.apply >> traverse
