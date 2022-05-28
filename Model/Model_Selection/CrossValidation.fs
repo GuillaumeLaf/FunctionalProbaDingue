@@ -41,6 +41,7 @@ module CrossValidation =
         |> Seq.take (kFold-1)
         
     
+    // Compute the out-of-sample errors aggregated over the folds
     let errors foldType kFold optimizationFunc ts m = 
         let overlap = Model.maxLag m
         split foldType kFold overlap ts
