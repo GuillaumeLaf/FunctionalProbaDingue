@@ -71,12 +71,12 @@ module TradingTypes =
     // NonParametric -> use general methods to trade (moving average, bollinger bands, ...)
     type PriceAction = 
         | Parametric of ModelType.S 
-        | NonParametric of (int*TimeseriesType.TS)
+        | NonParametric of (int*TimeseriesType.TS<float32 option>)
 
-    type Trades = Trades of TimeseriesType.TS
-    type Equity = Equity of TimeseriesType.TS
+    type Trades = Trades of int
+    type Equity = Equity of float32
 
-    type History = History of Equity * Trades
+    type History = History of TimeseriesType.TS<Trades> * TimeseriesType.TS<Equity>
 
     [<RequireQualifiedAccess>]
     // Each 'TS' could have a different strategy -> array of strategies 'Open', 'Close' and 'PositionSize'.

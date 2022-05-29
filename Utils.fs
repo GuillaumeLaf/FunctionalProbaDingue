@@ -63,7 +63,7 @@ module Utils
         }
 
     module Option =
-        
+
         let inline foldBack2 (folder:'T -> 'U -> 'State -> 'State) (option1:'T option) (option2:'U option) (state:'State) : 'State = 
             match option1,option2 with
             | None,_ -> state

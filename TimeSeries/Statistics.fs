@@ -23,10 +23,10 @@ module Stats =
         let var array = (fun mean -> sum (fun x -> (x-mean)*(x-mean)) array) (mean array) |> ( * ) (1.0f/(countSome array-1.0f))
         let std = var >> sqrt
 
-    let mean (ts:TS) = Array2D.collectByRow Computations.mean ts.Data
-    let var (ts:TS) = Array2D.collectByRow Computations.var ts.Data
-    let std (ts:TS) = Array2D.collectByRow Computations.std ts.Data
-    let cov (ts:TS) = Array2D.zeroCreate (ts.Size) (ts.Size) |> Array2D.mapi (fun i j _ -> Computations.cov ts.Data.[i,*] ts.Data.[j,*])
+    let mean (ts:TS<float32 option>) = Array2D.collectByRow Computations.mean ts.Data
+    let var (ts:TS<float32 option>) = Array2D.collectByRow Computations.var ts.Data
+    let std (ts:TS<float32 option>) = Array2D.collectByRow Computations.std ts.Data
+    let cov (ts:TS<float32 option>) = Array2D.zeroCreate (ts.Size) (ts.Size) |> Array2D.mapi (fun i j _ -> Computations.cov ts.Data.[i,*] ts.Data.[j,*])
     let cholesky = cov >> Utils.cholesky 
 
 

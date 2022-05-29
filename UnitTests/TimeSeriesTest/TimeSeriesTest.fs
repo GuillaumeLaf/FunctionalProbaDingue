@@ -6,8 +6,8 @@
     open FSharpPlus.Data
     open FSharpPlus
 
-    let ts = Array2D.init 5 50 (fun i j -> i*50 + j |> float32) |> TS.create
-    let initialState = (1,ts) : (int * TS)
+    let ts = Array2D.init 5 50 (fun i j -> i*50 + j |> (float32 >> Some)) |> TS.create
+    let initialState = (1,ts) : (int * TS<float32 option>)
 
     [<Fact>]
     let ``Get current index`` () =  

@@ -116,10 +116,10 @@ module ModelType =
         static member cholesky m = (Model.covariance >> Option.get >> Utils.cholesky) m
 
         // State Innovations are always initiated to zero. 
-        static member defaultState ts m = S(GraphType.S(Model.parameters m, Model.defaultVariables m, Model.defaultInnovations m), (0,ts, TS.zero_like ts))
+        static member defaultState ts m = S(GraphType.S(Model.parameters m, Model.defaultVariables m, Model.defaultInnovations m), (0,ts, TS.zero_likeOption ts))
 
         // Everything is set to zero (even parameters).
-        static member defaultEmptyState ts m = S(GraphType.S(Model.defaultParameters m, Model.defaultVariables m, Model.defaultInnovations m), (0,ts, TS.zero_like ts))
+        static member defaultEmptyState ts m = S(GraphType.S(Model.defaultParameters m, Model.defaultVariables m, Model.defaultInnovations m), (0,ts, TS.zero_likeOption ts))
 
 
 

@@ -37,7 +37,7 @@ module Transformations =
                     do! setTime i
                     let! c = compute arg1 arg2
                     out.[*,i] <- c
-                return! (TS<'T>.setData out >> TS<'T>.addTransformation (save arg1 arg2)) <!> timeseries
+                return! (TS<'T>.setData out >> TS<'T>.addTransformation (save arg1 arg2)) <!> timeseries<'T>
             }
 
         let traverse1 compute argM save = traverse2 (fun a _ -> compute a) argM (result ()) (fun a _ -> save a)
@@ -84,9 +84,9 @@ module Transformations =
                                     (Some >> Standardize)
 
         let totalDifference = traverse1 (fun _ -> Single.totalDifference)
-                                        (TS<'T>.atTime 0 <!> timeseries)
+                                        (TS.atTime 0 <!> timeseries)
                                         (Some >> TotalDifference)
-                                >>= (fun ts -> TS<'T>.setData (ts.Data.[*,1..]) ts |> result)
+                                >>= (fun ts -> TS<float32 option>.setData (ts.Data.[*,1..]) ts |> result)
 
         let fractionalDifference ds thresh = traverse1 Single.fractionalDifference 
                                                        ((Utils.fractionalDiffCoeffs >> Array.map) thresh ds |> result) 
@@ -112,7 +112,7 @@ module Transformations =
                     do! setTime i
                     let! c = compute arg1 arg2
                     out.[*,i] <- c
-                return! (TS<'T>.setData out >> TS<'T>.popTransformation) <!> timeseries
+                return! (TS<'T>.setData out >> TS<'T>.popTransformation) <!> timeseries<'T>
             }
 
         let traverse1 compute arg = traverse2 (fun a _ -> compute a) arg ()
@@ -127,7 +127,7 @@ module Transformations =
                     do! setTime i
                     let! c = compute
                     do! setCurrentElements c
-                return! TS<'T>.popTransformation <!> timeseries
+                return! TS<'T>.popTransformation <!> timeseries<'T>
             }
 
         module Single =
@@ -151,8 +151,8 @@ module Transformations =
                 let! t = currentTime
                 let! len = length
                 match t with
-                | 0 -> let! (out:float32 option [,]) = Array2D.zeroCreate<'T> <!> size <*> (( + ) 1 <!> length)         
-                       let! (data:float32 option [,]) = TS<'T>.data <!> timeseries                                
+                | 0 -> let! (out:float32 option [,]) = Array2D.zeroCreate <!> size <*> (( + ) 1 <!> length)         
+                       let! (data:float32 option [,]) = TS<float32 option>.data <!> timeseries                                
                        out.[*,0] <- firsts
                        out.[*,1..] <- data
                        do! setData out

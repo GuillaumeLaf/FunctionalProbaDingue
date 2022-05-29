@@ -53,7 +53,7 @@ module TimeseriesType =
         static member inline length ts = ts.Length
         static member inline size ts = ts.Size
         static member inline data ts = ts.Data
-        static member inline dataDefault ts = Array2D.map (Option.defaultValue 0.0f) ts.Data
+        static member inline dataDefault ts = Array2D.map (Option.defaultValue Unchecked.defaultof<'T>) ts.Data
         static member inline stats ts = ts.Stats
         static member inline transformation ts = ts.Transformation
         static member inline pctLength (pct:float32) ts = (float32 ts.Length) * (pct/100f) |> int
@@ -65,10 +65,22 @@ module TimeseriesType =
 
         // The type " 'T " must have a default value 
         static member inline zeroCreate i j = Array2D.zeroCreate<'T> i j |> TS.create 
+        static member inline zeroCreateOption i j = Array2D.zeroCreate<'T> i j |> Array2D.map Some |> TS.create 
         static member inline zero_like ts = TS<'T>.zeroCreate (TS<'T>.size ts) (TS<'T>.length ts)
+        static member inline zero_likeOption ts = TS<'T>.zeroCreateOption (TS<'T>.size ts) (TS<'T>.length ts)
         static member inline sub idx1 idx2 ts = (TS<'T>.data >> Array2D.sub idx1 idx2 >> TS.create) ts
 
         // Get the 'idx'th timeseries
         static member inline get idx ts = ts.Data[idx,*]
-        static member atTime t ts = if (0 <= t) && (t < ts.Length) then ts.Data.[*,t] else (Array.create ts.Size (Some 0.0f)) // 'Array.zeroCreate ts.Size' gives an array of 'None'
+        static member atTime t (ts:TS<'T>) = if (0 <= t) && (t < ts.Length) then ts.Data.[*,t] else (Array.create ts.Size Unchecked.defaultof<'T>) // 'Array.zeroCreate ts.Size' gives an array of 'None'
         static member modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
+
+
+
+
+
+
+
+
+
+

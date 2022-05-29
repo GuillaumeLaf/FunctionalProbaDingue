@@ -8,7 +8,7 @@
     open MathNet.Numerics.LinearAlgebra
 
         
-    let ts = Array2D.ofArray [|[|2f;1f|]; [|1f;2f|]|] |> TS.create
+    let ts = Array2D.ofArray [|[|Some 2f;Some 1f|]; [|Some 1f;Some 2f|]|] |> TS.create
 
     [<Fact>]
     let ``Means computation`` () = 

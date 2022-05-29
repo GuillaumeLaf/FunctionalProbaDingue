@@ -33,6 +33,8 @@ let main argv =
     let m = Model.create dgp
     let m, sample, _ = Model.sample 1000 m
 
+    printfn "%A" sample
+
     //let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) (L2Regu(0.2f)) 5
     let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) SquaredError 25
 

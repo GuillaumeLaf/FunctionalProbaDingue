@@ -32,17 +32,17 @@ module CrossValidation =
                                                         |> Seq.choose (fun x -> if ((fst >> snd) x - foldLength+1) % foldLength = 0 then Some x else None)
 
     // Get the splitted timeseries
-    let split foldType kFold overlap ts = 
+    let split foldType kFold overlap (ts:TS<'T>) = 
         let foldLength = ts.Length / kFold
         match foldType with
         | Fixed -> _fixedSplit foldLength overlap
         | Rolling -> _rollingSplit foldLength overlap
-        |> Seq.map ( fun ((train1,train2),(test1,test2)) -> (TS.sub train1 train2 ts, TS.sub test1 test2 ts) )
+        |> Seq.map ( fun ((train1,train2),(test1,test2)) -> (TS<'T>.sub train1 train2 ts, TS<'T>.sub test1 test2 ts) )
         |> Seq.take (kFold-1)
         
     
     // Compute the out-of-sample errors aggregated over the folds
-    let errors foldType kFold optimizationFunc ts m = 
+    let errors foldType kFold optimizationFunc (ts:TS<float32 option>) m = 
         let overlap = Model.maxLag m
         split foldType kFold overlap ts
             |> Seq.map (fun (trainTS,testTS) -> let fittedModel,_,_,_ = optimizationFunc m trainTS

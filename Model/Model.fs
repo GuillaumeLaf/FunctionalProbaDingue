@@ -14,13 +14,14 @@ open ModelState
 module Model = 
 
     [<RequireQualifiedAccess>]
-    module ModelTimeseries = 
+    module ModelTimeseries =
+
         // Timeseries Monad for computing the new 'Variable' values in the 'State Graph' 
         let rec updateRule = 
             let rec loop g = 
                 match g with
                 | VAR(var) -> [| for i in 1..var.order do lagElements i |]
-                | ErrorModel(inner,_) -> Array.append [|currentElements|] (loop inner)
+                | ErrorModel(inner,_) -> Array.append [|currentElements<float32 option>|] (loop inner)
             loop >> Utils.State.traverseBack >> map Array.transpose >> map array2D
             
     // Module grouping function for creating/managing graphs of a given model.
@@ -52,7 +53,7 @@ module Model =
 
     let sample n (m:Model) = 
         if (Model.covariance m) <> None then 
-            let ts = Array2D.zeroCreate<float32 option> (Model.crossSection m) n |> TS.create
+            let ts = TS.zeroCreateOption (Model.crossSection m) n 
             let defaultState = Model.defaultState ts m
 
             let newInnovFunc = randomNormalInnovations (Model.cholesky m) (Model.crossSection m)

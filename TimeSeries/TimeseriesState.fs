@@ -2,6 +2,7 @@
 
 open FSharpPlus
 open FSharpPlus.Data
+open FSharpPlus.Control
 open TimeseriesType
 
 // Everything that touches timeseries is implemented as multivariate operations.
@@ -13,45 +14,45 @@ open TimeseriesType
 module TimeseriesState = 
     
     // Get current Index
-    let currentTime = fst <!> State.get       : State<(int * TS<float32 option>),int> 
+    let currentTime<'T> = fst <!> State.get       : State<(int * TS<'T>),int> 
 
     // Modify the current time
-    let setTime newIdx = State.modify (fun (_,ts) -> (newIdx,ts))        : State<(int * TS<float32 option>),unit> 
+    let setTime<'T> newIdx = State.modify (fun (_,ts) -> (newIdx,ts))        : State<(int * TS<'T>),unit> 
 
     // Increment the current time by one.
-    let incrementTime () = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS<float32 option>),unit> 
+    let incrementTime<'T> = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS<'T>),unit> 
 
     // Get the Array2D object representing the 'TimeSeries'
-    let timeseries = snd <!> State.get       : State<(int * TS<float32 option>),TS<float32 option>>
+    let timeseries<'T> = snd <!> State.get       : State<(int * TS<'T>),TS<'T>>
 
     // Get the cross-sectional (or time) dimension
-    let size = TS<float32 option>.size <!> timeseries
-    let length = TS<float32 option>.length <!> timeseries
+    let size<'T> = TS<'T>.size <!> timeseries<'T>
+    let length<'T> = TS<'T>.length <!> timeseries<'T>
 
-    let lastIndex = flip ( - ) 1 <!> length
+    let lastIndex<'T> = flip ( - ) 1 <!> length<'T>
 
     // Set the current data
-    let setData newData = State.modify (fun (idx,ts) -> (idx, TS<float32 option>.setData newData ts))
+    let setData<'T> (newData:'T[,]) = State.modify (fun ((idx:int),ts) -> (idx, TS<'T>.setData newData ts))
 
     // Extract the current cross-section
-    let currentElements = TS<float32 option>.atTime <!> currentTime <*> timeseries
+    let currentElements<'T> = TS<'T>.atTime <!> currentTime<'T> <*> timeseries<'T>
 
     // Set the current elements of the cross-section
-    let setCurrentElements e = State.modify (fun (idx,ts) -> (idx,TS<float32 option>.modifyAtTime idx e ts))      : State<(int * TS<float32 option>),unit> 
+    let setCurrentElements<'T> e = State.modify (fun (idx,ts) -> (idx,TS<'T>.modifyAtTime idx e ts))      : State<(int * TS<'T>),unit> 
 
     // Extract the cross-sections at a given lag (from the current time)
-    let lagElements lag = TS<float32 option>.atTime <!> ((+) -lag <!> currentTime) <*> timeseries
+    let lagElements<'T> lag = TS<'T>.atTime <!> (flip (+) lag <!> currentTime<'T>) <*> timeseries<'T>
 
     // Extract the cross-sections at a given lead in the future (from the current time)
-    let leadElements lead = lagElements (-lead)
+    let leadElements<'T> lead = lagElements<'T> (-lead)
 
     // Extract a subrange of the 'idxTS'th timeseries with the current element along with 'lags' numbers of previous elements.
-    let multipleLagElementsFor lags idxTS = Array.sub <!> (TS<float32 option>.get idxTS <!> timeseries) <*> (flip ( - ) lags <!> currentTime) <*> result (lags+1)
+    let multipleLagElementsFor<'T> lags idxTS = Array.sub <!> (TS<'T>.get idxTS <!> timeseries<'T>) <*> (flip ( - ) lags <!> currentTime<'T>) <*> result (lags+1)
 
     // Extract a subrange with the current element along with 'lags' numbers of previous elements.
-    let multipleLagElements lags = 
+    let multipleLagElements<'T> lags = 
         monad {
-            let! (data:_[,]) = TS<float32 option>.data <!> timeseries
-            let! current = currentTime
+            let! (data:'T[,]) = TS<'T>.data <!> timeseries<'T>
+            let! current = currentTime<'T>
             return data.[*,current-lags..current]
         }
