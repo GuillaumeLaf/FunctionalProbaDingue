@@ -35,7 +35,15 @@ module TimeseriesState =
     let setData<'T> (newData:'T[,]) = State.modify (fun ((idx:int),ts) -> (idx, TS<'T>.setData newData ts))
 
     // Extract the current cross-section
+    // let currentElements<float32 option> = curry TS<float32 option>.atTime <!> currentTime<'T> <*> timeseries<'T>
     let currentElements<'T> = TS<'T>.atTime <!> currentTime<'T> <*> timeseries<'T>
+
+    let currentElementsZero<'T> = 
+        monad {
+            let! currents = currentElements<'T>
+            match currents with
+            | 
+        }
 
     // Set the current elements of the cross-section
     let setCurrentElements<'T> e = State.modify (fun (idx,ts) -> (idx,TS<'T>.modifyAtTime idx e ts))      : State<(int * TS<'T>),unit> 

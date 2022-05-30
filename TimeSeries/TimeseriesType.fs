@@ -37,14 +37,14 @@ module TimeseriesType =
         | Apply of f:(float32 -> float32) * invf:(float32 -> float32)
                     
     // Record Type representing a MULTIVARIATE timeseries. 
-    type TS<'T> = 
+    type TS< ^T when ^T:(static member get_Zero: unit -> ^T) > = 
         { Length:int;   // T
           Size:int;     // N
-          Data:'T[,];
+          Data:^T[,];
           Stats:Stats;
           Transformation:Transformation list }
 
-        static member create (data:'T[,]) = 
+        static member inline create (data:^T[,]) = 
             { Length=data.[0,*].Length; // T
               Size=data.[*,0].Length;   // N
               Data=data;
@@ -52,8 +52,8 @@ module TimeseriesType =
               Transformation=[] }
         static member inline length ts = ts.Length
         static member inline size ts = ts.Size
-        static member inline data ts = ts.Data
-        static member inline dataDefault ts = Array2D.map (Option.defaultValue Unchecked.defaultof<'T>) ts.Data
+        static member inline data (ts:TS< ^T >) : ^T[,] = ts.Data
+        static member inline dataDefault (ts:TS< ^T >) = Array2D.map (fun _ -> LanguagePrimitives.GenericZero< ^U >) ts.Data
         static member inline stats ts = ts.Stats
         static member inline transformation ts = ts.Transformation
         static member inline pctLength (pct:float32) ts = (float32 ts.Length) * (pct/100f) |> int
@@ -65,15 +65,15 @@ module TimeseriesType =
 
         // The type " 'T " must have a default value 
         static member inline zeroCreate i j = Array2D.zeroCreate<'T> i j |> TS.create 
-        static member inline zeroCreateOption i j = Array2D.zeroCreate<'T> i j |> Array2D.map Some |> TS.create 
+        // static member inline zeroCreateOption i j = Array2D.zeroCreate<'T> i j |> Array2D.map Some |> TS.create 
         static member inline zero_like ts = TS<'T>.zeroCreate (TS<'T>.size ts) (TS<'T>.length ts)
-        static member inline zero_likeOption ts = TS<'T>.zeroCreateOption (TS<'T>.size ts) (TS<'T>.length ts)
+        // static member inline zero_likeOption ts = TS<'T>.zeroCreateOption (TS<'T>.size ts) (TS<'T>.length ts)
         static member inline sub idx1 idx2 ts = (TS<'T>.data >> Array2D.sub idx1 idx2 >> TS.create) ts
 
         // Get the 'idx'th timeseries
         static member inline get idx ts = ts.Data[idx,*]
-        static member atTime t (ts:TS<'T>) = if (0 <= t) && (t < ts.Length) then ts.Data.[*,t] else (Array.create ts.Size Unchecked.defaultof<'T>) // 'Array.zeroCreate ts.Size' gives an array of 'None'
-        static member modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
+        static member inline atTime t ts = if (0 <= t) && (t < ts.Length) then ts.Data.[*,t] else (Array.create ts.Size LanguagePrimitives.GenericZero) //Unchecked.defaultof<'T>) // 'Array.zeroCreate ts.Size' gives an array of 'None'
+        static member inline modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
 
 
 
