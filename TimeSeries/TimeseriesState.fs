@@ -14,53 +14,46 @@ open TimeseriesType
 module TimeseriesState = 
     
     // Get current Index
-    let currentTime<'T> = fst <!> State.get       : State<(int * TS<'T>),int> 
+    let inline currentTime () = fst <!> State.get       : State<(int * TS< ^T >),int> 
 
     // Modify the current time
-    let setTime<'T> newIdx = State.modify (fun (_,ts) -> (newIdx,ts))        : State<(int * TS<'T>),unit> 
+    let inline setTime newIdx = State.modify (fun (_,ts) -> (newIdx,ts))         : State<(int * TS< ^T >),unit> 
 
     // Increment the current time by one.
-    let incrementTime<'T> = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS<'T>),unit> 
+    let inline incrementTime () = State.modify (fun (idx,ts) -> (idx+1,ts))     : State<(int * TS< ^T >),unit> 
 
     // Get the Array2D object representing the 'TimeSeries'
-    let timeseries<'T> = snd <!> State.get       : State<(int * TS<'T>),TS<'T>>
+    let inline timeseries () = snd <!> State.get       : State<(int * TS< ^T >),TS< ^T >>
 
     // Get the cross-sectional (or time) dimension
-    let size<'T> = TS<'T>.size <!> timeseries<'T>
-    let length<'T> = TS<'T>.length <!> timeseries<'T>
+    let inline size () = TS< ^T >.size <!> timeseries()
+    let inline length () = TS< ^T >.length <!> timeseries()
 
-    let lastIndex<'T> = flip ( - ) 1 <!> length<'T>
+    let inline lastIndex () = flip ( - ) 1 <!> length()
 
     // Set the current data
-    let setData<'T> (newData:'T[,]) = State.modify (fun ((idx:int),ts) -> (idx, TS<'T>.setData newData ts))
+    let inline setData (newData:^T[,]) = State.modify (fun ((idx:int),ts) -> (idx, TS< ^T >.setData newData ts))
 
     // Extract the current cross-section
     // let currentElements<float32 option> = curry TS<float32 option>.atTime <!> currentTime<'T> <*> timeseries<'T>
-    let currentElements<'T> = TS<'T>.atTime <!> currentTime<'T> <*> timeseries<'T>
-
-    let currentElementsZero<'T> = 
-        monad {
-            let! currents = currentElements<'T>
-            match currents with
-            | 
-        }
+    let inline currentElements () = TS<_>.atTime <!> currentTime() <*> timeseries()
 
     // Set the current elements of the cross-section
-    let setCurrentElements<'T> e = State.modify (fun (idx,ts) -> (idx,TS<'T>.modifyAtTime idx e ts))      : State<(int * TS<'T>),unit> 
+    let inline setCurrentElements e = State.modify (fun (idx,ts) -> (idx,TS< ^T >.modifyAtTime idx e ts))      : State<(int * TS< ^T >),unit> 
 
     // Extract the cross-sections at a given lag (from the current time)
-    let lagElements<'T> lag = TS<'T>.atTime <!> (flip (+) lag <!> currentTime<'T>) <*> timeseries<'T>
+    let inline lagElements lag = TS< ^T >.atTime <!> (flip (+) lag <!> currentTime()) <*> timeseries()
 
     // Extract the cross-sections at a given lead in the future (from the current time)
-    let leadElements<'T> lead = lagElements<'T> (-lead)
+    let inline leadElements lead = lagElements (-lead)
 
     // Extract a subrange of the 'idxTS'th timeseries with the current element along with 'lags' numbers of previous elements.
-    let multipleLagElementsFor<'T> lags idxTS = Array.sub <!> (TS<'T>.get idxTS <!> timeseries<'T>) <*> (flip ( - ) lags <!> currentTime<'T>) <*> result (lags+1)
+    let inline multipleLagElementsFor lags idxTS = Array.sub <!> (TS< ^T >.get idxTS <!> timeseries()) <*> (flip ( - ) lags <!> currentTime()) <*> result (lags+1)
 
     // Extract a subrange with the current element along with 'lags' numbers of previous elements.
-    let multipleLagElements<'T> lags = 
+    let inline multipleLagElements lags = 
         monad {
-            let! (data:'T[,]) = TS<'T>.data <!> timeseries<'T>
-            let! current = currentTime<'T>
+            let! (data:^T[,]) = TS< ^T >.data <!> timeseries()
+            let! current = currentTime()
             return data.[*,current-lags..current]
         }

@@ -37,7 +37,9 @@ module TimeseriesType =
         | Apply of f:(float32 -> float32) * invf:(float32 -> float32)
                     
     // Record Type representing a MULTIVARIATE timeseries. 
-    type TS< ^T when ^T:(static member get_Zero: unit -> ^T) > = 
+    // when ^T:(static member get_Zero: unit -> ^T)
+    // LanguagePrimitives.GenericZero
+    type TS< ^T > = 
         { Length:int;   // T
           Size:int;     // N
           Data:^T[,];
@@ -50,30 +52,34 @@ module TimeseriesType =
               Data=data;
               Stats=Stats.create;
               Transformation=[] }
-        static member inline length ts = ts.Length
-        static member inline size ts = ts.Size
-        static member inline data (ts:TS< ^T >) : ^T[,] = ts.Data
-        static member inline dataDefault (ts:TS< ^T >) = Array2D.map (fun _ -> LanguagePrimitives.GenericZero< ^U >) ts.Data
-        static member inline stats ts = ts.Stats
-        static member inline transformation ts = ts.Transformation
-        static member inline pctLength (pct:float32) ts = (float32 ts.Length) * (pct/100f) |> int
+        static member inline length (ts:TS< ^T >) = ts.Length
+        static member inline size (ts:TS< ^T >) = ts.Size
+        static member inline data (ts:TS< ^T >) = ts.Data
+        static member inline dataDefault (ts:TS< ^T >) = 
+            Array2D.map (fun _ -> Unchecked.defaultof< ^T >) ts.Data
+        static member inline stats (ts:TS< ^T >) = ts.Stats
+        static member inline transformation (ts:TS< ^T >) = ts.Transformation
+        static member inline pctLength (pct:float32) (ts:TS< ^T >) = (float32 ts.Length) * (pct/100f) |> int
 
-        static member inline setData x ts = { ts with Data=x; Length=x.[0,*].Length; Size=x.[*,0].Length }
-        static member inline setStats x ts = { ts with Stats=x }
-        static member inline addTransformation x ts = { ts with Transformation=x::ts.Transformation }
-        static member inline popTransformation ts = { ts with Transformation=List.tail ts.Transformation }
+        static member inline setData x (ts:TS< ^T >) = { ts with Data=x; Length=x.[0,*].Length; Size=x.[*,0].Length }
+        static member inline setStats x (ts:TS< ^T >) = { ts with Stats=x }
+        static member inline addTransformation x (ts:TS< ^T >) = { ts with Transformation=x::ts.Transformation }
+        static member inline popTransformation (ts:TS< ^T >) = { ts with Transformation=List.tail ts.Transformation }
 
         // The type " 'T " must have a default value 
-        static member inline zeroCreate i j = Array2D.zeroCreate<'T> i j |> TS.create 
+        static member inline zeroCreate (i:int) (j:int) = Array2D.zeroCreate i j |> TS< ^T >.create
         // static member inline zeroCreateOption i j = Array2D.zeroCreate<'T> i j |> Array2D.map Some |> TS.create 
-        static member inline zero_like ts = TS<'T>.zeroCreate (TS<'T>.size ts) (TS<'T>.length ts)
+        static member inline zero_like (ts:TS< ^T >) = TS<'T>.zeroCreate (TS<'T>.size ts) (TS<'T>.length ts)
         // static member inline zero_likeOption ts = TS<'T>.zeroCreateOption (TS<'T>.size ts) (TS<'T>.length ts)
-        static member inline sub idx1 idx2 ts = (TS<'T>.data >> Array2D.sub idx1 idx2 >> TS.create) ts
+        static member inline sub idx1 idx2 (ts:TS< ^T >) = (TS<'T>.data >> Array2D.sub idx1 idx2 >> TS.create) ts
 
         // Get the 'idx'th timeseries
-        static member inline get idx ts = ts.Data[idx,*]
-        static member inline atTime t ts = if (0 <= t) && (t < ts.Length) then ts.Data.[*,t] else (Array.create ts.Size LanguagePrimitives.GenericZero) //Unchecked.defaultof<'T>) // 'Array.zeroCreate ts.Size' gives an array of 'None'
-        static member inline modifyAtTime t values ts = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
+        static member inline get idx (ts:TS< ^T >) = ts.Data[idx,*]
+        
+        static member inline atTime (t:int) (ts:TS< ^T >) = 
+            if (0 <= t) && (t < ts.Length) then ts.Data.[*,t] else (Array.create ts.Size Unchecked.defaultof< ^T >)
+
+        static member inline modifyAtTime t values (ts:TS< ^T >) = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
 
 
 
