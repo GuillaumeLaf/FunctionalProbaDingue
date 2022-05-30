@@ -14,29 +14,26 @@ module Stats =
     // Module to create descriptive - and other - statistics about a timeseries. 
 
     module Computations = 
-        let crossSum f array1 array2 = Array.foldBack2 (Option.foldBack2 (fun x1 x2 s -> f x1 x2 + s)) array1 array2 0f
-        let sum f array = crossSum (fun _ -> f) array array
-        let countSome array = Array.foldBack (Option.count >> (+)) array 0 |> float32
+        let inline crossSum (f:^T -> ^T -> ^T) (array1:^T[]) (array2:^T[]) = Array.foldBack2 (fun x1 x2 s -> f x1 x2 + s) array1 array2 Unchecked.defaultof< ^T >
+        let inline sum f array = crossSum (fun _ -> f) array array
     
-        let mean array = flip (/) (countSome array) (sum id array)
-        let cov array1 array2 = (fun mean1 mean2 -> crossSum (fun x1 x2 -> (x1-mean1)*(x2-mean2)) array1 array2) (mean array1) (mean array2) |> ( * ) (1.0f/(countSome array1-1.0f))
-        let var array = (fun mean -> sum (fun x -> (x-mean)*(x-mean)) array) (mean array) |> ( * ) (1.0f/(countSome array-1.0f))
-        let std = var >> sqrt
-
-    let mean (ts:TS<float32 option>) = Array2D.collectByRow Computations.mean ts.Data
-    let var (ts:TS<float32 option>) = Array2D.collectByRow Computations.var ts.Data
-    let std (ts:TS<float32 option>) = Array2D.collectByRow Computations.std ts.Data
-    let cov (ts:TS<float32 option>) = Array2D.zeroCreate (ts.Size) (ts.Size) |> Array2D.mapi (fun i j _ -> Computations.cov ts.Data.[i,*] ts.Data.[j,*])
-    let cholesky = cov >> Utils.cholesky 
+        let inline mean (array:^T[]) = Array.average array
+        let inline cov array1 array2 = (fun mean1 mean2 -> crossSum (fun x1 x2 -> (x1-mean1)*(x2-mean2)) array1 array2) (mean array1) (mean array2) |> flip LanguagePrimitives.DivideByInt (array1.Length-1)
+        let inline var array = (fun mean -> sum (fun x -> (x-mean)*(x-mean)) array) (mean array) |> flip LanguagePrimitives.DivideByInt (array.Length-1)
+        
+    let inline mean (ts:TS< ^T >) = Array2D.collectByRow Computations.mean ts.Data
+    let inline var (ts:TS< ^T >) = Array2D.collectByRow Computations.var ts.Data
+    let inline cov (ts:TS< ^T >) = Array2D.zeroCreate (ts.Size) (ts.Size) |> Array2D.mapi (fun i j _ -> Computations.cov ts.Data.[i,*] ts.Data.[j,*])
+    let inline cholesky array = cov >> Utils.cholesky <| array
 
 
     module Monad = 
         // Monad form of statistics 
 
-        let mean = (mean >> Array.map Some) <!> timeseries
-        let var = (var >> Array.map Some) <!> timeseries
-        let std = (std >> Array.map Some) <!> timeseries
-        let cov = (cov  >> Array2D.toOption) <!> timeseries
+        let inline mean () = mean <!> timeseries()
+        let inline var () = var <!> timeseries()
+        let inline std () = Array.map sqrt <!> var()
+        let inline cov () = cov <!> timeseries()
         
 
 

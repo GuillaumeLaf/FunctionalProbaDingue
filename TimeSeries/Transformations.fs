@@ -14,13 +14,13 @@ module Transformations =
         // Get fractional coefficients (in reverse order : coeff for current time is last in array).
         // To allow inverse transfo. 'd' should be in (0, 0.5). 
         // https://link.springer.com/article/10.1007/s12572-021-00299-5
-        let fractionalDiffCoeffs (thresh:float32) (d:float32) = 
+        let inline fractionalDiffCoeffs thresh d = 
             let rec loop lag l = 
                 match l with
                 | x::xs when abs(x) <= thresh -> xs |> Array.ofList
-                | x::_ -> loop (lag+1f) ((-x)*((d-lag+1f)/lag)::l)
+                | x::_ -> loop (lag+LanguagePrimitives.GenericOne) ((-x)*((d-lag+LanguagePrimitives.GenericOne)/lag)::l)
                 | [] -> failwith "Impossible to have empty list in fractional coeffs." 
-            loop 2f [-d]
+            loop (LanguagePrimitives.GenericOne+LanguagePrimitives.GenericOne) [-d]
 
     [<RequireQualifiedAccess>]
     module Forward = 
@@ -32,72 +32,56 @@ module Transformations =
             monad {
                 let! arg1 = arg1M
                 let! arg2 = arg2M
-                let! out = Array2D.zeroCreate<'T> <!> size <*> length
+                let! out = Array2D.zeroCreate<'T> <!> size() <*> length()
                 for i in 0..Array2D.length2 out-1 do
                     do! setTime i
                     let! c = compute arg1 arg2
                     out.[*,i] <- c
-                return! (TS<'T>.setData out >> TS<'T>.addTransformation (save arg1 arg2)) <!> timeseries<'T>
+                return! (TS.setData out >> TS.addTransformation (save arg1 arg2)) <!> timeseries()
             }
 
-        let traverse1 compute argM save = traverse2 (fun a _ -> compute a) argM (result ()) (fun a _ -> save a)
-        let traverse compute save = traverse1 (fun _ -> compute) (result ()) (fun _ -> save)
+        let inline traverse1 compute argM save = traverse2 (fun a _ -> compute a) argM (result()) (fun a _ -> save a)
+        let inline traverse compute save = traverse1 (fun _ -> compute) (result()) (fun _ -> save)
 
         module Single = 
             // Compute the transform for a single observation (given the whole TS).
-            let totalDifference = (( - ) |> (Option.map2 >> Array.map2)) <!> currentElements <*> lagElements 1  
+            let totalDifference = Array.map2 ( - ) <!> currentElements() <*> lagElements 1  
     
-            let center means = (( - ) |> (Option.map2 >> Array.map2)) <!> currentElements <*> result means
+            let center means = Array.map2 ( - ) <!> currentElements() <*> result means
 
-            let standardize stds = (( / ) |> (Option.map2 >> Array.map2)) <!> currentElements <*> result stds
+            let standardize stds = Array.map2 ( / ) <!> currentElements() <*> result stds
 
-            // Append idx to array list if changed with default
-            // Use Inplace Array modification
-            let defaultWith value (array:int list[]) = 
-                let tmp currentIdx i = function
-                    | Some _ as x -> x
-                    | None -> array.[i] <- currentIdx::array.[i]
-                              Some value
-                monad {
-                    let! idx = currentTime
-                    return! Array.mapi (tmp idx) <!> currentElements
-                }
-
-            let inline apply f = (Option.map >> Array.map) f <!> currentElements
+            let inline apply f = Array.map f <!> currentElements()
 
             // Take the fractional difference with the given exponents
-            let fractionalDifference (coeffs:float32[][]) = 
+            let inline fractionalDifference (coeffs: ^T[][]) = 
                 monad {
-                    let out = Array.zeroCreate (Array.length coeffs)
+                    let out : ^T[] = Array.zeroCreate (Array.length coeffs)
                     for i in 0..Array.length coeffs-1 do
-                        let! (e:float32 option[]) = multipleLagElementsFor (Array.length coeffs.[i]) i                          
-                        out.[i] <- Array.foldBack2 (fun coeff elem s -> ( * ) coeff <!> elem |> lift2 ( + ) s) coeffs.[i] e (Some 0f)
+                        let! (e: ^T[]) = multipleLagElementsFor (Array.length coeffs.[i]) i                          
+                        out.[i] <- Array.foldBack2 (fun coeff elem s -> ( * ) coeff <!> elem |> lift2 ( + ) s) coeffs.[i] e Unchecked.defaultof< ^T >
                     return out
                 }
 
         let center = traverse1 Single.center 
-                               Stats.Monad.mean 
+                               (Stats.Monad.mean())
                                (Some >> Center)
 
         let standardize = traverse1 Single.standardize 
-                                    Stats.Monad.std 
+                                    (Stats.Monad.std())
                                     (Some >> Standardize)
 
         let totalDifference = traverse1 (fun _ -> Single.totalDifference)
-                                        (TS.atTime 0 <!> timeseries)
+                                        (TS.atTime 0 <!> timeseries())
                                         (Some >> TotalDifference)
-                                >>= (fun ts -> TS<float32 option>.setData (ts.Data.[*,1..]) ts |> result)
+                                >>= (fun ts -> TS.setData (ts.Data.[*,1..]) ts |> result)
 
-        let fractionalDifference ds thresh = traverse1 Single.fractionalDifference 
+        let inline fractionalDifference ds thresh = traverse1 Single.fractionalDifference 
                                                        ((Utils.fractionalDiffCoeffs >> Array.map) thresh ds |> result) 
                                                        (fun _ -> FracDifference(Some ds,thresh))
 
-        let defaultWith value = traverse1 (Single.defaultWith value)
-                                          (Array.create <!> size <*> result [])
-                                          (fun indices -> DefaultWith(value, Some indices))
-
-        let apply f invf = traverse (Single.apply f)
-                                    (Apply(f,invf))
+        let inline apply f invf = traverse (Single.apply f)
+                                           (Apply(f,invf))
                                           
 
     [<RequireQualifiedAccess>]
@@ -107,12 +91,12 @@ module Transformations =
         // Possible Parallelization, since isn't carried along.
         let inline traverse2 compute arg1 arg2 = 
             monad {
-                let! out = Array2D.zeroCreate<'T> <!> size <*> length
+                let! out = Array2D.zeroCreate<'T> <!> size() <*> length()
                 for i in 0..Array2D.length2 out-1 do
                     do! setTime i
                     let! c = compute arg1 arg2
                     out.[*,i] <- c
-                return! (TS<'T>.setData out >> TS<'T>.popTransformation) <!> timeseries<'T>
+                return! (TS<'T>.setData out >> TS<'T>.popTransformation) <!> timeseries()
             }
 
         let traverse1 compute arg = traverse2 (fun a _ -> compute a) arg ()

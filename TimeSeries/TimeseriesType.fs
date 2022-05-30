@@ -8,33 +8,32 @@ module TimeseriesType =
     // 'Stats' does not contain the data only statistics about some data.
     // Therefore the data holder must have a 'Stats' object. 
     // General option type indicates if the given statistic has already been computed
-    type Stats = 
-        { Mean:float32[] option;
-          Var:float32[] option;
-          Cov:float32[,] option;
-          LowerCholeskyCov:float32[,] option }
+    type Stats< ^T > = 
+        { Mean:^T[] option;
+          Var:^T[] option;
+          Cov:^T[,] option;
+          LowerCholeskyCov:^T[,] option }
 
-        static member create = 
+        static member inline create : Stats< ^T > = 
             { Mean=None; Var=None; Cov=None; LowerCholeskyCov=None }
-        static member mean s = s.Mean
-        static member var s = s.Var
-        static member cov s = s.Cov
-        static member lowerCholeskyCov s = s.LowerCholeskyCov
+        static member inline mean s = s.Mean
+        static member inline var s = s.Var
+        static member inline cov s = s.Cov
+        static member inline lowerCholeskyCov s = s.LowerCholeskyCov
 
-        static member setMean x s = { s with Mean=Some x }
-        static member setVar x s = { s with Var=Some x }
-        static member setCov x s = { s with Cov=Some x }
-        static member setLowerCholeskyCov x s = { s with LowerCholeskyCov=Some x } 
+        static member inline setMean x s = { s with Mean=Some x }
+        static member inline setVar x s = { s with Var=Some x }
+        static member inline setCov x s = { s with Cov=Some x }
+        static member inline setLowerCholeskyCov x s = { s with LowerCholeskyCov=Some x } 
 
     // Type of possible 'Transformation' for a 'TS'.
     // Keep relevant information to - possibly - inverse the transform.
-    type Transformation = 
-        | FracDifference of ds:float32[] option * thresh:float32
-        | Center of means:float32 option[] option
-        | Standardize of stds:float32 option[] option
-        | TotalDifference of first:float32 option[] option
-        | DefaultWith of value:float32 * indices:int list[] option       // replace 'None' by some constant and save idx where that happened
-        | Apply of f:(float32 -> float32) * invf:(float32 -> float32)
+    type Transformation< ^T > = 
+        | FracDifference of ds:^T[] option * thresh:^T
+        | Center of means:^T[] option
+        | Standardize of stds:^T[] option
+        | TotalDifference of first:^T[] option
+        | Apply of f:(^T -> ^T) * invf:(^T -> ^T)
                     
     // Record Type representing a MULTIVARIATE timeseries. 
     // when ^T:(static member get_Zero: unit -> ^T)
@@ -43,14 +42,14 @@ module TimeseriesType =
         { Length:int;   // T
           Size:int;     // N
           Data:^T[,];
-          Stats:Stats;
-          Transformation:Transformation list }
+          Stats:Stats< ^T >;
+          Transformation:Transformation< ^T > list }
 
         static member inline create (data:^T[,]) = 
             { Length=data.[0,*].Length; // T
               Size=data.[*,0].Length;   // N
               Data=data;
-              Stats=Stats.create;
+              Stats=Stats< ^T >.create;
               Transformation=[] }
         static member inline length (ts:TS< ^T >) = ts.Length
         static member inline size (ts:TS< ^T >) = ts.Size
