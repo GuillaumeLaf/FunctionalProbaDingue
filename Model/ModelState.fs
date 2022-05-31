@@ -16,45 +16,46 @@ module ModelState =
     let graphToMonad2D = Array2D.map Graph.toMonad >> State.traverseBack2D
 
     // Get the Graph, Timeseries or Innovation State from the 'State' Model.
-    let getGraphState (S(gs,_)) = gs                            : GraphType.S
-    let getTimeseriesState (S(_,(idx,ts,_))) = (idx,ts)         : (int*TimeseriesType.TS<float32 option>)
-    let getInnovationState (S(_,(idx,_,innov))) = (idx,innov)   : (int*TimeseriesType.TS<float32 option>)
+    let inline getGraphState (S(gs,_)) = gs                            : GraphType.S
+    let inline getTimeseriesState (S(_,(idx,ts,_))) = (idx,ts)         : (int*TimeseriesType.TS< ^T >)
+    let inline getInnovationState (S(_,(idx,_,innov))) = (idx,innov)   : (int*TimeseriesType.TS< ^T >)
 
     // Monad extension of 'getGraphState', 'getTimeSeriesState' and 'getInnovationState' functions
-    let graphState = getGraphState <!> State.get                  : State<S, GraphType.S>
-    let timeseriesState = getTimeseriesState <!> State.get        : State<S, (int*TimeseriesType.TS<float32 option>)>
-    let innovationState = getInnovationState <!> State.get        : State<S, (int*TimeseriesType.TS<float32 option>)>
+    let inline graphState () = getGraphState <!> State.get                  : State<S< ^T >, GraphType.S>
+    let inline timeseriesState () = getTimeseriesState <!> State.get        : State<S< ^T >, (int*TimeseriesType.TS< ^T >)>
+    let inline innovationState () = getInnovationState <!> State.get        : State<S< ^T >, (int*TimeseriesType.TS< ^T >)>
 
     // Evaluate a 'Graph Monad' or 'Timeseries Monad' with the corresponding state of the 'State Model'.
-    let evalG (graphM:State<GraphType.S,'a>) = State.eval graphM <!> graphState
-    let evalT (timeseriesM:State<(int*TimeseriesType.TS<float32 option>),'a>) = State.eval timeseriesM <!> timeseriesState
-    let evalI (innovationM:State<(int*TimeseriesType.TS<float32 option>),'a>) = State.eval innovationM <!> innovationState
+    let inline evalG (graphM:State<GraphType.S,'a>) = State.eval graphM <!> graphState()
+    let inline evalT (timeseriesM:State<(int*TimeseriesType.TS< ^T >),'a>) = State.eval timeseriesM <!> timeseriesState()
+    let inline evalI (innovationM:State<(int*TimeseriesType.TS< ^T >),'a>) = State.eval innovationM <!> innovationState()
 
     // Evaluate a 'Graph Monad' or 'Timeseries Monad' which modify their corresponding state
     // with the corresponding state of the 'State Model'.
-    let modifyG graphM = State.exec graphM <!> graphState >>= (fun newG -> State.modify (fun (S(_,oldT)) -> S(newG,oldT)))
-    let modifyT timeseriesM = State.exec timeseriesM <!> timeseriesState >>= (fun (idx,ts) -> State.modify (fun (S(oldG,(_,_,innov))) -> S(oldG,(idx,ts,innov))))
-    let modifyI innovationM = State.exec innovationM <!> innovationState >>= (fun (idx,innov) -> State.modify (fun (S(oldG,(_,ts,_))) -> S(oldG,(idx,ts,innov))))
+    let inline modifyG graphM = State.exec graphM <!> graphState() >>= (fun newG -> State.modify (fun (S(_,oldT)) -> S(newG,oldT)))
+    let inline modifyT timeseriesM = State.exec timeseriesM <!> timeseriesState() >>= (fun (idx,ts) -> State.modify (fun (S(oldG,(_,_,innov))) -> S(oldG,(idx,ts,innov))))
+    let inline modifyI innovationM = State.exec innovationM <!> innovationState() >>= (fun (idx,innov) -> State.modify (fun (S(oldG,(_,ts,_))) -> S(oldG,(idx,ts,innov))))
 
 
     // Draw a random vector from 'rndVectorFunc' and update GraphState and TimeseriesState. 
-    let updateInnovations rndVectorFunc = monad {
-        let rndSampleVector = (rndVectorFunc >> Array2D.toOption) ()
-        do! (GraphState.updateInnovations >> modifyG) rndSampleVector
-        do! (TimeseriesState.setCurrentElements >> modifyI) rndSampleVector.[*,0] 
-    }
+    let inline updateInnovations rndVectorFunc = 
+        monad {
+            let rndSampleVector = rndVectorFunc ()
+            do! (GraphState.updateInnovations >> modifyG) rndSampleVector
+            do! (TimeseriesState.setCurrentElements >> modifyI) rndSampleVector.[*,0] 
+        }
 
     // Take a 'TS' monad with an 'Array2D' containing the updating rule for each variable.
     // Return a 'Model' monad with updated variables. 
-    let updateVariables = evalT >> bind (GraphState.updateVariables >> modifyG) 
+    let inline updateVariables m = evalT >> bind (GraphState.updateVariables >> modifyG) <| m
 
-    let update rndVectorFunc (m:Model) = monad {
+    let inline update rndVectorFunc (m:Model< ^T >) = monad {
         do! updateVariables m.UpdateRule
         do! updateInnovations rndVectorFunc
     }
 
     // Model Monad to get a sample from the model
-    let sample n rndVectorFunc (m:Model) = 
+    let inline sample n rndVectorFunc (m:Model< ^T >) = 
         monad {
             for i in 0..n-1 do 
                 do! modifyT (TimeseriesState.setTime i) 
@@ -64,7 +65,7 @@ module ModelState =
         } 
 
     // Get the prediction for the model 'm' at the given 'idx' time.
-    let predictFor (idx:int) (m:Model) = 
+    let inline predictFor (idx:int) (m:Model< ^T >) = 
         monad {
             do! modifyT (TimeseriesState.setTime idx)
             do! updateVariables m.UpdateRule
@@ -72,20 +73,20 @@ module ModelState =
         }
 
     // Shorthand notation for predicting the first out-of-sample forecast value of the timeseries contained in 'm' Model.
-    let predict m = evalT TimeseriesState.length >>= flip predictFor m
+    let inline predict m = evalT (TimeseriesState.length()) >>= flip predictFor m
 
-    let predictForArray (indices:int[]) (m:Model) = Array.map (flip predictFor m) >> State.accumulate >> map (Array.transpose >> array2D) <| indices
-    let predictForAll (m:Model) = (flip Array.init id) <!> evalT TimeseriesState.length >>= flip predictForArray m
+    let inline predictForArray (indices:int[]) (m:Model< ^T >) = Array.map (flip predictFor m) >> State.accumulate >> map (Array.transpose >> array2D) <| indices
+    let inline predictForAll (m:Model< ^T >) = (flip Array.init id) <!> evalT (TimeseriesState.length()) >>= flip predictForArray m
 
     // Get multistep prediction starting from 'idx' time for 'steps' steps.
     // Monad value contains the array of predictions.
-    let multiPredictFor (idx:int) (steps:int) (m:Model) = 
+    let inline multiPredictFor (idx:int) (steps:int) (m:Model< ^T >) = 
         monad {
-            let maxL = Model.maxLag m
+            let maxL = Model< ^T >.maxLag m
             do! modifyT (TimeseriesState.setTime idx)
 
             let! lags = evalT (TimeseriesState.multipleLagElements maxL) 
-            let! (tmpData:float32 option[,]) = flip Array2D.zeroCreate (maxL+steps) <!> (evalT size)
+            let! (tmpData: ^T[,]) = flip Array2D.zeroCreate (maxL+steps) <!> (evalT (size()))
             tmpData.[*,0..maxL-1] <- lags
             do! modifyT (TimeseriesState.setData tmpData)
 
@@ -101,7 +102,7 @@ module ModelState =
         } |> State.ignoreStateModif
 
     // Shorthand notation for multisteps out-of-sample predictions at the end of the current timeseries in 'm' Model.
-    let multiPredict steps m = evalT TimeseriesState.length >>= (fun idx -> multiPredictFor idx steps m) 
+    let inline multiPredict steps m = evalT (TimeseriesState.length()) >>= (fun idx -> multiPredictFor idx steps m) 
 
     
 

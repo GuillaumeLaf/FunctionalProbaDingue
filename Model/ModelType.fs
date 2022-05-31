@@ -12,7 +12,7 @@ module ModelType =
     // Type for the 'State' Monad of a model.
     // Fst : state of the graph
     // Snd : state of the timeseries
-    type S = S of GraphType.S * (int*TimeseriesType.TS<float32 option>*TimeseriesType.TS<float32 option>)
+    type S< ^T when ^T : (static member Zero : ^T) > = S of GraphType.S * (int*TimeseriesType.TS< ^T >*TimeseriesType.TS< ^T >)
 
     // Vector Autoregressive Model
     // 'parameters' -> Fst : which timeseries
@@ -41,12 +41,12 @@ module ModelType =
 
     // Record Type representing a model.
     // Contains all information required for using a model.
-    type Model = 
+    type Model< ^T when ^T : (static member Zero : ^T) > = 
         { Model:DGP;
           Graphs:Graph[];
           GraphMonad:State<GraphType.S, float32 option[]>;
           GraphGradient:State<GraphType.S, float32 option[,]>;
-          UpdateRule:State<(int*TimeseriesType.TS<float32 option>), float32 option[,]>;
+          UpdateRule:State<(int*TimeseriesType.TS< ^T >), float32 option[,]>;
         }
           
         static member inline model m = m.Model
@@ -57,69 +57,69 @@ module ModelType =
         static member inline setModel x m = { m with Model=x }
         static member inline setGraphMonad x m = { m with GraphMonad=x }
         static member inline setUpdateRule x m = { m with UpdateRule=x }
-        static member setParameters p m = { m with Model=(Model.model >> DGP.setParameters p) m }
+        static member inline setParameters p m = { m with Model=(Model< ^T >.model >> DGP.setParameters p) m }
 
-        static member parameterShape m = 
+        static member inline parameterShape m = 
             let rec loop = function
                 | VAR(var) -> var.n, var.n*var.order
                 | ErrorModel(inner,_) -> loop inner
             loop m.Model
 
-        static member variableShape m = 
+        static member inline variableShape m = 
             let rec loop = function
                 | VAR(var) -> var.n, var.order
                 | ErrorModel(inner,_) -> loop inner |> (fun (i,j) -> (i,j+1))
             loop m.Model
 
-        static member innovationShape m = 
+        static member inline innovationShape m = 
             let rec loop = function
                 | VAR(var) -> var.n, 1
                 | ErrorModel(inner,_) -> loop inner 
             loop m.Model
 
-        static member crossSection m = 
+        static member inline crossSection m = 
             let rec loop = function
                 | VAR(var) -> var.n
                 | ErrorModel(inner,_) -> loop inner
             loop m.Model
 
-        static member maxLag m = 
+        static member inline maxLag m = 
             let rec loop = function
                 | VAR(var) -> var.order
                 | ErrorModel(inner,_) -> loop inner
             loop m.Model
 
         // Unsafe unboxing -> parameters should be already be defined in 'DGP'
-        static member parameters m =
+        static member inline parameters m =
             let rec loop = function
                 | VAR(var) -> var.parameters |> Option.get |> Array.reduce Utils.Array2D.stackColumn
                 | ErrorModel(inner,_) -> loop inner
             loop m.Model
 
-        static member defaultParameters m = (Model.parameterShape >> (fun (i,j) -> Array2D.create i j (Some 0f))) m
-        static member defaultVariables m = (Model.variableShape >> (fun (i,j) -> Array2D.create i j (Some 0f))) m
-        static member defaultInnovations m = (Model.innovationShape >> (fun (i,j) -> Array2D.create i j (Some 0f))) m
+        static member inline defaultParameters m = (Model< ^T >.parameterShape >> (fun (i,j) -> Array2D.create i j (Some 0f))) m
+        static member inline defaultVariables m = (Model< ^T >.variableShape >> (fun (i,j) -> Array2D.create i j (Some 0f))) m
+        static member inline defaultInnovations m = (Model< ^T >.innovationShape >> (fun (i,j) -> Array2D.create i j (Some 0f))) m
 
         // Covariance between innovations
-        static member covariance m =
+        static member inline covariance m =
             let rec loop = function
                 | VAR(var) -> var.covariance 
                 | ErrorModel(inner,_) -> loop inner
             loop m.Model
 
-        static member setCovariance cov m = 
+        static member inline setCovariance cov m = 
             let rec loop = function
                 | VAR(var) -> VAR({var with covariance=Some cov})
                 | ErrorModel(inner,_) -> loop inner
-            loop m.Model |> flip Model.setModel m
+            loop m.Model |> flip Model< ^T >.setModel m
 
-        static member cholesky m = (Model.covariance >> Option.get >> Utils.cholesky) m
+        static member inline cholesky m = (Model< ^T >.covariance >> Option.get >> Utils.cholesky) m
 
         // State Innovations are always initiated to zero. 
-        static member defaultState ts m = S(GraphType.S(Model.parameters m, Model.defaultVariables m, Model.defaultInnovations m), (0,ts, TS.zero_likeOption ts))
+        static member inline defaultState ts m = S(GraphType.S(Model< ^T >.parameters m, Model< ^T >.defaultVariables m, Model< ^T >.defaultInnovations m), (0,ts, TS.zero_like ts))
 
         // Everything is set to zero (even parameters).
-        static member defaultEmptyState ts m = S(GraphType.S(Model.defaultParameters m, Model.defaultVariables m, Model.defaultInnovations m), (0,ts, TS.zero_likeOption ts))
+        static member inline defaultEmptyState ts m = S(GraphType.S(Model< ^T >.defaultParameters m, Model< ^T >.defaultVariables m, Model< ^T >.defaultInnovations m), (0,ts, TS.zero_like ts))
 
 
 
