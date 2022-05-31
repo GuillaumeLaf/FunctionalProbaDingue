@@ -36,13 +36,13 @@ module TimeseriesState =
 
     // Extract the current cross-section
     // let currentElements<float32 option> = curry TS<float32 option>.atTime <!> currentTime<'T> <*> timeseries<'T>
-    let inline currentElements () = TS<_>.atTime <!> currentTime() <*> timeseries()
+    let inline currentElements () = TS< ^T >.atTime< ^T > <!> currentTime() <*> timeseries()
 
     // Set the current elements of the cross-section
     let inline setCurrentElements e = State.modify (fun (idx,ts) -> (idx,TS< ^T >.modifyAtTime idx e ts))      : State<(int * TS< ^T >),unit> 
 
     // Extract the cross-sections at a given lag (from the current time)
-    let inline lagElements lag = TS< ^T >.atTime <!> (flip (+) lag <!> currentTime()) <*> timeseries()
+    let inline lagElements lag = TS< ^T >.atTime< ^T > <!> (flip (+) lag <!> currentTime()) <*> timeseries()
 
     // Extract the cross-sections at a given lead in the future (from the current time)
     let inline leadElements lead = lagElements (-lead)
