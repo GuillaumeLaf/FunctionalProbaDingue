@@ -149,7 +149,7 @@ module Graph =
                               | Variable(grpidx,idx) -> return! lift (GraphState.variableM grpidx idx)
                               | Innovation(grpidx,idx) -> return! lift (GraphState.innovationM grpidx idx)
         }
-        loop >> ContT.eval  
+        loop >> ContT.eval <| g
 
     // Get the default 'S' for a given graph.
     // This function makes sure to not take 'BasicInput's with same indices twice.
