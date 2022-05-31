@@ -17,7 +17,7 @@ module Graph =
     let inline multiply g1 g2 = Multiplication(g1,g2)
 
     // Check equality between two graphs.
-    // Graphs are considered equal if all their nodes are equal
+    // Graphs are considered equal if all their nodes are equal and in the same order
     let equal g1 g2 = 
         let opCont l1 r1 l2 r2 f : Cont<'a,bool> = monad { let! xl = f l1 l2
                                                            let! xr = f r1 r2
@@ -36,7 +36,7 @@ module Graph =
     
     // Catamorphism for folding over a graph tree. 
     // Each function takes the current node as first input. 
-    let inline cataFoldX constF polyF addF subF multF inputF (x:Graph) = 
+    let inline cataFoldX constF polyF addF subF multF inputF (x:Graph<'T>) = 
         let inline opCont opF x lg rg f : Cont<'a,'b> = monad { let! xl = f lg
                                                                 let! xr = f rg
                                                                 return opF x xl xr }
@@ -58,7 +58,7 @@ module Graph =
         cataFoldX (fun _ -> constF) (fun _ -> polyF) (fun _ -> addF) (fun _ -> subF) (fun _ -> multF) (fun _ -> inputF)
 
     // Collect in an array all the subgraphs from the graph 'x'
-    let collectSubGraphs (x:Graph) = 
+    let collectSubGraphs (x:Graph<'T>) = 
         cataFoldX (fun x _ acc -> x::acc)
                   (fun x g _ acc -> x::(g acc))
                   (fun x lacc racc acc -> x::(racc >> lacc) acc)
@@ -68,7 +68,7 @@ module Graph =
                   x [] |> Array.ofList
 
     // Concatenate in an array all the 'Input' nodes of the graph 'x'. 
-    let collectInputs (x:Graph) = 
+    let collectInputs (x:Graph<'T>) = 
         cataFold (fun _ acc -> acc)
                  (fun g _ acc -> g acc)
                  (fun lacc racc acc -> lacc (racc acc))
@@ -77,8 +77,8 @@ module Graph =
                  (fun i acc -> i::acc)
                  x [] |> Array.ofList
 
-    let collectUniqueInputs = collectInputs >> Array.distinct
-    let collectUniqueParameters = collectUniqueInputs >> Array.filter (function | Parameter(_,_) -> true | _ -> false)
+    let collectUniqueInputs (g:Graph<'T>) = collectInputs >> Array.distinct <| g
+    let collectUniqueParameters (g:Graph<'T>) = collectUniqueInputs >> Array.filter (function | Parameter(_,_) -> true | _ -> false) <| g
 
     // From an 'Array' of 'BasicInput's count the number of 'BasicInput's for each group.
     // For instance, the output array is of the form : [|Parameter(0,2);Variable(1,3)|], 
@@ -95,17 +95,17 @@ module Graph =
         >> Array.sortBy (function | Parameter(grpidx,_) | Variable(grpidx,_) | Innovation(grpidx,_) -> grpidx)
 
     // Count the 'BasicInput's contained in the 'Graph' as an array.
-    let count = collectInputs >> countInputByGroup
+    let count (g:Graph<'T>) = collectInputs >> countInputByGroup <| g
         
     // Count the UNIQUE 'BasicInput's contained in the 'Graph' as an array.
-    let countUnique = collectInputs >> Array.countBy id >> Array.map fst >> countInputByGroup
+    let countUnique (g:Graph<'T>) = collectInputs >> Array.countBy id >> Array.map fst >> countInputByGroup <| g
 
-    let countGroups = count >> Array.collect (function | Parameter(grp,_) -> [|grp|]
-                                                       | Variable(grp,_) -> [|grp|]
-                                                       | Innovation(grp,_) -> [|grp|]) >> Array.sort
+    let countGroups (g:Graph<'T>) = count >> Array.collect (function | Parameter(grp,_) -> [|grp|]
+                                                                     | Variable(grp,_) -> [|grp|]
+                                                                     | Innovation(grp,_) -> [|grp|]) >> Array.sort <| g
         
     // Change the 'Group Index' of some 'BasicInput' from 'oldGrp' to 'newGrp'.
-    let changeGroup (oldGrp:int) (newGrp:int) =
+    let changeGroup (oldGrp:int) (newGrp:int) (g:Graph<'T>) =
         cataFold (fun v -> Constant(v))
                  (fun g e -> Polynomial(g,e))
                  (fun l r -> Addition(l,r))
@@ -114,8 +114,9 @@ module Graph =
                  (function | Parameter(grpidx,idx) as x -> if grpidx=oldGrp then Input(Parameter(newGrp,idx)) else Input(x)
                            | Variable(grpidx,idx) as x -> if grpidx=oldGrp then Input(Variable(newGrp,idx)) else Input(x)
                            | Innovation(grpidx,idx) as x -> if grpidx=oldGrp then Input(Innovation(newGrp,idx)) else Input(x))
+                 g
 
-    let shift (t:int*int->BasicInput) i = 
+    let shift (t:int*int->BasicInput) i (g:Graph<'T>) = 
         cataFoldX (fun x _ -> x)
                   (fun _ -> ( ** ))
                   (fun _ -> ( + ))
@@ -125,10 +126,7 @@ module Graph =
                                      | Variable(grpIdx,idx) when (t(0,0)) = (Variable(0,0)) -> Input(Variable(grpIdx,idx+i)) 
                                      | Innovation(grpIdx,idx) when (t(0,0)) = (Innovation(0,0)) -> Input(Innovation(grpIdx,idx+i))
                                      | _ -> x)  
-    
-    // Run the graph with the indices of the Inputs as data.
-    // This method was primarily to test the graph's computations.
-    let run = cataFold id (fun g e -> g ** (float32 e)) ( + ) ( - ) ( * ) (function Parameter(_,idx) | Variable(_,idx) | Innovation(_,idx) -> float32 idx)
+                  g
         
     // Create a State Monad from the Graph
     // Working with monads makes composing computations easier and,
@@ -136,20 +134,16 @@ module Graph =
     // However, for speedy computations Monads may not be the best option.
     // In the far end, one should create a compiler with faster than light compiled Monad operations.
     // But for now, I trust 'FSharpPlus' to efficiently compile my Monads.
-    let toMonad = 
-        let rec loop g : ContT<State<S,'b>,float32 option> = monad {
+    let inline toMonad (g:Graph<'T>) = 
+        let rec loop g : ContT<State<S<'T>,'b>,'T> = monad {
             match g with
-            | Constant(value) -> return! lift (result (Some value))
+            | Constant(value) -> return value
+            | Polynomial(_,0) -> return LanguagePrimitives.GenericOne
             | Polynomial(g,1) -> return! loop g
-            | Polynomial(g,2) -> let! x = loop g
-                                 return Option.map2 ( * ) x x
-            | Polynomial(g,3) -> let! x = loop g
-                                 return (Option.map2 ( * ) x >> Option.map2 ( * ) x) x
-            | Polynomial(g,4) -> let! x = loop g
-                                 return (Option.map2 ( * ) x >> Option.map2 ( * ) x >> Option.map2 ( * ) x) x
-            | Addition(l,r) -> return! Option.map2 (+) <!> (loop l) <*> (loop r)
-            | Substraction(l,r) -> return! Option.map2 (-) <!> (loop l) <*> (loop r)
-            | Multiplication(l,r) -> return! Option.map2 (*) <!> (loop l) <*> (loop r)
+            | Polynomial(g,pwr) -> return! ( * ) <!> (loop g) <*> (loop (Polynomial(g,pwr-1)))
+            | Addition(l,r) -> return! ( + ) <!> (loop l) <*> (loop r)
+            | Substraction(l,r) -> return! ( - ) <!> (loop l) <*> (loop r)
+            | Multiplication(l,r) -> return! ( * ) <!> (loop l) <*> (loop r)
             | Input(i) -> match i with
                               | Parameter(grpidx,idx) -> return! lift (GraphState.parameterM grpidx idx)
                               | Variable(grpidx,idx) -> return! lift (GraphState.variableM grpidx idx)
@@ -159,7 +153,7 @@ module Graph =
 
     // Get the default 'S' for a given graph.
     // This function makes sure to not take 'BasicInput's with same indices twice.
-    let defaultState : (Graph -> S) = 
+    let defaultState (g:Graph<'T>) = 
         collectInputs
           >> Array.groupBy (function | Parameter(_,_) -> 0 | Variable(_,_) -> 1 | Innovation(_,_) -> 2)
           >> Array.sortBy fst
@@ -168,56 +162,79 @@ module Graph =
                                                       | Innovation(grp,_) -> grp) 
                             >> Array.map (snd >> Array.distinct >> Array.length >> Array.zeroCreate)
                             >> Utils.Array2D.ofArray)
-          >> (fun a -> S(a.[0],a.[1],a.[2]))
+          >> (fun a -> S(a.[0],a.[1],a.[2])) <| g
 
-    let simplify = 
-        cataFoldX (fun x _ -> x)
+          
+    let inline (|Constant0|Constant1|Other|) (g:Graph<'T>) = 
+        match g with
+        | Constant((c:'T)) when c = LanguagePrimitives.GenericZero -> Constant0
+        | Constant((c:'T)) when c = LanguagePrimitives.GenericOne -> Constant1
+        | _ -> Other
+
+    let inline simplify (g:Graph<'T>) = 
+                  // Constant
+        cataFoldX (fun x _ -> x)  
+                  // Polynomial
                   (fun _ g e -> match g,e with
-                                | _,0 -> Constant(1.0f)
+                                | _,0 -> Constant(LanguagePrimitives.GenericOne)
                                 | _,1 -> g
-                                | Constant(0.0f),_ -> Constant(0.0f)
-                                | Constant(1.0f),_ -> Constant(1.0f)
+                                | Constant0,_ -> Constant(LanguagePrimitives.GenericZero)
+                                | Constant1,_ -> Constant(LanguagePrimitives.GenericOne)
                                 | Polynomial(g,e2),e1 -> Polynomial(g,e1*e2)
                                 | _ -> g ** e)
+                  // Addition
                   (fun _ l r -> match l,r with
-                                | Constant(0.0f),_ -> r 
-                                | _,Constant(0.0f) -> l
+                                | Constant0,_ -> r 
+                                | _,Constant0 -> l
                                 | _ -> l + r)
+                  // Substraction
                   (fun _ l r -> match l,r with
-                                | Constant(0.0f),_ -> Constant(-1.0f) * r 
-                                | _,Constant(0.0f) -> l
+                                | Constant0,_ -> Constant(-LanguagePrimitives.GenericOne) * r 
+                                | _,Constant0 -> l
                                 | _ -> l - r)
+                  // Multiplication
                   (fun _ l r -> match l,r with
-                                | Constant(0.0f),_ -> Constant(0.0f)
-                                | _,Constant(0.0f) -> Constant(0.0f)
-                                | Constant(1.0f),_ -> r 
-                                | _,Constant(1.0f) -> l
+                                | Constant0,_ -> Constant(LanguagePrimitives.GenericZero)
+                                | _,Constant0 -> Constant(LanguagePrimitives.GenericZero)
+                                | Constant1,_ -> r 
+                                | _,Constant1 -> l
                                 | _ -> l * r)
+                  // Inputs
                   (fun x _ -> x)
+                  g
+
+    let inline convertInt (n:int) = Seq.init n (fun _ -> LanguagePrimitives.GenericOne) |> Seq.sum
 
     // Create a graph representing the gradient of a given graph for a given parameter.
     // Fst : current gradient
     // Snd : current value
-    let inline gradientForParameter grpIdx idx = 
-        cataFoldX (fun x _ -> Constant(0.0f),x)
-                  (fun x g e -> fst g * Constant(float32 e) * Polynomial(snd g,e-1) |> simplify ,x)
+    let inline gradientForParameter grpIdx idx (g:Graph<'T>) = 
+                  // Constant
+        cataFoldX (fun x _ -> Constant(LanguagePrimitives.GenericZero),x)
+                  // Polynomial
+                  (fun x g e -> fst g * Constant(convertInt e) * Polynomial(snd g,e-1) |> simplify ,x)
+                  // Addition
                   (fun x l r -> fst l + fst r |> simplify, x)
+                  // Substraction
                   (fun x l r -> fst l - fst r |> simplify, x)
+                  // Multiplication
                   (fun x l r -> (fst l * snd r) + (fst r * snd l) |> simplify,x)
-                  (fun x -> function | Parameter(grp,i) -> if (grp=grpIdx && idx=i) then Constant(1.0f),x else Constant(0.0f),x
-                                     | Variable(_,_) -> Constant(0.0f),x
-                                     | Innovation(_,_) -> Constant(0.0f),x)
+                  // Inputs
+                  (fun x -> function | Parameter(grp,i) -> if (grp=grpIdx && idx=i) then Constant(LanguagePrimitives.GenericOne),x else Constant(LanguagePrimitives.GenericZero),x
+                                     | Variable(_,_) -> Constant(LanguagePrimitives.GenericZero),x
+                                     | Innovation(_,_) -> Constant(LanguagePrimitives.GenericZero),x)
                   >> fst // retrieve gradient
+                  <| g
 
     // Create an 'Array' of 'Graph's representing the gradient for 'Parameter's of a given group. 
-    let inline gradientForGroup grpIdx (x:Graph) = 
+    let inline gradientForGroup grpIdx (g:Graph<'T>) = 
         (countUnique >> Array.choose (function | Parameter(grp,idx) -> if grpIdx=grp then Some idx else None
                                                | _ -> None)
                      >> Array.item 0
-                     >> flip Array.init id) x
-                     |>  Array.map (fun i -> gradientForParameter grpIdx i x)
+                     >> flip Array.init id) g
+                     |>  Array.map (fun i -> gradientForParameter grpIdx i g)
 
-    let inline gradient graph = (Array.mapi gradientForGroup >> Array2D.ofArray) graph
+    let inline gradient (gs:Graph<'T>[]) = Array.mapi gradientForGroup >> Array2D.ofArray <| gs
 
 
 
