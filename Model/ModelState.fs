@@ -5,16 +5,16 @@ open FSharpPlus.Data
 open FSharpPlus.Math
 open ComputationalGraph
 open ComputationalGraph.GraphType
-open ComputationalGraph.GraphState
 open Timeseries
 open Timeseries.TimeseriesType
 open Timeseries.TimeseriesState
 open ModelType
 
+[<RequireQualifiedAccess>]
 module ModelState = 
 
-    let graphToMonad (gs:Graph<'T>[]) = Array.map Graph.toMonad >> State.traverseBack <| gs
-    let graphToMonad2D (gs:Graph<'T>[,])= Array2D.map Graph.toMonad >> State.traverseBack2D <| gs
+    let inline graphToMonad (gs:Graph<'T>[]) = Array.map Graph.toMonad >> State.traverseBack <| gs
+    let inline graphToMonad2D (gs:Graph<'T>[,])= Array2D.map Graph.toMonad >> State.traverseBack2D <| gs
 
     // Get the Graph, Timeseries or Innovation State from the 'State' Model.
     let inline getGraphState (S(gs,_)) = gs                            : GraphType.S<'T>

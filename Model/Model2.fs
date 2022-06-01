@@ -8,11 +8,9 @@ open Timeseries
 open Timeseries.TimeseriesState
 open Timeseries.TimeseriesType
 open ModelType
-open ModelState
 
 [<RequireQualifiedAccess>]
 module Model = 
-
 
     [<RequireQualifiedAccess>]
     module ModelTimeseries =
@@ -43,7 +41,7 @@ module Model =
             | ErrorModel(inner,errType) -> let err i = (Graph.shift Variable 1) >> (-) (Input(Variable(i,0))) 
                                            (create >> Array.mapi err >> errorGraph errType) inner
         
-    let create (m:DGP) = 
+    let inline create (m:DGP<'T>) = 
         let tmp = ModelGraph.create m
         { Model=m; Graphs=tmp; GraphMonad=ModelState.graphToMonad tmp; 
         GraphGradient=ModelState.graphToMonad2D (Graph.gradient tmp);
@@ -52,9 +50,10 @@ module Model =
     // Sample an 'Array' from a multivariate normal
     let randomNormalInnovations cholesky N () = Utils.randomNormalVector N cholesky |> (Array.map Array.singleton >> array2D)
 
-    let sample n (m:Model) = 
+    // Huge number of type constraints since using cholesky and random draws
+    let inline sample n (m:Model<'T>) = 
         if (Model.covariance m) <> None then 
-            let ts = TS.zeroCreateOption (Model.crossSection m) n 
+            let ts = TS.zeroCreate (Model.crossSection m) n 
             let defaultState = Model.defaultState ts m
 
             let newInnovFunc = randomNormalInnovations (Model.cholesky m) (Model.crossSection m)
@@ -65,16 +64,16 @@ module Model =
 
     // Fit the model with the given optimizer.
     // Output the final fitted model and optimizer along with original 'TS' and in-sample errors 'TS'. 
-    let fit (opt:Optimisation.Optimizer) (errorType:ErrorType) (epochs:int) (m:Model) (ts:TS<float32 option>) = 
-        if Model.crossSection m = TS<float32 option>.size ts then
+    let inline fit (opt:Optimisation.Optimizer<'T>) (errorType:ErrorType<'T>) (epochs:int) (m:Model<'T>) (ts:TS<'T>) = 
+        if Model.crossSection m = TS.size ts then
             let errModel = create (ErrorModel(m.Model,errorType)) 
             let fittedParameters = Optimisation.fit errModel opt epochs ts
                                         |> (Optimisation.getModelState >> ModelState.getGraphState >> GraphState.getParameters) 
             Model.setParameters fittedParameters m, opt, errorType, ts
         else invalidArg "TS" "Timeseries cross-section dimension doesnt match given model cross-section dimension."
         
-    let predict (m:Model) = flip Model.defaultState m >> State.eval (ModelState.predict m) 
-    let multiPredict (m:Model) (steps:int) = flip Model.defaultState m >> State.eval (ModelState.multiPredict steps m) 
+    let inline predict (m:Model<'T>) = flip Model.defaultState m >> State.eval (ModelState.predict m) 
+    let inline multiPredict (m:Model<'T>) (steps:int) = flip Model.defaultState m >> State.eval (ModelState.multiPredict steps m) 
         
         
         

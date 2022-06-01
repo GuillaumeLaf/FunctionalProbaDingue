@@ -4,6 +4,7 @@ open FSharpPlus
 open FSharpPlus.Data
 open GraphType
 
+[<RequireQualifiedAccess>]
 module GraphState = 
     
     // Extract the whole array of the 'S' type.

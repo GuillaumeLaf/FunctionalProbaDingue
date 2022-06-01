@@ -7,23 +7,26 @@ module Utils
 (*    let mapTuple f (x,y) = (f x, f y)*)
     
     // This function unbox Option types unsafely - i.e. Option.get
-    let randomNormalVector length lowerCholesky = ( * ) (Matrix<float32>.Build.DenseOfArray(lowerCholesky))
+    let randomNormalVector2 length lowerCholesky = ( * ) (Matrix<float32>.Build.DenseOfArray(lowerCholesky))
                                                         (Vector<float32>.Build.Random(length, new Normal())) |> Vector.toArray
 
+    let randomNormalVector length lowerCholesky = ( * ) (Matrix<'T>.Build.DenseOfArray(lowerCholesky))
+                                                        (Vector<'T>.Build.Random(length, new Normal())) |> Vector.toArray
+
     // https://rosettacode.org/wiki/Cholesky_decomposition#F.23
-    let cholesky a =
-        let calc (a: float32[,]) (l: float32[,]) i j =
-            let c1 j =
+    let inline cholesky (a:'T[,]) =
+        let inline calc (a: 'T[,]) (l: 'T[,]) i j =
+            let inline c1 j =
                 let sum = List.sumBy (fun k -> l.[j, k] * l.[j, k]) [0..j - 1]
                 sqrt (a.[j, j] - sum)
-            let c2 i j = 
+            let inline c2 i j = 
                 let sum = List.sumBy (fun k -> l.[i, k] * l.[j, k]) [0..j - 1]
-                (1.0f / l.[j, j]) * (a.[i, j] - sum)
-            if j > i then 0.0f else
+                (LanguagePrimitives.GenericOne / l.[j, j]) * (a.[i, j] - sum)
+            if j > i then LanguagePrimitives.GenericZero else
                 if i = j
                 then c1 j
                 else c2 i j
-        let l = Array2D.zeroCreate (Array2D.length1 a) (Array2D.length2 a)
+        let l = Array2D.zeroCreate<'T> (Array2D.length1 a) (Array2D.length2 a)
         Array2D.iteri (fun i j _ -> l.[i, j] <- calc a l i j) l
         l
 

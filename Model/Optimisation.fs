@@ -3,62 +3,63 @@
 open FSharpPlus
 open FSharpPlus.Data
 open ModelType
-open ModelState
+open ComputationalGraph
 open ComputationalGraph.GraphType
-open ComputationalGraph.GraphState
 open Timeseries.TimeseriesType
 open Timeseries.TimeseriesState
 
 [<RequireQualifiedAccess>]
 module Optimizers = 
     
-    type Classic = 
-        { LearningRate:float32 }
-        static member create rate = { LearningRate=rate }
+    type Classic<'T> = 
+        { LearningRate:'T }
+        static member inline create (rate:'T) = { LearningRate=rate }
 
     // 'MomentumValue' array dim. must match the number of parameters in the model.
     // Each parameter will have its 'MomentumValue'.
-    type Momentum = 
-        { LearningRate:float32; MomentumRate:float32; MomentumValue:float32[,] }
-        static member create learn mom (i,j) = { LearningRate=learn; MomentumRate=mom; MomentumValue=Array2D.zeroCreate i j }
+    type Momentum<'T> = 
+        { LearningRate:'T; MomentumRate:'T; MomentumValue:'T[,] }
+        static member inline create (learn:'T) (mom:'T) (i,j) = { LearningRate=learn; MomentumRate=mom; MomentumValue=Array2D.zeroCreate<'T> i j }
 
     [<RequireQualifiedAccess>]
-    type State = 
-        | Classic of Classic
-        | Momentum of Momentum
+    type OptimizerState<'T> = 
+        | Classic of Classic<'T>
+        | Momentum of Momentum<'T>
 
-    let update (parameters:float32 option[,]) (gradient:float32 option[,]) = function
-        | State.Classic(opt) as x -> x, Array2D.map2 (fun p g -> Option.map2 (-) p (( * ) opt.LearningRate <!> g)) parameters gradient
-        | State.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> - opt.MomentumRate*mom - opt.LearningRate*(Option.defaultValue 0f g) ) opt.MomentumValue gradient
-                                 State.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 ((+) >> (<!>)) newMomentum parameters 
+    let inline update (parameters:'T[,]) (gradient:'T[,]) (s:OptimizerState<'T>) = 
+        match s with
+        | OptimizerState.Classic(opt) as x -> x, Array2D.map2 (fun p g -> p - opt.LearningRate * g) parameters gradient
+        | OptimizerState.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> opt.MomentumRate*mom + opt.LearningRate * g ) opt.MomentumValue gradient
+                                          OptimizerState<'T>.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 (-) parameters newMomentum 
 
 
 module Optimisation = 
     
     // Optimizer.Method keeps tracks of the updated momentum values. 
-    type S = S of ModelType.S * Optimizers.State
+    type S<'T when 'T : (static member Zero : 'T)> = S of ModelType.S<'T> * Optimizers.OptimizerState<'T>
 
     [<RequireQualifiedAccess>]
-    type Optimizer = 
-        | Classic of learnRate:float32
-        | Momentum of learnRate:float32 * momentumRate:float32
-        static member convert m = function
-            | Classic(r) -> Optimizers.Classic.create r |> Optimizers.State.Classic
-            | Momentum(r,mom) -> Model.parameterShape m |> Optimizers.Momentum.create r mom |> Optimizers.State.Momentum
+    type Optimizer<'T when 'T : (static member Zero : 'T)> = 
+        | Classic of learnRate:'T
+        | Momentum of learnRate:'T * momentumRate:'T
+        static member inline convert (m:Model<'T>) (opt:Optimizer<'T>) = 
+            match opt with
+            | Classic(r) -> Optimizers.Classic.create r |> Optimizers.OptimizerState.Classic
+            | Momentum(r,mom) -> Model.parameterShape m |> Optimizers.Momentum.create r mom |> Optimizers.OptimizerState.Momentum
 
 
-    let getModelState (S(ms,_)) = ms 
-    let getOptimizerState (S(_,opt)) = opt
+    let inline getModelState (S(ms,_)) = ms 
+    let inline getOptimizerState (S(_,opt)) = opt
 
-    let modelState () = getModelState <!> State.get
-    let optimizerState () = getOptimizerState <!> State.get
+    let inline modelState () = getModelState <!> State.get
+    let inline optimizerState () = getOptimizerState <!> State.get
 
-    let evalM (modelM:State<ModelType.S,'a>) = State.eval modelM <!> modelState()
-    let modifyM modelM = State.exec modelM <!> modelState() >>= (fun newM -> State.modify (fun (S(_,oldMethod)) -> S(newM,oldMethod)))
+    let inline evalM (modelM:State<ModelType.S<'T>,'a>) = State.eval modelM <!> modelState()
+    let inline modifyM modelM = State.exec modelM <!> modelState() >>= (fun newM -> State.modify (fun (S(_,oldMethod)) -> S(newM,oldMethod)))
 
     // Fit the model with the given optimizer.
     // Model should already contain the data and be a kind of 'ErrorModel'. 
-    let fit (errModel:Model) (opt:Optimizer) (epochs:int) (ts:TS<float32 option>) =
+    let inline fit (errModel:Model<'T>) (opt:Optimizer<'T>) (epochs:int) (ts:TS<'T>) =
         let initStateOptimizer = Optimizer.convert errModel opt
         let initStateModel = Model.defaultEmptyState ts errModel
         let initState = S(initStateModel, initStateOptimizer)
@@ -66,7 +67,7 @@ module Optimisation =
         // Updating of the parameters during optimization according to the chosen Optimizer.
         // Will compute the gradient at the current timestep. 
         let updateParameters = monad {
-            let! p = (ModelState.evalG >> evalM) ComputationalGraph.GraphState.parametersM
+            let! p = (ModelState.evalG >> evalM) (GraphState.parametersM())
             let! gradients = (ModelState.evalG >> evalM) errModel.GraphGradient
             let! newOpt, newParams = Optimizers.update p gradients <!> optimizerState()
             do! State.modify (fun (S(ms,_)) -> S(ms,newOpt))
