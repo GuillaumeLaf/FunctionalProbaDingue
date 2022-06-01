@@ -10,13 +10,6 @@
     let initialState = S((Array2D.ofArray >> Array2D.toOption) [|[|0f;1f;2f;3f|]|], Array2D.ofArray [|[| Some 0f|]|], Array2D.ofArray [|[|Some 0f|]|])
 
     [<Fact>]
-    // 'run'
-    let ``run graph and treat indices as data`` () = 
-        let result = Graph.run graph
-        let expected = 7f
-        Assert.Equal<float32>(expected, result)
-
-    [<Fact>]
     // 'ToMonad'
     let ``Create State monad with graph and runs it`` () = 
         let m = Graph.toMonad graph

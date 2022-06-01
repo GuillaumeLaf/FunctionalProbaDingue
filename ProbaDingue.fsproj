@@ -45,19 +45,19 @@
 	<Compile Include="TimeSeries\Plot.fs" />
 	<Compile Include="Model\ModelType.fs" />
 	<Compile Include="Model\DGP.fs" />
-	<Compile Include="Model\Model.fs" />
+	<Compile Include="Model\ModelOps.fs" />
 	<Compile Include="Model\ModelState.fs" />
 	<Compile Include="Model\Optimisation.fs" />
-	<Compile Include="Model\Model2.fs" />
+	<Compile Include="Model\Model.fs" />
 	<Compile Include="Model\Model_Selection\CrossValidation.fs" />
 	<Compile Include="Trading\TradingTypes.fs" />
 	<Compile Include="Trading\OpenStrategy.fs" />
 	<Compile Include="Trading\CloseStrategy.fs" />
-	<Compile Include="UnitTests\UtilsTest.fs" />
+	<!--<Compile Include="UnitTests\UtilsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\StatisticsTest.fs" />
 	<Compile Include="UnitTests\TimeSeriesTest\TimeSeriesTest.fs" />
 	<Compile Include="UnitTests\ComputationalGraphTest\GraphTest.fs" />
-	<Compile Include="UnitTests\ComputationalGraphTest\NodeTest.fs" />
+	<Compile Include="UnitTests\ComputationalGraphTest\NodeTest.fs" />-->
     <Compile Include="Main.fs" />
     <None Include="MainScript.fsx" />
   </ItemGroup>

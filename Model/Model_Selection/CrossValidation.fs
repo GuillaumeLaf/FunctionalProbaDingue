@@ -4,8 +4,6 @@ open Timeseries
 open TimeseriesType
 open Models
 open ModelType
-open ModelState
-open Model
 open FSharpPlus
 open FSharpPlus.Data
 
@@ -32,24 +30,24 @@ module CrossValidation =
                                                         |> Seq.choose (fun x -> if ((fst >> snd) x - foldLength+1) % foldLength = 0 then Some x else None)
 
     // Get the splitted timeseries
-    let split foldType kFold overlap (ts:TS<'T>) = 
+    let inline split foldType kFold overlap (ts:TS<'T>) = 
         let foldLength = ts.Length / kFold
         match foldType with
         | Fixed -> _fixedSplit foldLength overlap
         | Rolling -> _rollingSplit foldLength overlap
-        |> Seq.map ( fun ((train1,train2),(test1,test2)) -> (TS<'T>.sub train1 train2 ts, TS<'T>.sub test1 test2 ts) )
+        |> Seq.map ( fun ((train1,train2),(test1,test2)) -> (TS.sub train1 train2 ts, TS.sub test1 test2 ts) )
         |> Seq.take (kFold-1)
         
     
     // Compute the out-of-sample errors aggregated over the folds
-    let errors foldType kFold optimizationFunc (ts:TS<float32 option>) m = 
-        let overlap = Model.maxLag m
+    let inline errors foldType kFold optimizationFunc (ts:TS<'T>) m = 
+        let overlap = ModelOps.maxLag m
         split foldType kFold overlap ts
             |> Seq.map (fun (trainTS,testTS) -> let fittedModel,_,_,_ = optimizationFunc m trainTS
-                                                (ModelState.predictForAll fittedModel) </State.eval/> (Model.defaultState testTS fittedModel) 
-                                                |> ((-) |> Option.map2 |> Array2D.map2) <| testTS.Data)
-            |> Seq.map (Array2D.collectByRow (Array.skip overlap >> Stats.Computations.sum (flip ( ** ) 2f)))
-            |> Seq.fold (Array.map2 (+)) ((Model.crossSection >> Array.zeroCreate) m)
+                                                (ModelState.predictForAll fittedModel) </State.eval/> (ModelOps.defaultState testTS fittedModel) 
+                                                |> Array2D.map2 (-) <| testTS.Data)
+            |> Seq.map (Array2D.collectByRow (Array.skip overlap >> Stats.Computations.sum (flip ( ** ) (LanguagePrimitives.GenericOne+LanguagePrimitives.GenericOne))))
+            |> Seq.fold (Array.map2 (+)) ((ModelOps.crossSection >> Array.zeroCreate) m)
     
         
 

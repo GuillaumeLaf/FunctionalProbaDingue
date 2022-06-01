@@ -29,14 +29,14 @@ let main argv =
 (*    let g = Input(Parameter(0,0)) + Input(Parameter(0,1)) * (Input(Parameter(0,1))*Input(Parameter(0,2)) + Input(Parameter(1,2)))
     printfn "%A" (Graph.collectInputs g)*)
 
-    let dgp = VAR({n=2; order=1; parameters=Some([|(Array2D.ofArray >> Array2D.toOption) [|[|0.7f;-0.2f|];[|0.1f;-0.5f|]|]|]); covariance=Some(Array2D.ofArray [|[|1.0f;0.0f|];[|0.0f;1.0f|]|])})
+    let dgp = VAR({n=2; order=1; parameters=Some([| array2D [|[|0.7f;-0.2f|];[|0.1f;-0.5f|]|]|]); covariance=Some(array2D [|[|1.0f;0.0f|];[|0.0f;1.0f|]|])})
     let m = Model.create dgp
     let m, sample, _ = Model.sample 1000 m
 
-    printfn "%A" sample
+    //printfn "%A" sample
 
     //let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) (L2Regu(0.2f)) 5
-    let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) SquaredError 25
+    let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) SquaredError 100
 
     let OOSerrors = CrossValidation.errors (CrossValidation.Rolling) 5 fitFunc sample m
     printfn "%A" OOSerrors

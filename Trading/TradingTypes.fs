@@ -70,11 +70,15 @@ module TradingTypes =
     // Parametric -> use of an econometric model for the 'TS'
     // NonParametric -> use general methods to trade (moving average, bollinger bands, ...)
     type PriceAction = 
-        | Parametric of ModelType.S 
-        | NonParametric of (int*TimeseriesType.TS<float32 option>)
+        | Parametric of ModelType.S<float32> 
+        | NonParametric of (int*TimeseriesType.TS<float32>)
 
-    type Trades = Trades of int
-    type Equity = Equity of float32
+    type Trades = Trades of int with
+        static member inline get_Zero () = Trades(0) 
+
+
+    type Equity = Equity of float32 with
+        static member inline get_Zero() = Equity(0.0f)
 
     type History = History of TimeseriesType.TS<Trades> * TimeseriesType.TS<Equity>
 

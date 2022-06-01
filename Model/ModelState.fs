@@ -82,7 +82,7 @@ module ModelState =
     // Monad value contains the array of predictions.
     let inline multiPredictFor (idx:int) (steps:int) (m:Model< 'T >) = 
         monad {
-            let maxL = Model.maxLag m
+            let maxL = ModelOps.maxLag m
             do! modifyT (TimeseriesState.setTime idx)
 
             let! lags = evalT (TimeseriesState.multipleLagElements maxL) 

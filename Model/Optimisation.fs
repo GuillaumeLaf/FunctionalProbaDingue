@@ -45,7 +45,7 @@ module Optimisation =
         static member inline convert (m:Model<'T>) (opt:Optimizer<'T>) = 
             match opt with
             | Classic(r) -> Optimizers.Classic.create r |> Optimizers.OptimizerState.Classic
-            | Momentum(r,mom) -> Model.parameterShape m |> Optimizers.Momentum.create r mom |> Optimizers.OptimizerState.Momentum
+            | Momentum(r,mom) -> ModelOps.parameterShape m |> Optimizers.Momentum.create r mom |> Optimizers.OptimizerState.Momentum
 
 
     let inline getModelState (S(ms,_)) = ms 
@@ -61,7 +61,7 @@ module Optimisation =
     // Model should already contain the data and be a kind of 'ErrorModel'. 
     let inline fit (errModel:Model<'T>) (opt:Optimizer<'T>) (epochs:int) (ts:TS<'T>) =
         let initStateOptimizer = Optimizer.convert errModel opt
-        let initStateModel = Model.defaultEmptyState ts errModel
+        let initStateModel = ModelOps.defaultEmptyState ts errModel
         let initState = S(initStateModel, initStateOptimizer)
 
         // Updating of the parameters during optimization according to the chosen Optimizer.
