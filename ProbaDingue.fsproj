@@ -45,9 +45,10 @@
 	<Compile Include="TimeSeries\Plot.fs" />
 	<Compile Include="Model\ModelType.fs" />
 	<Compile Include="Model\DGP.fs" />
+	<Compile Include="Model\Model.fs" />
 	<Compile Include="Model\ModelState.fs" />
 	<Compile Include="Model\Optimisation.fs" />
-	<Compile Include="Model\Model.fs" />
+	<Compile Include="Model\Model2.fs" />
 	<Compile Include="Model\Model_Selection\CrossValidation.fs" />
 	<Compile Include="Trading\TradingTypes.fs" />
 	<Compile Include="Trading\OpenStrategy.fs" />
