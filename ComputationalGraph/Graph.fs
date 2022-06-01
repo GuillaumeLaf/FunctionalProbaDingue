@@ -18,6 +18,7 @@ module Graph =
 
     // Check equality between two graphs.
     // Graphs are considered equal if all their nodes are equal and in the same order
+    // [TESTED]
     let equal g1 g2 = 
         let opCont l1 r1 l2 r2 f : Cont<'a,bool> = monad { let! xl = f l1 l2
                                                            let! xr = f r1 r2
@@ -58,6 +59,7 @@ module Graph =
         cataFoldX (fun _ -> constF) (fun _ -> polyF) (fun _ -> addF) (fun _ -> subF) (fun _ -> multF) (fun _ -> inputF)
 
     // Collect in an array all the subgraphs from the graph 'x'
+    // [TESTED]
     let collectSubGraphs (x:Graph<'T>) = 
         cataFoldX (fun x _ acc -> x::acc)
                   (fun x g _ acc -> x::(g acc))
@@ -95,9 +97,11 @@ module Graph =
         >> Array.sortBy (function | Parameter(grpidx,_) | Variable(grpidx,_) | Innovation(grpidx,_) -> grpidx)
 
     // Count the 'BasicInput's contained in the 'Graph' as an array.
+    // [TESTED]
     let count (g:Graph<'T>) = collectInputs >> countInputByGroup <| g
         
     // Count the UNIQUE 'BasicInput's contained in the 'Graph' as an array.
+    // [TESTED]
     let countUnique (g:Graph<'T>) = collectInputs >> Array.countBy id >> Array.map fst >> countInputByGroup <| g
 
     let countGroups (g:Graph<'T>) = count >> Array.collect (function | Parameter(grp,_) -> [|grp|]
@@ -134,6 +138,7 @@ module Graph =
     // However, for speedy computations Monads may not be the best option.
     // In the far end, one should create a compiler with faster than light compiled Monad operations.
     // But for now, I trust 'FSharpPlus' to efficiently compile my Monads.
+    // [TESTED]
     let inline toMonad (g:Graph<'T>) = 
         let rec loop g : ContT<State<S<'T>,'b>,'T> = monad {
             match g with

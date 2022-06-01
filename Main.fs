@@ -36,7 +36,10 @@ let main argv =
     //printfn "%A" sample
 
     //let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) (L2Regu(0.2f)) 5
-    let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) SquaredError 100
+    // let fitFunc = Model.fit (Optimisation.Optimizer.Momentum(0.005f, 0.9f)) SquaredError 100
+    
+    let fitFunc = Model.fit (Optimisation.Optimizer.Classic(0.005f)) SquaredError 100
+    
 
     let OOSerrors = CrossValidation.errors (CrossValidation.Rolling) 5 fitFunc sample m
     printfn "%A" OOSerrors

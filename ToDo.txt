@@ -4,12 +4,13 @@ To Do or Ideas :
 
 1) Add specific type for Hyperparameters (?)
 	answer : no, hyperparameters must all be included in 'DGP'.
+
 2) Bayes hyperparameter tuning vs GridSearch vs PSO
 
-3) (Multistep) predictions and prediction standard errors. 
+3) (Multistep) predictions [DONE] and prediction standard errors. 
 
-4) Create a monad which saves the current state, does the computation and then reinit the state with the saved one ("state forgetting")
-
+4) [DONE] Create a monad which saves the current state, does the computation and then reinit the state with the saved one ("state forgetting")
+	
 5) Create a monad which modifiy the current state and return the result of the argument monad (instead of 'unit').
 
 6) GPU programming : https://github.com/Sergio0694/ComputeSharp

@@ -29,9 +29,8 @@ module Optimizers =
     let inline update (parameters:'T[,]) (gradient:'T[,]) (s:OptimizerState<'T>) = 
         match s with
         | OptimizerState.Classic(opt) as x -> x, Array2D.map2 (fun p g -> p - opt.LearningRate * g) parameters gradient
-        | OptimizerState.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> opt.MomentumRate*mom + opt.LearningRate * g ) opt.MomentumValue gradient
-                                          OptimizerState<'T>.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 (-) parameters newMomentum 
-
+        | OptimizerState.Momentum(opt) -> let newMomentum = Array2D.map2 (fun mom g -> opt.MomentumRate * mom + opt.LearningRate * g ) opt.MomentumValue gradient
+                                          OptimizerState<'T>.Momentum({ opt with MomentumValue=newMomentum }), Array2D.map2 (-) parameters newMomentum
 
 module Optimisation = 
     

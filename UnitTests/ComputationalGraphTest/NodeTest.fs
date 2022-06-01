@@ -96,10 +96,10 @@
     let ``Univariate Linear Combinaison`` () = 
         let actual = Node.linearCombinaison 0 1 2
         let expected = Input(Parameter(0,1))*Input(Variable(0,1))+Input(Parameter(0,2))*Input(Variable(0,2))
-        Assert.Equal<Graph>(expected, actual)
+        Assert.Equal<Graph<obj>>(expected, actual)
     
     [<Fact>]
     let ``Multivariate Linear Combinaison`` () = 
         let actual = Node.multivariateLinearCombinaison 1 2 1
         let expected = [|Input(Parameter(0,0))*Input(Variable(0,1))+Input(Parameter(0,1))*Input(Variable(0,2))|]
-        Assert.Equal<Graph[]>(expected, actual)
+        Assert.Equal<Graph<obj>[]>(expected, actual)
