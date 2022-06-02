@@ -104,11 +104,14 @@ module Graph =
     // [TESTED]
     let countUnique (g:Graph<'T>) = collectInputs >> Array.countBy id >> Array.map fst >> countInputByGroup <| g
 
+    // Get an array with each unique group indices
+    // [TESTED]
     let countGroups (g:Graph<'T>) = count >> Array.collect (function | Parameter(grp,_) -> [|grp|]
                                                                      | Variable(grp,_) -> [|grp|]
                                                                      | Innovation(grp,_) -> [|grp|]) >> Array.sort <| g
         
     // Change the 'Group Index' of some 'BasicInput' from 'oldGrp' to 'newGrp'.
+    // [TESTED]
     let changeGroup (oldGrp:int) (newGrp:int) (g:Graph<'T>) =
         cataFold (fun v -> Constant(v))
                  (fun g e -> Polynomial(g,e))
@@ -120,6 +123,10 @@ module Graph =
                            | Innovation(grpidx,idx) as x -> if grpidx=oldGrp then Input(Innovation(newGrp,idx)) else Input(x))
                  g
 
+    // Shift the individual index of a given 'BasicInput' ('t') by 'i'.
+    // All groups are shifted.
+    // e.g. Parameter(_,1) - > Parameter(_, 3) if 'i' is 2 and 't' is 'Parameter'
+    // [TESTED]
     let shift (t:int*int->BasicInput) i (g:Graph<'T>) = 
         cataFoldX (fun x _ -> x)
                   (fun _ -> ( ** ))
@@ -158,17 +165,28 @@ module Graph =
 
     // Get the default 'S' for a given graph.
     // This function makes sure to not take 'BasicInput's with same indices twice.
+    // [COSTLY]
+    // [TESTED]
     let defaultState (g:Graph<'T>) = 
         collectInputs
-          >> Array.groupBy (function | Parameter(_,_) -> 0 | Variable(_,_) -> 1 | Innovation(_,_) -> 2)
-          >> Array.sortBy fst
-          >> Array.map (snd >> Array.groupBy(function | Parameter(grp,_) -> grp 
+          // Make sure at least 1 BasicInput is present (group and indiv. idx should never be negative)
+          >> flip Array.append [|Parameter(-1,-1);Variable(-1,-1);Innovation(-1,-1)|] 
+          // Group same BasicInput (regardless of grp)
+          >> Array.groupBy (function | Parameter(_,_) -> 0 | Variable(_,_) -> 1 | Innovation(_,_) -> 2) 
+          // Sort array of 'Parameters' then 'Variable' then 'Innovation'
+          >> Array.sortBy fst   
+          >> Array.map (snd // Inside each BasicInput array, create subgroup
+                            >> Array.groupBy(function | Parameter(grp,_) -> grp 
                                                       | Variable(grp,_) -> grp 
                                                       | Innovation(grp,_) -> grp) 
-                            >> Array.map (snd >> Array.distinct >> Array.length >> Array.zeroCreate)
-                            >> Utils.Array2D.ofArray)
+                            // Sort by group index (to have grp '-1' first) and get rid of the grp '-1'
+                            >> Array.sortBy fst >> Array.tail
+                            // make sure we don't take same BasicInput twice and replace each by an array of zeros
+                            >> Array.map (snd >> Array.distinct >> Array.length >> Array.zeroCreate) 
+                            // convert to 'Array2D'
+                            >> array2D)
           >> (fun a -> S(a.[0],a.[1],a.[2])) <| g
-
+                        
           
     let inline (|Constant0|Constant1|Other|) (g:Graph<'T>) = 
         match g with

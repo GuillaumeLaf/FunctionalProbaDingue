@@ -1,4 +1,6 @@
-﻿module NodeTest
+﻿namespace GraphTest
+
+module Node =
     open Xunit
     open ComputationalGraph
     open ComputationalGraph.GraphType
