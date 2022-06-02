@@ -46,3 +46,12 @@ module TS =
     let inline modifyAtTime t values (ts:TS< 'T >) = if (0 <= t || t < ts.Length) then { ts with Data= Utils.Array2D.setColumn t values ts.Data} else invalidArg "Index" "Time index greater than length of Timeseries."
 
 
+
+
+
+
+
+
+
+
+

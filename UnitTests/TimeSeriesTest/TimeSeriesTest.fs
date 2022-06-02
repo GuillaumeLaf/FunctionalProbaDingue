@@ -8,27 +8,27 @@ module TS =
     open FSharpPlus
 
     let ts = Array2D.init 2 3 (fun i j -> i*3 + j) |> TS.create
-    let initialState : (int * TS<int>) = (1,ts) 
 
     [<Fact>]
-    let ``dataDefault`` () = Assert.Equal<int[,]>(array2D [|[|0;1;2|];[|3;4;5|]|], TS.dataDefault ts) 
+    let ``dataDefault`` () = Assert.Equal<int[,]>(array2D [|[|0;0;0|];[|0;0;0|]|], TS.dataDefault ts) 
         
     [<Fact>]
     let ``pctLength`` () = Assert.Equal<int>(1, TS.pctLength 50f ts)
 
     [<Fact>]
-    let ``zeroCreate`` () = Assert.Equal<TS<int>>(array2D >> TS.create <| [|[|0;0;0|]; [|0;0;0|]|], TS.zeroCreate 2 3)
+    let ``zeroCreate`` () = Assert.Equal<int[,]>(array2D [|[|0;0;0|]; [|0;0;0|]|], TS.zeroCreate 2 3 |> TS.data)
 
     [<Fact>]
-    let ``sub`` () = Assert.Equal<TS<int>>((array2D >> TS.create) <| [|[|1;2|];[|4;5|]|], TS.sub 1 2 ts)
+    let ``sub`` () = Assert.Equal<int[,]>(array2D [|[|1;2|];[|4;5|]|], TS.sub 1 2 ts |> TS.data)
 
+    let timeValues:obj[] list = [ [|0;[|0;3|]|]; [|-1;[|0;0|]|]; [|3;[|0;0|]|] ]
     [<Theory>]
-    [<InlineData(0,[|0;3|])>]
-    let ``atTime`` (t:int) (expected:int[]) = 
+    [<MemberData(nameof(timeValues))>]
+    let ``atTime`` t expected = Assert.Equal<int[]>(expected, TS.atTime t ts)
         
 
 
-    [<Fact>]
+(*    [<Fact>]
     let ``Get current index`` () =  
         let expected = 1
         let actual = State.eval (TimeseriesState.currentTime) initialState
@@ -52,5 +52,5 @@ module TS =
         let m = monad { do! TimeseriesState.setTime 5
                         return! TimeseriesState.currentTime }
         let actual = State.eval m initialState
-        Assert.Equal<int>(expected,actual)
+        Assert.Equal<int>(expected,actual)*)
 
