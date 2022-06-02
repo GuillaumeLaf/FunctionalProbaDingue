@@ -104,13 +104,6 @@ module Utils
                 Array2D.init i j (fun m n -> array.[m*j+n])
             else invalidArg (nameof array) "Array cannot be casted into Array2D. The dimensions must exactly match."
 
-        // Fst : outer array
-        // Snd : inner array
-        let ofArray (array:'T[][]) = 
-            if (Array.concat >> Array.length) array % array.[0].Length = 0 then     
-                Array2D.init array.Length array.[0].Length (fun i j -> array.[i].[j])
-            else invalidArg "array" "Jagged array cannot be casted into Array2D. At least one inner array hasn't the right size."
-
         // Flatten the 'Array2D' by concatenating the rows into an 'Array'.
         let flatten (array:'T[,]) = Array.init (length array) (fun idx -> array.[(idx/Array2D.length2 array),(idx%Array2D.length2 array)])
 

@@ -1,13 +1,32 @@
-﻿module TimeSeriesTest
+﻿namespace TimeseriesTest
+
+module TS =
     open Xunit
     open Timeseries
     open Timeseries.TimeseriesType
-    open Timeseries.TimeseriesState
     open FSharpPlus.Data
     open FSharpPlus
 
-    let ts = Array2D.init 5 50 (fun i j -> i*50 + j |> (float32 >> Some)) |> TS.create
-    let initialState = (1,ts) : (int * TS<float32 option>)
+    let ts = Array2D.init 2 3 (fun i j -> i*3 + j) |> TS.create
+    let initialState : (int * TS<int>) = (1,ts) 
+
+    [<Fact>]
+    let ``dataDefault`` () = Assert.Equal<int[,]>(array2D [|[|0;1;2|];[|3;4;5|]|], TS.dataDefault ts) 
+        
+    [<Fact>]
+    let ``pctLength`` () = Assert.Equal<int>(1, TS.pctLength 50f ts)
+
+    [<Fact>]
+    let ``zeroCreate`` () = Assert.Equal<TS<int>>(array2D >> TS.create <| [|[|0;0;0|]; [|0;0;0|]|], TS.zeroCreate 2 3)
+
+    [<Fact>]
+    let ``sub`` () = Assert.Equal<TS<int>>((array2D >> TS.create) <| [|[|1;2|];[|4;5|]|], TS.sub 1 2 ts)
+
+    [<Theory>]
+    [<InlineData(0,[|0;3|])>]
+    let ``atTime`` (t:int) (expected:int[]) = 
+        
+
 
     [<Fact>]
     let ``Get current index`` () =  

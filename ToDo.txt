@@ -15,6 +15,7 @@ To Do or Ideas :
 
 6) GPU programming : https://github.com/Sergio0694/ComputeSharp
 
+7) Recursively simplify 'Graph'
 
 
 

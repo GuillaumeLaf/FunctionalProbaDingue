@@ -188,12 +188,14 @@ module Graph =
           >> (fun a -> S(a.[0],a.[1],a.[2])) <| g
                         
           
-    let inline (|Constant0|Constant1|Other|) (g:Graph<'T>) = 
+    let inline (|Constant0|Constant1|Constant_1|Other|) (g:Graph<'T>) = 
         match g with
         | Constant((c:'T)) when c = LanguagePrimitives.GenericZero -> Constant0
         | Constant((c:'T)) when c = LanguagePrimitives.GenericOne -> Constant1
+        | Constant((c:'T)) when c = -LanguagePrimitives.GenericOne -> Constant_1
         | _ -> Other
 
+    // Not tail-recursive !
     let inline simplify (g:Graph<'T>) = 
                   // Constant
         cataFoldX (fun x _ -> x)  
@@ -212,7 +214,7 @@ module Graph =
                                 | _ -> l + r)
                   // Substraction
                   (fun _ l r -> match l,r with
-                                | Constant0,_ -> Constant(-LanguagePrimitives.GenericOne) * r 
+                                | Constant0,_ -> Constant(-LanguagePrimitives.GenericOne) * r
                                 | _,Constant0 -> l
                                 | _ -> l - r)
                   // Multiplication
@@ -221,6 +223,8 @@ module Graph =
                                 | _,Constant0 -> Constant(LanguagePrimitives.GenericZero)
                                 | Constant1,_ -> r 
                                 | _,Constant1 -> l
+                                | Constant_1,Constant(x) -> Constant(-x)
+                                | Constant(x),Constant_1 -> Constant(-x)
                                 | _ -> l * r)
                   // Inputs
                   (fun x _ -> x)
@@ -247,7 +251,7 @@ module Graph =
                                      | Variable(_,_) -> Constant(LanguagePrimitives.GenericZero),x
                                      | Innovation(_,_) -> Constant(LanguagePrimitives.GenericZero),x)
                   >> fst // retrieve gradient
-                  <| g
+                  <| g |> simplify
 
     // Create an 'Array' of 'Graph's representing the gradient for 'Parameter's of a given group. 
     let inline gradientForGroup grpIdx (g:Graph<'T>) = 
@@ -257,7 +261,7 @@ module Graph =
                      >> flip Array.init id) g
                      |>  Array.map (fun i -> gradientForParameter grpIdx i g)
 
-    let inline gradient (gs:Graph<'T>[]) = Array.mapi gradientForGroup >> Array2D.ofArray <| gs
+    let inline gradient (gs:Graph<'T>[]) = Array.mapi gradientForGroup >> array2D <| gs
 
 
 

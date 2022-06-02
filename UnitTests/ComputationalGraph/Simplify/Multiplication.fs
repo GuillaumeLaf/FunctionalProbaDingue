@@ -34,3 +34,23 @@ module Multiplication =
         let expected = Input(Parameter(0,0))*Input(Variable(0,0))
         let actual = Graph.simplify graph
         Assert.Equal<Graph<int>>(expected, actual)
+
+    [<Fact>]
+    let ``Multiplication(-1,Constant(_))`` () =
+        let graph = Constant(-1) * Constant(2)
+        let expected = Constant(-2)
+        let actual = Graph.simplify graph
+        Assert.Equal<Graph<int>>(expected, actual)
+
+    [<Fact>]
+    let ``Multiplication(Constant(_),-1)`` () =
+        let graph = Constant(2) * Constant(-1)
+        let expected = Constant(-2)
+        let actual = Graph.simplify graph
+        Assert.Equal<Graph<int>>(expected, actual)
+
+
+
+
+
+
