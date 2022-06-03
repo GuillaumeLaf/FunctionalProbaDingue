@@ -60,8 +60,10 @@
 	<Compile Include="UnitTests\ComputationalGraph\Simplify\Addition.fs" />
 	<Compile Include="UnitTests\ComputationalGraph\Simplify\Substraction.fs" />
 	<Compile Include="UnitTests\ComputationalGraph\Simplify\Multiplication.fs" />
-	<Compile Include="UnitTests\TimeSeriesTest\TimeSeriesTest.fs" />
-	<!--<Compile Include="UnitTests\TimeSeriesTest\StatisticsTest.fs" />-->
+	<Compile Include="UnitTests\TimeSeriesTest\TS.fs" />
+	<Compile Include="UnitTests\TimeSeriesTest\TimeseriesState.fs" />
+	<Compile Include="UnitTests\TimeSeriesTest\Statistics.fs" />
+	<Compile Include="UnitTests\TimeSeriesTest\Transformations.fs" />
 	<Compile Include="UnitTests\ComputationalGraph\Gradient.fs" />
     <Compile Include="Main.fs" />
     <None Include="MainScript.fsx" />

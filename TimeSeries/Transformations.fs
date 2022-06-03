@@ -158,11 +158,11 @@ module Transformations =
                                                        ((( * ) -LanguagePrimitives.GenericOne >> Utils.fractionalDiffCoeffs >> Array.map) thresh ds) 
 
         let inline apply invf = Single.apply >> traverse <| invf
-    
+
     // Transfrom a timeseries, then save the transformation made in 'TS',
     // such that, the transformation reversible
     let inline forward (transforms:Transformation< 'T > list) (ts:TS< 'T >) = 
-        let inline apply loop ts xs m = State.eval m (0,ts) |> loop xs
+        let inline apply loop (ts:TS<'T>) (xs:Transformation< 'T > list) (m:State<int*TS<'T>,TS<'T>>):TS<'T> = State.eval m (0,ts) |> loop xs
         let rec loop remaining ts = 
             match remaining with
             | [] -> ts

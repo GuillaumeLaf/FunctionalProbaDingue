@@ -42,18 +42,18 @@ module TimeseriesState =
     let inline setCurrentElements e = State.modify (fun (idx,ts) -> (idx,TS.modifyAtTime idx e ts))      : State<(int * TS< 'T >),unit> 
 
     // Extract the cross-sections at a given lag (from the current time)
-    let inline lagElements lag = TS.atTime< 'T > <!> (flip (+) lag <!> currentTime()) <*> timeseries()
+    let inline lagElements lag = TS.atTime< 'T > <!> (flip (-) lag <!> currentTime()) <*> timeseries()
 
     // Extract the cross-sections at a given lead in the future (from the current time)
     let inline leadElements lead = lagElements (-lead)
 
     // Extract a subrange of the 'idxTS'th timeseries with the current element along with 'lags' numbers of previous elements.
-    let inline multipleLagElementsFor lags idxTS = Array.sub <!> (TS.get idxTS <!> timeseries()) <*> (flip ( - ) lags <!> currentTime()) <*> result (lags+1)
+    let inline multipleLagElementsFor nlags idxTS = Array.sub <!> (TS.get idxTS <!> timeseries()) <*> (flip ( - ) nlags <!> currentTime()) <*> result (nlags+1)
 
     // Extract a subrange with the current element along with 'lags' numbers of previous elements.
-    let inline multipleLagElements lags = 
+    let inline multipleLagElements nlags = 
         monad {
             let! (data:'T[,]) = TS.data <!> timeseries()
             let! current = currentTime()
-            return data.[*,current-lags..current]
+            return data.[*,current-nlags..current]
         }
